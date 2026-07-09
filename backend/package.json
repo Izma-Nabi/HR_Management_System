@@ -1,0 +1,39 @@
+{
+  "name": "bookme-hr-backend",
+  "version": "1.0.0",
+  "description": "Combined admin and employee backend for the HR Management System.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "check": "node --check src/server.js",
+    "prisma:generate": "node -r ../global/env ../node_modules/prisma/build/index.js generate --schema ../database/schema.prisma",
+    "prisma:migrate": "node -r ../global/env ../node_modules/prisma/build/index.js migrate dev --schema ../database/schema.prisma",
+    "prisma:studio": "node -r ../global/env ../node_modules/prisma/build/index.js studio --schema ../database/schema.prisma"
+  },
+  "prisma": {
+    "seed": "node ../database/seed.js"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "admin-auth",
+    "employee-auth",
+    "hrms"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

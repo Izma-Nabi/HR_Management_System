@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Global roles shared by admin and employee modules.
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  EMPLOYEE
+}
+
+// Global account status shared by all login-capable users.
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  // Global auth table.
+  // Admin accounts use role SUPER_ADMIN or ADMIN.
+  // Employee accounts use role EMPLOYEE and may have one employee profile.
+  id           Int        @id @default(autoincrement()) @db.UnsignedInt
+  fullName     String     @map("full_name") @db.VarChar(100)
+  email        String     @unique @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         Role       @default(EMPLOYEE)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Employee module relation.
+  employeeProfile EmployeeProfile?
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model EmployeeProfile {
+  // Employee-only profile data. Admin users do not have this row.
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  userId       Int       @unique @map("user_id") @db.UnsignedInt
+  employeeCode String    @unique @map("employee_code") @db.VarChar(50)
+  department   String    @db.VarChar(100)
+  designation  String?   @db.VarChar(100)
+  biometricId  String?   @map("biometric_id") @db.VarChar(100)
+  joiningDate  DateTime? @map("joining_date") @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("employee_profiles")
+}

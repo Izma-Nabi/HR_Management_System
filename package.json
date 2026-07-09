@@ -1,0 +1,22 @@
+{
+  "name": "bookme-pk",
+  "private": true,
+  "description": "Root-level database and global configuration tooling for Bookme.pk.",
+  "scripts": {
+    "prisma:generate": "node -r ./global/env ./node_modules/prisma/build/index.js generate --schema ./database/schema.prisma",
+    "prisma:migrate": "node -r ./global/env ./node_modules/prisma/build/index.js migrate dev --schema ./database/schema.prisma",
+    "prisma:studio": "node -r ./global/env ./node_modules/prisma/build/index.js studio --schema ./database/schema.prisma",
+    "prisma:seed": "node ./database/seed.js"
+  },
+  "prisma": {
+    "seed": "node ./database/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3"
+  }
+}

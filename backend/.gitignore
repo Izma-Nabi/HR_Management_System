@@ -1,0 +1,18 @@
+# Dependency folder created by npm install.
+node_modules/
+
+# Local environment variables. Keep real secrets out of Git.
+.env
+
+# Runtime logs.
+logs/
+*.log
+npm-debug.log*
+
+# Local downloaded SSL certificates for database connections.
+certs/*.pem
+
+# OS/editor files.
+.DS_Store
+Thumbs.db
+.vscode/

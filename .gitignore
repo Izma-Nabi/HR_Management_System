@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+global/.env
+backend/.env
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Local certificates
+backend/certs/*.pem
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
