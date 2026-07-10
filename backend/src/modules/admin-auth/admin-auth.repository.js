@@ -1,12 +1,17 @@
 const { prisma } = require("../../../../database/prisma");
 
-const adminRoles = ["SUPER_ADMIN", "ADMIN"];
+const adminRoles = ["SUPER ADMIN", "ADMIN"];
 
 const safeUserSelect = {
   id: true,
   fullName: true,
   email: true,
-  role: true,
+  role: {
+    select: {
+      id: true,
+      roleName: true
+    }
+  },
   status: true,
   createdAt: true,
   updatedAt: true
@@ -26,7 +31,7 @@ const toSafeUser = (user) => {
     id: user.id,
     fullName: user.fullName,
     email: user.email,
-    role: user.role,
+    role: user.role.roleName,
     status: user.status,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -47,20 +52,22 @@ const findAdminByEmail = async (email) => {
     where: {
       email,
       role: {
-        in: adminRoles
+        roleName: {
+          in: adminRoles
+        }
       }
     },
     select: userWithPasswordSelect
   });
 };
 
-const createAdmin = async ({ fullName, email, passwordHash, role }) => {
+const createAdmin = async ({ fullName, email, passwordHash, roleId }) => {
   return prisma.user.create({
     data: {
       fullName,
       email,
       passwordHash,
-      role,
+      roleId,
       status: "ACTIVE"
     },
     select: safeUserSelect

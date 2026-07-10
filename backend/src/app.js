@@ -4,7 +4,9 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const env = require("../../global/env");
 const adminAuthRoutes = require("./modules/admin-auth/admin-auth.routes");
+const userRoutes = require("./modules/users/user.routes");
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
+
 const {
   notFoundHandler,
   errorHandler
@@ -65,6 +67,7 @@ app.get("/health", (req, res) => {
 // These power the admin frontend. /api/auth keeps the old admin backend path,
 // while /api/admin/auth is the clearer combined-backend path.
 app.use("/api/auth", adminAuthRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 
 // Compatibility for the current admin frontend page that calls /api/api/auth.

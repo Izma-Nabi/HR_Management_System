@@ -3,7 +3,7 @@ const { comparePassword, hashPassword } = require("../../utils/password");
 const { signAccessToken } = require("../../utils/jwt");
 const adminAuthRepository = require("./admin-auth.repository");
 
-// Admin service: rules for SUPER_ADMIN and ADMIN accounts.
+// Admin service: rules for SUPER ADMIN and ADMIN accounts.
 
 const loginAdmin = async ({ email, password }) => {
   const user = await adminAuthRepository.findAdminByEmail(email);

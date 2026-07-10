@@ -65,41 +65,60 @@ model User {
   @@map("users")
 }
 
-model AdminProfile {
-  id         Int      @id @default(autoincrement()) @db.UnsignedInt
-  userId     Int      @unique @map("user_id") @db.UnsignedInt
+model Department {
+  id              Int      @id @default(autoincrement()) @db.UnsignedInt
+  departmentName  String   @unique @map("department_name") @db.VarChar(100)
+  description     String?  @db.VarChar(255)
 
-  firstName  String   @map("first_name") @db.VarChar(100)
-  lastName   String   @map("last_name") @db.VarChar(100)
-  phone      String?  @db.VarChar(20)
-  office     String?  @db.VarChar(100)
-  photo      String?  @db.VarChar(255)
+  employees       EmployeeProfile[]
 
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("admin_profiles")
+  @@map("departments")
 }
 
 model EmployeeProfile {
-  id            Int      @id @default(autoincrement()) @db.UnsignedInt
-  userId        Int      @unique @map("user_id") @db.UnsignedInt
+  id             Int       @id @default(autoincrement()) @db.UnsignedInt
+  userId         Int       @unique @map("user_id") @db.UnsignedInt
 
-  employeeCode  String   @unique @map("employee_code") @db.VarChar(50)
-  firstName     String   @map("first_name") @db.VarChar(100)
-  lastName      String   @map("last_name") @db.VarChar(100)
-  phone         String?  @db.VarChar(20)
-  address       String?  @db.VarChar(255)
-  department    String   @db.VarChar(100)
-  designation   String?  @db.VarChar(100)
-  joiningDate   DateTime? @map("joining_date") @db.Date
+  employeeCode   String    @unique @map("employee_code") @db.VarChar(50)
+  firstName      String    @map("first_name") @db.VarChar(100)
+  lastName       String    @map("last_name") @db.VarChar(100)
+  phone          String?   @db.VarChar(20)
+  address        String?   @db.VarChar(255)
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  departmentId   Int       @map("department_id") @db.UnsignedInt
+  department     Department @relation(fields: [departmentId], references: [id])
+
+  designation    String?   @db.VarChar(100)
+  joiningDate    DateTime? @map("joining_date") @db.Date
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([departmentId])
   @@map("employee_profiles")
+}
+
+model AdminProfile {
+
+  id Int @id @default(autoincrement()) 
+
+  userId Int @unique @map("user_id")
+
+  firstName String @map("first_name")
+  lastName String? @map("last_name")
+
+  phone String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(
+    fields:[userId],
+    references:[id],
+    onDelete: Cascade
+  )
+
+  @@map("admin_profiles")
 }

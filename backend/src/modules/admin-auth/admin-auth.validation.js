@@ -12,7 +12,7 @@ const loginSchema = Joi.object({
   })
 });
 
-// Admin signup creates ADMIN by default; SUPER_ADMIN is allowed for seed/setup.
+// Admin signup creates ADMIN by default; SUPER ADMIN is allowed for seed/setup.
 const signupSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100).required().messages({
     "string.empty": "Full name is required"
@@ -28,7 +28,7 @@ const signupSchema = Joi.object({
     "string.min": "Password must be at least 8 characters"
   }),
 
-  role: Joi.string().valid("SUPER_ADMIN", "ADMIN").default("ADMIN")
+  role: Joi.string().valid("SUPER ADMIN", "ADMIN").default("ADMIN")
 });
 
 module.exports = {
