@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const env = require("../../global/env");
 const adminAuthRoutes = require("./modules/admin-auth/admin-auth.routes");
 const userRoutes = require("./modules/users/user.routes");
+const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.routes");
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
 
 const {
@@ -46,6 +47,7 @@ app.get("/", (req, res) => {
     data: {
       health: "/health",
       adminLogin: "/api/auth/login",
+      adminEmployees: "/api/admin/employees",
       employeeLogin: "/api/v1/employee/auth/login"
     }
   });
@@ -75,6 +77,10 @@ app.use("/api/api/auth", adminAuthRoutes);
 
 // Compatibility for the old administrator signup route intent.
 app.use("/api/administrator", adminAuthRoutes);
+
+// Super Admin employee management routes.
+app.use("/api/admin/employees", adminEmployeesRoutes);
+app.use("/api/v1/admin/employees", adminEmployeesRoutes);
 
 // Employee routes.
 // These keep the employee frontend's existing /api/v1/employee/auth path.

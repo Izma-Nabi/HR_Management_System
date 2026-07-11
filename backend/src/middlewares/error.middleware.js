@@ -22,6 +22,18 @@ const normalizeDatabaseError = (error) => {
       return new ApiError(409, "Employee code is already registered");
     }
 
+    if (target.includes("employee_code")) {
+      return new ApiError(409, "Employee code is already registered");
+    }
+
+    if (target.includes("fingerprintId") || target.includes("fingerprint_id")) {
+      return new ApiError(409, "Fingerprint ID is already registered");
+    }
+
+    if (target.includes("userId") || target.includes("user_id")) {
+      return new ApiError(409, "Employee account is already linked to a user");
+    }
+
     return new ApiError(409, "Duplicate value already exists");
   }
 

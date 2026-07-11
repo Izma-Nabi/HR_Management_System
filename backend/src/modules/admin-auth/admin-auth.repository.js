@@ -1,4 +1,5 @@
 const { prisma } = require("../../../../database/prisma");
+const { roleNameCandidates, toRoleKey } = require("../../utils/roles");
 
 const adminRoles = ["SUPER ADMIN", "ADMIN"];
 
@@ -31,43 +32,73 @@ const toSafeUser = (user) => {
     id: user.id,
     fullName: user.fullName,
     email: user.email,
-    role: user.role.roleName,
+    role: toRoleKey(user.role),
     status: user.status,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
 };
 
+const toUserWithPassword = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...toSafeUser(user),
+    passwordHash: user.passwordHash
+  };
+};
+
 const findUserByEmail = async (email) => {
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: {
       email
     },
     select: safeUserSelect
   });
+
+  return toSafeUser(user);
 };
 
 const findAdminByEmail = async (email) => {
-  return prisma.user.findFirst({
+  const user = await prisma.user.findFirst({
     where: {
       email,
       role: {
         roleName: {
-          in: adminRoles
+          in: adminRoles.flatMap(roleNameCandidates)
         }
       }
     },
     select: userWithPasswordSelect
   });
+
+  return toUserWithPassword(user);
 };
 
-const createAdmin = async ({ fullName, email, passwordHash, roleId }) => {
+const createAdmin = async ({ fullName, email, passwordHash, role }) => {
+  const adminRole = await prisma.role.findFirst({
+    where: {
+      roleName: {
+        in: roleNameCandidates(role)
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!adminRole) {
+    throw new Error(`Role not found: ${role}`);
+  }
+
   return prisma.user.create({
     data: {
       fullName,
       email,
       passwordHash,
-      roleId,
+      roleId: adminRole.id,
       status: "ACTIVE"
     },
     select: safeUserSelect

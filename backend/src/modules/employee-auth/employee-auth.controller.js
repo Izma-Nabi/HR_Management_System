@@ -14,7 +14,7 @@ const login = asyncHandler(async (req, res) => {
 const me = asyncHandler(async (req, res) => {
   const result = await employeeAuthService.getCurrentEmployee(req.user.id);
 
-  return sendSuccess(res, 200, "Employee profile fetched successfully", result);
+  return sendSuccess(res, 200, "Employee fetched successfully", result);
 });
 
 const logout = asyncHandler(async (req, res) => {

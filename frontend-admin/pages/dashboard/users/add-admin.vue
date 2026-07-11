@@ -100,14 +100,6 @@
           />
         </div>
 
-        <div class="form-group">
-          <label>Joining Date</label>
-          <input
-            v-model="form.joiningDate"
-            type="date"
-          />
-        </div>
-
         <div class="form-group full">
           <label>Address</label>
           <textarea
@@ -163,7 +155,6 @@ const form = ref({
   phone:"",
   department:"",
   designation:"",
-  joiningDate:"",
   address:"",
   photo:null
 })
@@ -177,11 +168,15 @@ const config = useRuntimeConfig()
 const saveAdmin = async () => {
 
   try {
+    const token = localStorage.getItem("token")
 
     const response = await $fetch(
       `${config.public.apiBase}/users/admin`,
       {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
         body: {
           fullName: form.value.fullName,
           email: form.value.email,

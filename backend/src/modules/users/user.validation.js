@@ -60,15 +60,11 @@ const createEmployeeSchema = Joi.object({
 
   phone: Joi.string().allow("").optional(),
 
-  address: Joi.string().allow("").optional(),
-
   department: Joi.string().required().messages({
     "string.empty": "Department is required"
   }),
 
-  designation: Joi.string().allow("").optional(),
-
-  joiningDate: Joi.date().optional()
+  designation: Joi.string().allow("").optional()
 
 });
 

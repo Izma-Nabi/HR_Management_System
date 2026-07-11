@@ -2,28 +2,19 @@ const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
-
-const userController = require("./user.controller");
-
+const adminEmployeesController = require("./admin-employees.controller");
 const {
-  createAdminSchema,
   createEmployeeSchema
-} = require("./user.validation");
+} = require("./admin-employees.validation");
 
 const router = express.Router();
 
-router.use(authMiddleware, allowRoles("SUPER_ADMIN"));
-
 router.post(
-  "/admin",
-  validate(createAdminSchema),
-  userController.createAdmin
-);
-
-router.post(
-  "/employee",
+  "/",
+  authMiddleware,
+  allowRoles("SUPER_ADMIN"),
   validate(createEmployeeSchema),
-  userController.createEmployee
+  adminEmployeesController.createEmployee
 );
 
 module.exports = router;

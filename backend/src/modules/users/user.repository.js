@@ -1,4 +1,5 @@
 const { prisma } = require("../../../../database/prisma");
+const { roleNameCandidates } = require("../../utils/roles");
 
 const findUserByEmail = async (email) => {
   return prisma.user.findUnique({
@@ -9,7 +10,7 @@ const findUserByEmail = async (email) => {
 };
 
 const findEmployeeByCode = async (employeeCode) => {
-  return prisma.employeeProfile.findUnique({
+  return prisma.employee.findUnique({
     where: {
       employeeCode
     }
@@ -17,9 +18,11 @@ const findEmployeeByCode = async (employeeCode) => {
 };
 
 const findRoleByName = async (roleName) => {
-  return prisma.role.findUnique({
+  return prisma.role.findFirst({
     where: {
-      roleName
+      roleName: {
+        in: roleNameCandidates(roleName)
+      }
     }
   });
 };
@@ -42,9 +45,7 @@ const createAdmin = async (data) => {
         userId: user.id,
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
-        office: data.office,
-        photo: data.photo
+        phone: data.phone
       }
     });
 
@@ -66,18 +67,14 @@ const createEmployee = async (data) => {
       }
     });
 
-    await tx.employeeProfile.create({
+    await tx.employee.create({
       data: {
         userId: user.id,
         employeeCode: data.employeeCode,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        name: data.fullName,
         phone: data.phone,
-        address: data.address,
         department: data.department,
-        designation: data.designation,
-        joiningDate: data.joiningDate,
-        photo: data.photo
+        designation: data.designation
       }
     });
 

@@ -27,7 +27,7 @@ const loginEmployee = async ({ email, password }) => {
   const account = await employeeAuthRepository.findEmployeeAccountByUserId(user.id);
 
   if (!account) {
-    throw new ApiError(403, "Employee profile is not configured for this user");
+    throw new ApiError(403, "Employee record is not configured for this user");
   }
 
   const token = signAccessToken({
@@ -37,7 +37,7 @@ const loginEmployee = async ({ email, password }) => {
 
   return {
     user: account.user,
-    employeeProfile: account.employeeProfile,
+    employee: account.employee,
     token
   };
 };

@@ -9,7 +9,7 @@ const createAdmin = async (payload) => {
     throw new Error("Email already exists");
   }
 
-  const role = await repository.findRoleByName("Admin");
+  const role = await repository.findRoleByName("ADMIN");
 
   if (!role) {
     throw new Error("Admin role not found");
@@ -20,8 +20,7 @@ const createAdmin = async (payload) => {
   return repository.createAdmin({
     ...payload,
     passwordHash,
-    roleId: role.id,
-    photo: null
+    roleId: role.id
   });
 
 };
@@ -42,7 +41,7 @@ const createEmployee = async (payload) => {
     throw new Error("Employee code already exists");
   }
 
-  const role = await repository.findRoleByName("Employee");
+  const role = await repository.findRoleByName("EMPLOYEE");
 
   if (!role) {
     throw new Error("Employee role not found");
@@ -53,8 +52,7 @@ const createEmployee = async (payload) => {
   return repository.createEmployee({
     ...payload,
     passwordHash,
-    roleId: role.id,
-    photo: null
+    roleId: role.id
   });
 
 };
