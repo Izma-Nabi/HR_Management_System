@@ -115,6 +115,22 @@ const findEmployeeRole = async (dbClient = prisma) => {
   });
 };
 
+const listEmployeeAccounts = async () => {
+  const employees = await prisma.employeeProfile.findMany({
+    orderBy: [
+      {
+        firstName: "asc"
+      },
+      {
+        lastName: "asc"
+      }
+    ],
+    select: employeeAccountSelect
+  });
+
+  return employees.map(mapEmployeeAccount);
+};
+
 const createEmployeeAccount = async ({ user, employee }) => {
   const createdEmployee = await prisma.$transaction(
     async (tx) => {
@@ -166,5 +182,6 @@ const createEmployeeAccount = async ({ user, employee }) => {
 module.exports = {
   findUserByEmail,
   findDepartmentById,
+  listEmployeeAccounts,
   createEmployeeAccount
 };

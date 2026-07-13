@@ -10,6 +10,13 @@ const {
 
 const router = express.Router();
 
+router.get(
+  "/",
+  authMiddleware,
+  allowRoles("SUPER_ADMIN", "ADMIN"),
+  adminEmployeesController.listEmployees
+);
+
 router.post(
   "/",
   authMiddleware,

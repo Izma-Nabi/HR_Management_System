@@ -2,6 +2,10 @@ const { ApiError } = require("../../utils/apiResponse");
 const { hashPassword } = require("../../utils/password");
 const adminEmployeesRepository = require("./admin-employees.repository");
 
+const listEmployees = async () => {
+  return adminEmployeesRepository.listEmployeeAccounts();
+};
+
 const createEmployee = async (payload) => {
   const existingUser = await adminEmployeesRepository.findUserByEmail(payload.email);
 
@@ -55,5 +59,6 @@ const createEmployee = async (payload) => {
 };
 
 module.exports = {
+  listEmployees,
   createEmployee
 };
