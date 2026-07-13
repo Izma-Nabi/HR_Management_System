@@ -275,7 +275,7 @@ const saveEmployee = async () => {
         </button>
 
         <button class="primary-button" type="submit" :disabled="loading">
-          {{ loading ? "Creating..." : "Create Employee" }}
+          {{ loading ? "Creating..." : "Save" }}
         </button>
       </div>
     </form>
