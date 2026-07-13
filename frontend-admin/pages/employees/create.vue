@@ -12,23 +12,30 @@ type AdminUser = {
   status: string;
 };
 
+type Department = {
+  id: number;
+  departmentName: string;
+};
+
 const config = useRuntimeConfig();
 
 const defaultForm = () => ({
-  name: "",
-  employeeCode: "",
+  firstName: "",
+  lastName: "",
   email: "",
   password: "",
   phone: "",
-  department: "",
-  designation: "",
-  fingerprintId: "",
-  employmentStatus: "ACTIVE"
+  address: "",
+  photo: null as File | null,
+  departmentId: null as number | null,
+  designation: ""
 });
 
 const form = reactive(defaultForm());
 const token = ref("");
+const photoInputKey = ref(0);
 const adminUser = ref<AdminUser | null>(null);
+const departments = ref<Department[]>([]);
 const pageReady = ref(false);
 const accessDenied = ref(false);
 const loading = ref(false);
@@ -42,6 +49,16 @@ const fieldErrorMap = computed(() => {
     return errors;
   }, {});
 });
+
+const loadDepartments = async () => {
+  const response = await $fetch<{ data: Department[] }>(`${config.public.apiBase}/departments`, {
+    headers: {
+      Authorization: `Bearer ${token.value}`
+    }
+  });
+
+  departments.value = response.data;
+};
 
 onMounted(async () => {
   token.value = localStorage.getItem("token") || "";
@@ -62,6 +79,15 @@ onMounted(async () => {
   }
 
   accessDenied.value = adminUser.value?.role !== "SUPER_ADMIN";
+
+  if (!accessDenied.value) {
+    try {
+      await loadDepartments();
+    } catch {
+      departments.value = [];
+    }
+  }
+
   pageReady.value = true;
 });
 
@@ -69,6 +95,12 @@ const resetForm = () => {
   Object.assign(form, defaultForm());
   fieldErrors.value = [];
   errorMessage.value = "";
+  photoInputKey.value += 1;
+};
+
+const selectPhoto = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  form.photo = input.files?.[0] || null;
 };
 
 const logout = async () => {
@@ -84,12 +116,27 @@ const createEmployee = async () => {
   fieldErrors.value = [];
 
   try {
+    const body = new FormData();
+
+    body.append("firstName", form.firstName);
+    body.append("lastName", form.lastName);
+    body.append("email", form.email);
+    body.append("password", form.password);
+    body.append("phone", form.phone);
+    body.append("address", form.address);
+    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
+    body.append("designation", form.designation);
+
+    if (form.photo) {
+      body.append("photo", form.photo);
+    }
+
     const response = await $fetch<{ message: string }>(`${config.public.apiBase}/admin/employees`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token.value}`
       },
-      body: form
+      body
     });
 
     successMessage.value = response.message || "Employee created successfully";
@@ -130,15 +177,15 @@ const createEmployee = async () => {
 
       <form v-else class="employee-form" @submit.prevent="createEmployee">
         <label class="field">
-          <span>Name</span>
-          <input v-model="form.name" type="text" autocomplete="name" required>
-          <small v-if="fieldErrorMap.name">{{ fieldErrorMap.name }}</small>
+          <span>First name</span>
+          <input v-model="form.firstName" type="text" autocomplete="given-name" required>
+          <small v-if="fieldErrorMap.firstName">{{ fieldErrorMap.firstName }}</small>
         </label>
 
         <label class="field">
-          <span>Employee code</span>
-          <input v-model="form.employeeCode" type="text" required>
-          <small v-if="fieldErrorMap.employeeCode">{{ fieldErrorMap.employeeCode }}</small>
+          <span>Last name</span>
+          <input v-model="form.lastName" type="text" autocomplete="family-name" required>
+          <small v-if="fieldErrorMap.lastName">{{ fieldErrorMap.lastName }}</small>
         </label>
 
         <label class="field">
@@ -160,9 +207,29 @@ const createEmployee = async () => {
         </label>
 
         <label class="field">
+          <span>Photo</span>
+          <input
+            :key="photoInputKey"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            @change="selectPhoto"
+          >
+          <small v-if="fieldErrorMap.photo">{{ fieldErrorMap.photo }}</small>
+        </label>
+
+        <label class="field">
           <span>Department</span>
-          <input v-model="form.department" type="text">
-          <small v-if="fieldErrorMap.department">{{ fieldErrorMap.department }}</small>
+          <select v-model.number="form.departmentId">
+            <option value="">Select Department</option>
+            <option
+              v-for="department in departments"
+              :key="department.id"
+              :value="department.id"
+            >
+              {{ department.departmentName }}
+            </option>
+          </select>
+          <small v-if="fieldErrorMap.departmentId">{{ fieldErrorMap.departmentId }}</small>
         </label>
 
         <label class="field">
@@ -171,21 +238,10 @@ const createEmployee = async () => {
           <small v-if="fieldErrorMap.designation">{{ fieldErrorMap.designation }}</small>
         </label>
 
-        <label class="field">
-          <span>Fingerprint ID</span>
-          <input v-model="form.fingerprintId" type="text">
-          <small v-if="fieldErrorMap.fingerprintId">{{ fieldErrorMap.fingerprintId }}</small>
-        </label>
-
-        <label class="field">
-          <span>Status</span>
-          <select v-model="form.employmentStatus">
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="RESIGNED">Resigned</option>
-            <option value="TERMINATED">Terminated</option>
-          </select>
-          <small v-if="fieldErrorMap.employmentStatus">{{ fieldErrorMap.employmentStatus }}</small>
+        <label class="field field-full">
+          <span>Address</span>
+          <textarea v-model="form.address" rows="4"></textarea>
+          <small v-if="fieldErrorMap.address">{{ fieldErrorMap.address }}</small>
         </label>
 
         <div class="actions">
@@ -271,7 +327,8 @@ h1 {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
@@ -282,8 +339,13 @@ h1 {
   outline: none;
 }
 
+.field textarea {
+  resize: vertical;
+}
+
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: #1f6feb;
   box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
 }
@@ -292,6 +354,10 @@ h1 {
   color: #b42318;
   font-size: 12px;
   font-weight: 700;
+}
+
+.field-full {
+  grid-column: 1 / -1;
 }
 
 .actions {
@@ -368,6 +434,10 @@ h1 {
 
   .employee-form {
     grid-template-columns: 1fr;
+  }
+
+  .field-full {
+    grid-column: auto;
   }
 
   .actions {

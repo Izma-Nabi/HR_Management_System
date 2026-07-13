@@ -1,18 +1,17 @@
 require('../../global/env')
 const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcrypt");
 const prisma = new PrismaClient();
 
 const main = async()=>{
     const roles=[
         {
-            roleName:'Super Admin'
+            roleName:'SUPER ADMIN'
         },
         {
-            roleName:'Admin'
+            roleName:'ADMIN'
         },
         {
-            roleName:'Employee'
+            roleName:'EMPLOYEE'
         }
     ];
 

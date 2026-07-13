@@ -4,27 +4,36 @@ type Department = {
   departmentName: string;
 };
 
-type FieldError = {
-  field: string;
-  message: string;
+type AdminProfile = {
+  id: number;
+  firstName: string;
+  lastName: string | null;
+  phone: string | null;
+  address: string | null;
+  departmentId: number | null;
+  designation: string | null;
+  joiningDate: string | null;
+  user: {
+    email: string;
+  };
 };
 
 definePageMeta({
   layout: "dashboard"
 });
 
+const route = useRoute();
 const config = useRuntimeConfig();
+const id = route.params.id;
 
 const departments = ref<Department[]>([]);
 const loading = ref(false);
+const pageLoading = ref(true);
 const errorMessage = ref("");
-const successMessage = ref("");
-const fieldErrors = ref<FieldError[]>([]);
 const photoInputKey = ref(0);
 
 const form = reactive({
   email: "",
-  password: "",
   firstName: "",
   lastName: "",
   phone: "",
@@ -33,13 +42,6 @@ const form = reactive({
   designation: "",
   joiningDate: "",
   photo: null as File | null
-});
-
-const fieldErrorMap = computed(() => {
-  return fieldErrors.value.reduce<Record<string, string>>((errors, error) => {
-    errors[error.field] = error.message;
-    return errors;
-  }, {});
 });
 
 const authHeaders = () => {
@@ -54,14 +56,16 @@ const authHeaders = () => {
   };
 };
 
-const loadDepartments = async () => {
-  const headers = authHeaders();
+const formatDate = (value: string | null) => {
+  return value ? value.substring(0, 10) : "";
+};
 
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
+const selectPhoto = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  form.photo = input.files?.[0] || null;
+};
 
+const loadDepartments = async (headers: Record<string, string>) => {
   const response = await $fetch<{ data: Department[] }>(`${config.public.apiBase}/departments`, {
     headers
   });
@@ -69,34 +73,44 @@ const loadDepartments = async () => {
   departments.value = response.data;
 };
 
-onMounted(async () => {
-  try {
-    await loadDepartments();
-  } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to load departments";
-  }
-});
+const loadAdmin = async (headers: Record<string, string>) => {
+  const response = await $fetch<{ data: AdminProfile }>(`${config.public.apiBase}/users/admin/${id}`, {
+    headers
+  });
 
-const selectPhoto = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  form.photo = input.files?.[0] || null;
-};
+  const admin = response.data;
 
-const resetForm = () => {
-  form.email = "";
-  form.password = "";
-  form.firstName = "";
-  form.lastName = "";
-  form.phone = "";
-  form.address = "";
-  form.departmentId = null;
-  form.designation = "";
-  form.joiningDate = "";
+  form.email = admin.user.email;
+  form.firstName = admin.firstName;
+  form.lastName = admin.lastName || "";
+  form.phone = admin.phone || "";
+  form.address = admin.address || "";
+  form.departmentId = admin.departmentId;
+  form.designation = admin.designation || "";
+  form.joiningDate = formatDate(admin.joiningDate);
   form.photo = null;
-  fieldErrors.value = [];
-  errorMessage.value = "";
   photoInputKey.value += 1;
 };
+
+onMounted(async () => {
+  const headers = authHeaders();
+
+  if (!headers) {
+    await navigateTo("/login", { replace: true });
+    return;
+  }
+
+  try {
+    await Promise.all([
+      loadDepartments(headers),
+      loadAdmin(headers)
+    ]);
+  } catch (error: any) {
+    errorMessage.value = error?.data?.message || "Unable to load administrator";
+  } finally {
+    pageLoading.value = false;
+  }
+});
 
 const saveAdmin = async () => {
   const headers = authHeaders();
@@ -108,14 +122,11 @@ const saveAdmin = async () => {
 
   loading.value = true;
   errorMessage.value = "";
-  successMessage.value = "";
-  fieldErrors.value = [];
 
   try {
     const body = new FormData();
 
     body.append("email", form.email);
-    body.append("password", form.password);
     body.append("firstName", form.firstName);
     body.append("lastName", form.lastName);
     body.append("phone", form.phone);
@@ -128,18 +139,15 @@ const saveAdmin = async () => {
       body.append("photo", form.photo);
     }
 
-    const response = await $fetch<{ message: string }>(`${config.public.apiBase}/users/admin`, {
-      method: "POST",
+    await $fetch(`${config.public.apiBase}/users/admin/${id}`, {
+      method: "PUT",
       headers,
       body
     });
 
-    successMessage.value = response.message || "Administrator created successfully";
-    resetForm();
     await navigateTo("/dashboard/admins");
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to create administrator";
-    fieldErrors.value = Array.isArray(error?.data?.errors) ? error.data.errors : [];
+    errorMessage.value = error?.data?.message || "Update failed";
   } finally {
     loading.value = false;
   }
@@ -150,45 +158,38 @@ const saveAdmin = async () => {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1>Add New Admin</h1>
-        <p>Create a new admin account.</p>
+        <h1>Edit Administrator</h1>
+        <p>Update administrator information.</p>
       </div>
 
-      <NuxtLink to="/dashboard/admins" class="back-link">
+      <NuxtLink to="/dashboard/admins" class="cancel">
         Back
       </NuxtLink>
     </div>
 
-    <form class="form" autocomplete="off" @submit.prevent="saveAdmin">
+    <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
+    <p v-if="pageLoading" class="loading">Loading administrator...</p>
+
+    <form v-else class="form" autocomplete="off" @submit.prevent="saveAdmin">
       <div class="grid">
         <label class="form-group">
           <span>First Name</span>
           <input v-model="form.firstName" type="text" placeholder="First name" required>
-          <small v-if="fieldErrorMap.firstName">{{ fieldErrorMap.firstName }}</small>
         </label>
 
         <label class="form-group">
           <span>Last Name</span>
           <input v-model="form.lastName" type="text" placeholder="Last name">
-          <small v-if="fieldErrorMap.lastName">{{ fieldErrorMap.lastName }}</small>
         </label>
 
         <label class="form-group">
           <span>Email</span>
-          <input v-model="form.email" type="email" placeholder="admin@company.com" autocomplete="new-email" required>
-          <small v-if="fieldErrorMap.email">{{ fieldErrorMap.email }}</small>
-        </label>
-
-        <label class="form-group">
-          <span>Password</span>
-          <input v-model="form.password" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" required>
-          <small v-if="fieldErrorMap.password">{{ fieldErrorMap.password }}</small>
+          <input v-model="form.email" type="email" placeholder="admin@company.com" required>
         </label>
 
         <label class="form-group">
           <span>Phone</span>
           <input v-model="form.phone" type="tel" placeholder="03xxxxxxxxx">
-          <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
         </label>
 
         <label class="form-group">
@@ -203,25 +204,21 @@ const saveAdmin = async () => {
               {{ department.departmentName }}
             </option>
           </select>
-          <small v-if="fieldErrorMap.departmentId">{{ fieldErrorMap.departmentId }}</small>
         </label>
 
         <label class="form-group">
           <span>Designation</span>
           <input v-model="form.designation" type="text" placeholder="Designation">
-          <small v-if="fieldErrorMap.designation">{{ fieldErrorMap.designation }}</small>
         </label>
 
         <label class="form-group">
           <span>Joining Date</span>
           <input v-model="form.joiningDate" type="date">
-          <small v-if="fieldErrorMap.joiningDate">{{ fieldErrorMap.joiningDate }}</small>
         </label>
 
         <label class="form-group full">
           <span>Address</span>
           <textarea v-model="form.address" rows="3" placeholder="Enter address"></textarea>
-          <small v-if="fieldErrorMap.address">{{ fieldErrorMap.address }}</small>
         </label>
 
         <label class="form-group full">
@@ -232,12 +229,8 @@ const saveAdmin = async () => {
             accept="image/jpeg,image/png,image/webp"
             @change="selectPhoto"
           >
-          <small v-if="fieldErrorMap.photo">{{ fieldErrorMap.photo }}</small>
         </label>
       </div>
-
-      <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="notice success">{{ successMessage }}</p>
 
       <div class="buttons">
         <NuxtLink to="/dashboard/admins" class="cancel">
@@ -245,7 +238,7 @@ const saveAdmin = async () => {
         </NuxtLink>
 
         <button type="submit" :disabled="loading">
-          {{ loading ? "Creating..." : "Save" }}
+          {{ loading ? "Saving..." : "Save Changes" }}
         </button>
       </div>
     </form>
@@ -276,17 +269,6 @@ const saveAdmin = async () => {
   color: #6b7280;
 }
 
-.back-link,
-.cancel {
-  padding: 10px 16px;
-  color: #374151;
-  text-decoration: none;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-weight: 700;
-}
-
 .form {
   padding: 35px;
   background: #ffffff;
@@ -307,7 +289,6 @@ const saveAdmin = async () => {
 .form-group {
   display: grid;
   gap: 8px;
-  min-width: 0;
 }
 
 .form-group span {
@@ -339,36 +320,21 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(117, 109, 176, 0.14);
 }
 
-small {
-  color: #b42318;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.notice {
-  margin: 18px 0 0;
-  padding: 12px 14px;
-  border-radius: 8px;
-  font-weight: 700;
-}
-
-.notice.error {
-  color: #9f1d1d;
-  background: #fff0f0;
-  border: 1px solid #f4c7c7;
-}
-
-.notice.success {
-  color: #0f6b3d;
-  background: #ecfdf3;
-  border: 1px solid #b7ebc9;
-}
-
 .buttons {
   display: flex;
   justify-content: flex-end;
   gap: 15px;
   margin-top: 35px;
+}
+
+.cancel {
+  padding: 10px 16px;
+  color: #374151;
+  text-decoration: none;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 700;
 }
 
 button {
@@ -385,6 +351,26 @@ button {
 button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.notice,
+.loading {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.notice.error {
+  color: #9f1d1d;
+  background: #fff0f0;
+  border: 1px solid #f4c7c7;
+}
+
+.loading {
+  color: #6b7280;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 
 @media (max-width: 768px) {

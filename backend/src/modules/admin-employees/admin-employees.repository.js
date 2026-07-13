@@ -1,16 +1,26 @@
 const { prisma } = require("../../../../database/prisma");
 const { ROLE_KEYS, roleNameCandidates, toRoleKey } = require("../../utils/roles");
+const { generateNextEmployeeCode } = require("../../utils/employee-code");
 
 const employeeSelect = {
-  employeeId: true,
+  id: true,
   userId: true,
   employeeCode: true,
-  name: true,
+  firstName: true,
+  lastName: true,
   phone: true,
-  department: true,
+  address: true,
+  photo: true,
+  departmentId: true,
+  department: {
+    select: {
+      id: true,
+      departmentName: true,
+      description: true
+    }
+  },
   designation: true,
-  fingerprintId: true,
-  employmentStatus: true,
+  joiningDate: true,
   createdAt: true,
   updatedAt: true
 };
@@ -77,28 +87,17 @@ const findUserByEmail = async (email) => {
   });
 };
 
-const findEmployeeByCode = async (employeeCode) => {
-  return prisma.employee.findUnique({
-    where: {
-      employeeCode
-    },
-    select: {
-      employeeId: true
-    }
-  });
-};
-
-const findEmployeeByFingerprintId = async (fingerprintId) => {
-  if (!fingerprintId) {
+const findDepartmentById = async (id, dbClient = prisma) => {
+  if (!id) {
     return null;
   }
 
-  return prisma.employee.findUnique({
+  return dbClient.department.findUnique({
     where: {
-      fingerprintId
+      id: Number(id)
     },
     select: {
-      employeeId: true
+      id: true
     }
   });
 };
@@ -125,6 +124,8 @@ const createEmployeeAccount = async ({ user, employee }) => {
         throw new Error("Employee role is not configured");
       }
 
+      const employeeCode = await generateNextEmployeeCode(tx);
+
       const createdUser = await tx.user.create({
         data: {
           fullName: user.fullName,
@@ -138,16 +139,17 @@ const createEmployeeAccount = async ({ user, employee }) => {
         }
       });
 
-      return tx.employee.create({
+      return tx.employeeProfile.create({
         data: {
           userId: createdUser.id,
-          employeeCode: employee.employeeCode,
-          name: employee.name,
+          employeeCode,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
           phone: employee.phone,
-          department: employee.department,
-          designation: employee.designation,
-          fingerprintId: employee.fingerprintId,
-          employmentStatus: employee.employmentStatus
+          address: employee.address,
+          photo: employee.photo,
+          departmentId: employee.departmentId ? Number(employee.departmentId) : null,
+          designation: employee.designation
         },
         select: employeeAccountSelect
       });
@@ -163,7 +165,6 @@ const createEmployeeAccount = async ({ user, employee }) => {
 
 module.exports = {
   findUserByEmail,
-  findEmployeeByCode,
-  findEmployeeByFingerprintId,
+  findDepartmentById,
   createEmployeeAccount
 };

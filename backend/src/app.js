@@ -3,10 +3,12 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const env = require("../../global/env");
+const { uploadsRoot } = require("./middlewares/upload.middleware");
 const adminAuthRoutes = require("./modules/admin-auth/admin-auth.routes");
 const userRoutes = require("./modules/users/user.routes");
 const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.routes");
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
+const departmentRoutes = require("./modules/departments/departments.routes");
 
 const {
   notFoundHandler,
@@ -34,6 +36,9 @@ app.use(express.json({ limit: "10kb" }));
 // Parse URL-encoded bodies. Useful if a tool sends form-style data.
 app.use(express.urlencoded({ extended: false }));
 
+// Serve uploaded employee photos.
+app.use("/uploads", express.static(uploadsRoot));
+
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
@@ -48,6 +53,7 @@ app.get("/", (req, res) => {
       health: "/health",
       adminLogin: "/api/auth/login",
       adminEmployees: "/api/admin/employees",
+      departments: "/api/departments",
       employeeLogin: "/api/v1/employee/auth/login"
     }
   });
@@ -70,7 +76,9 @@ app.get("/health", (req, res) => {
 // while /api/admin/auth is the clearer combined-backend path.
 app.use("/api/auth", adminAuthRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/departments", departmentRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
+app.use("/api/admin/departments", departmentRoutes);
 
 // Compatibility for the current admin frontend page that calls /api/api/auth.
 app.use("/api/api/auth", adminAuthRoutes);
@@ -81,6 +89,7 @@ app.use("/api/administrator", adminAuthRoutes);
 // Super Admin employee management routes.
 app.use("/api/admin/employees", adminEmployeesRoutes);
 app.use("/api/v1/admin/employees", adminEmployeesRoutes);
+app.use("/api/v1/departments", departmentRoutes);
 
 // Employee routes.
 // These keep the employee frontend's existing /api/v1/employee/auth path.

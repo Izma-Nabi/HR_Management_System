@@ -3,53 +3,54 @@ const { hashPassword } = require("../../utils/password");
 const adminEmployeesRepository = require("./admin-employees.repository");
 
 const createEmployee = async (payload) => {
-  const [
-    existingUser,
-    existingEmployeeCode,
-    existingFingerprint
-  ] = await Promise.all([
-    adminEmployeesRepository.findUserByEmail(payload.email),
-    adminEmployeesRepository.findEmployeeByCode(payload.employeeCode),
-    adminEmployeesRepository.findEmployeeByFingerprintId(payload.fingerprintId)
-  ]);
+  const existingUser = await adminEmployeesRepository.findUserByEmail(payload.email);
 
   if (existingUser) {
     throw new ApiError(409, "Email is already registered");
   }
 
-  if (existingEmployeeCode) {
-    throw new ApiError(409, "Employee code is already registered");
-  }
+  const department = await adminEmployeesRepository.findDepartmentById(payload.departmentId);
 
-  if (existingFingerprint) {
-    throw new ApiError(409, "Fingerprint ID is already registered");
+  if (!department) {
+    throw new ApiError(400, "Department not found");
   }
 
   const passwordHash = await hashPassword(payload.password);
+  const fullName = `${payload.firstName} ${payload.lastName}`.trim();
 
-  try {
-    return await adminEmployeesRepository.createEmployeeAccount({
-      user: {
-        fullName: payload.name,
-        email: payload.email,
-        passwordHash
-      },
-      employee: {
-        employeeCode: payload.employeeCode,
-        name: payload.name,
-        phone: payload.phone,
-        department: payload.department,
-        designation: payload.designation,
-        fingerprintId: payload.fingerprintId,
-        employmentStatus: payload.employmentStatus
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await adminEmployeesRepository.createEmployeeAccount({
+        user: {
+          fullName,
+          email: payload.email,
+          passwordHash
+        },
+        employee: {
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          phone: payload.phone,
+          address: payload.address,
+          photo: payload.photo,
+          departmentId: payload.departmentId,
+          designation: payload.designation
+        }
+      });
+    } catch (error) {
+      if (error.message === "Employee role is not configured") {
+        throw new ApiError(500, "Employee role is not configured. Run role seeds before creating employee profiles.");
       }
-    });
-  } catch (error) {
-    if (error.message === "Employee role is not configured") {
-      throw new ApiError(500, "Employee role is not configured. Run role seeds before creating employees.");
-    }
 
-    throw error;
+      const target = Array.isArray(error.meta?.target) ? error.meta.target.join(", ") : "";
+      const isGeneratedCodeCollision = error.code === "P2002"
+        && (target.includes("employeeCode") || target.includes("employee_code"));
+
+      if (isGeneratedCodeCollision && attempt < 3) {
+        continue;
+      }
+
+      throw error;
+    }
   }
 };
 

@@ -15,6 +15,9 @@ npm-debug.log*
 # Local certificates
 backend/certs/*.pem
 
+# Uploaded runtime files
+backend/uploads/
+
 # OS/editor files
 .DS_Store
 Thumbs.db

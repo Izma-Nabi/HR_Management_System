@@ -22,15 +22,23 @@ const userWithPasswordSelect = {
 };
 
 const employeeSelect = {
-  employeeId: true,
+  id: true,
   userId: true,
   employeeCode: true,
-  name: true,
+  firstName: true,
+  lastName: true,
   phone: true,
-  department: true,
+  address: true,
+  photo: true,
+  departmentId: true,
+  department: {
+    select: {
+      id: true,
+      departmentName: true,
+      description: true
+    }
+  },
   designation: true,
-  fingerprintId: true,
-  employmentStatus: true,
   joiningDate: true,
   createdAt: true,
   updatedAt: true
@@ -38,7 +46,7 @@ const employeeSelect = {
 
 const employeeAccountSelect = {
   ...safeUserSelect,
-  employee: {
+  employeeProfile: {
     select: employeeSelect
   }
 };
@@ -71,13 +79,13 @@ const toUserWithPassword = (user) => {
 };
 
 const mapEmployeeAccount = (user) => {
-  if (!user || !user.employee) {
+  if (!user || !user.employeeProfile) {
     return null;
   }
 
   return {
     user: toSafeUser(user),
-    employee: user.employee
+    employee: user.employeeProfile
   };
 };
 

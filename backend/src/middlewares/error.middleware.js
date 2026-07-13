@@ -1,3 +1,4 @@
+const fs = require("fs");
 const env = require("../../../global/env");
 const { ApiError, sendError } = require("../utils/apiResponse");
 
@@ -22,16 +23,20 @@ const normalizeDatabaseError = (error) => {
       return new ApiError(409, "Employee code is already registered");
     }
 
+    if (target.includes("adminCode") || target.includes("admin_code")) {
+      return new ApiError(409, "Admin code is already registered");
+    }
+
     if (target.includes("employee_code")) {
       return new ApiError(409, "Employee code is already registered");
     }
 
-    if (target.includes("fingerprintId") || target.includes("fingerprint_id")) {
-      return new ApiError(409, "Fingerprint ID is already registered");
-    }
-
     if (target.includes("userId") || target.includes("user_id")) {
       return new ApiError(409, "Employee account is already linked to a user");
+    }
+
+    if (target.includes("departmentName") || target.includes("department_name")) {
+      return new ApiError(409, "Department name already exists");
     }
 
     return new ApiError(409, "Duplicate value already exists");
@@ -49,6 +54,10 @@ const errorHandler = (err, req, res, next) => {
   const isOperational = normalizedError.isOperational === true;
   const message = isOperational ? normalizedError.message : "Internal server error";
   const errors = normalizedError.errors || [];
+
+  if (req.file?.path) {
+    fs.unlink(req.file.path, () => {});
+  }
 
   // In development, log unexpected errors so you can debug them.
   // In production, the API response still stays safe and generic.

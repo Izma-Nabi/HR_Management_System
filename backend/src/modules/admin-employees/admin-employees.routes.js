@@ -2,6 +2,7 @@ const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
+const { uploadEmployeePhoto } = require("../../middlewares/upload.middleware");
 const adminEmployeesController = require("./admin-employees.controller");
 const {
   createEmployeeSchema
@@ -13,6 +14,7 @@ router.post(
   "/",
   authMiddleware,
   allowRoles("SUPER_ADMIN"),
+  uploadEmployeePhoto,
   validate(createEmployeeSchema),
   adminEmployeesController.createEmployee
 );

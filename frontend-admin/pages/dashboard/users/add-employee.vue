@@ -5,15 +5,20 @@ type FieldError = {
 };
 
 type EmployeeForm = {
-  employeeCode: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   phone: string;
-  department: string;
+  address: string;
+  photo: File | null;
+  departmentId: number | null;
   designation: string;
-  fingerprintId: string;
-  employmentStatus: string;
+};
+
+type Department = {
+  id: number;
+  departmentName: string;
 };
 
 definePageMeta({
@@ -23,18 +28,20 @@ definePageMeta({
 const config = useRuntimeConfig();
 
 const defaultForm = (): EmployeeForm => ({
-  employeeCode: "",
-  name: "",
+  firstName: "",
+  lastName: "",
   email: "",
   password: "",
   phone: "",
-  department: "",
-  designation: "",
-  fingerprintId: "",
-  employmentStatus: "ACTIVE"
+  address: "",
+  photo: null,
+  departmentId: null,
+  designation: ""
 });
 
 const form = reactive(defaultForm());
+const photoInputKey = ref(0);
+const departments = ref<Department[]>([]);
 const loading = ref(false);
 const successMessage = ref("");
 const errorMessage = ref("");
@@ -47,11 +54,28 @@ const fieldErrorMap = computed(() => {
   }, {});
 });
 
+const loadDepartments = async (token: string) => {
+  const response = await $fetch<{ data: Department[] }>(`${config.public.apiBase}/departments`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  departments.value = response.data;
+};
+
 onMounted(async () => {
   const token = localStorage.getItem("token");
 
   if (!token) {
     await navigateTo("/login", { replace: true });
+    return;
+  }
+
+  try {
+    await loadDepartments(token);
+  } catch {
+    departments.value = [];
   }
 });
 
@@ -59,6 +83,12 @@ const resetForm = () => {
   Object.assign(form, defaultForm());
   fieldErrors.value = [];
   errorMessage.value = "";
+  photoInputKey.value += 1;
+};
+
+const selectPhoto = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  form.photo = input.files?.[0] || null;
 };
 
 const saveEmployee = async () => {
@@ -75,22 +105,27 @@ const saveEmployee = async () => {
   fieldErrors.value = [];
 
   try {
+    const body = new FormData();
+
+    body.append("firstName", form.firstName);
+    body.append("lastName", form.lastName);
+    body.append("email", form.email);
+    body.append("password", form.password);
+    body.append("phone", form.phone);
+    body.append("address", form.address);
+    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
+    body.append("designation", form.designation);
+
+    if (form.photo) {
+      body.append("photo", form.photo);
+    }
+
     const response = await $fetch<{ message: string }>(`${config.public.apiBase}/admin/employees`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`
       },
-      body: {
-        employeeCode: form.employeeCode,
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        phone: form.phone,
-        department: form.department,
-        designation: form.designation,
-        fingerprintId: form.fingerprintId,
-        employmentStatus: form.employmentStatus
-      }
+      body
     });
 
     successMessage.value = response.message || "Employee created successfully";
@@ -115,7 +150,7 @@ const saveEmployee = async () => {
     <div class="page-header">
       <div>
         <h1>Create Employee</h1>
-        <p>Add employee login and HR details.</p>
+        <p>Add employee profile and login details.</p>
       </div>
 
       <NuxtLink to="/dashboard/users/add" class="back-link">
@@ -126,26 +161,27 @@ const saveEmployee = async () => {
     <form class="form" @submit.prevent="saveEmployee">
       <div class="grid">
         <label class="form-group">
-          <span>Employee Code</span>
+          <span>First Name</span>
           <input
-            v-model="form.employeeCode"
+            v-model="form.firstName"
             type="text"
-            placeholder="EMP001"
+            placeholder="First name"
+            autocomplete="given-name"
             required
           >
-          <small v-if="fieldErrorMap.employeeCode">{{ fieldErrorMap.employeeCode }}</small>
+          <small v-if="fieldErrorMap.firstName">{{ fieldErrorMap.firstName }}</small>
         </label>
 
         <label class="form-group">
-          <span>Name</span>
+          <span>Last Name</span>
           <input
-            v-model="form.name"
+            v-model="form.lastName"
             type="text"
-            placeholder="Employee full name"
-            autocomplete="name"
+            placeholder="Last name"
+            autocomplete="family-name"
             required
           >
-          <small v-if="fieldErrorMap.name">{{ fieldErrorMap.name }}</small>
+          <small v-if="fieldErrorMap.lastName">{{ fieldErrorMap.lastName }}</small>
         </label>
 
         <label class="form-group">
@@ -184,19 +220,29 @@ const saveEmployee = async () => {
         </label>
 
         <label class="form-group">
+          <span>Photo</span>
+          <input
+            :key="photoInputKey"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            @change="selectPhoto"
+          >
+          <small v-if="fieldErrorMap.photo">{{ fieldErrorMap.photo }}</small>
+        </label>
+
+        <label class="form-group">
           <span>Department</span>
-          <select v-model="form.department">
+          <select v-model.number="form.departmentId">
             <option value="">Select Department</option>
-            <option>Human Resources</option>
-            <option>Information Technology</option>
-            <option>Finance</option>
-            <option>Administration</option>
-            <option>Software Development</option>
-            <option>Quality Assurance</option>
-            <option>Sales & Marketing</option>
-            <option>Customer Support</option>
+            <option
+              v-for="department in departments"
+              :key="department.id"
+              :value="department.id"
+            >
+              {{ department.departmentName }}
+            </option>
           </select>
-          <small v-if="fieldErrorMap.department">{{ fieldErrorMap.department }}</small>
+          <small v-if="fieldErrorMap.departmentId">{{ fieldErrorMap.departmentId }}</small>
         </label>
 
         <label class="form-group">
@@ -209,25 +255,14 @@ const saveEmployee = async () => {
           <small v-if="fieldErrorMap.designation">{{ fieldErrorMap.designation }}</small>
         </label>
 
-        <label class="form-group">
-          <span>Fingerprint ID</span>
-          <input
-            v-model="form.fingerprintId"
-            type="text"
-            placeholder="Optional biometric ID"
-          >
-          <small v-if="fieldErrorMap.fingerprintId">{{ fieldErrorMap.fingerprintId }}</small>
-        </label>
-
-        <label class="form-group">
-          <span>Status</span>
-          <select v-model="form.employmentStatus">
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="RESIGNED">Resigned</option>
-            <option value="TERMINATED">Terminated</option>
-          </select>
-          <small v-if="fieldErrorMap.employmentStatus">{{ fieldErrorMap.employmentStatus }}</small>
+        <label class="form-group full">
+          <span>Address</span>
+          <textarea
+            v-model="form.address"
+            rows="4"
+            placeholder="Employee address"
+          ></textarea>
+          <small v-if="fieldErrorMap.address">{{ fieldErrorMap.address }}</small>
         </label>
       </div>
 
@@ -294,6 +329,10 @@ const saveEmployee = async () => {
   gap: 18px;
 }
 
+.full {
+  grid-column: 1 / -1;
+}
+
 .form-group {
   display: grid;
   gap: 8px;
@@ -306,7 +345,8 @@ const saveEmployee = async () => {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
@@ -317,8 +357,13 @@ select {
   outline: none;
 }
 
+textarea {
+  resize: vertical;
+}
+
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: #756db0;
   box-shadow: 0 0 0 3px rgba(117, 109, 176, 0.14);
 }
@@ -388,6 +433,10 @@ small {
 
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .full {
+    grid-column: auto;
   }
 
   .buttons {

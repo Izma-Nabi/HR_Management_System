@@ -13,13 +13,6 @@ enum UserStatus {
   SUSPENDED
 }
 
-enum EmploymentStatus {
-  ACTIVE
-  INACTIVE
-  RESIGNED
-  TERMINATED
-}
-
 model Role {
   id        Int      @id @default(autoincrement()) @db.UnsignedInt
   roleName  String   @unique @map("role_name") @db.VarChar(50)
@@ -65,7 +58,7 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   adminProfile    AdminProfile?
-  employee        Employee?
+  employeeProfile EmployeeProfile?
 
   @@index([roleId])
   @@index([status])
@@ -77,38 +70,53 @@ model Department {
   departmentName  String   @unique @map("department_name") @db.VarChar(100)
   description     String?  @db.VarChar(255)
 
+  admins          AdminProfile[]
+  employees       EmployeeProfile[]
+
   @@map("departments")
 }
 
 model AdminProfile {
-  id        Int      @id @default(autoincrement()) @db.UnsignedInt
-  userId    Int      @unique @map("user_id") @db.UnsignedInt
-  firstName String   @map("first_name") @db.VarChar(100)
-  lastName  String?  @map("last_name") @db.VarChar(100)
-  phone     String?  @db.VarChar(30)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id               Int         @id @default(autoincrement()) @db.UnsignedInt
+  userId           Int         @unique @map("user_id") @db.UnsignedInt
+  adminCode        String      @unique @map("admin_code") @db.VarChar(20)
+  firstName        String      @map("first_name") @db.VarChar(100)
+  lastName         String?     @map("last_name") @db.VarChar(100)
+  phone            String?     @db.VarChar(30)
+  address          String?     @db.VarChar(255)
+  departmentId     Int?        @map("department_id") @db.UnsignedInt
+  designation      String?     @db.VarChar(100)
+  employmentStatus String?     @default("Active") @map("employment_status") @db.VarChar(50)
+  joiningDate      DateTime?   @map("joining_date") @db.Date
+  photo            String?     @db.VarChar(255)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
+  @@index([departmentId])
   @@map("admin_profiles")
 }
 
-model Employee {
-  employeeId       Int              @id @default(autoincrement()) @map("employee_id") @db.UnsignedInt
-  userId           Int              @unique(map: "employees_user_id_unique") @map("user_id") @db.UnsignedInt
-  employeeCode     String           @unique(map: "employees_employee_code_unique") @map("employee_code") @db.VarChar(50)
-  name             String           @db.VarChar(100)
-  phone            String?          @db.VarChar(30)
-  department       String?          @db.VarChar(100)
-  designation      String?          @db.VarChar(100)
-  fingerprintId    String?          @unique(map: "employees_fingerprint_id_unique") @map("fingerprint_id") @db.VarChar(100)
-  employmentStatus EmploymentStatus @default(ACTIVE) @map("employment_status")
-  joiningDate      DateTime?        @map("joining_date") @db.Date
-  createdAt        DateTime         @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+model EmployeeProfile {
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  userId       Int       @unique(map: "employee_profiles_user_id_unique") @map("user_id") @db.UnsignedInt
+  employeeCode String    @unique(map: "employee_profiles_employee_code_unique") @map("employee_code") @db.VarChar(50)
+  firstName    String    @map("first_name") @db.VarChar(100)
+  lastName     String    @map("last_name") @db.VarChar(100)
+  phone        String?   @db.VarChar(30)
+  address      String?   @db.VarChar(255)
+  photo        String?   @db.VarChar(255)
+  departmentId Int?      @map("department_id") @db.UnsignedInt
+  designation  String?   @db.VarChar(100)
+  joiningDate  DateTime? @map("joining_date") @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "employees_user_id_fk")
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade, map: "employee_profiles_user_id_fk")
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  @@map("employees")
+  @@index([departmentId])
+  @@map("employee_profiles")
 }

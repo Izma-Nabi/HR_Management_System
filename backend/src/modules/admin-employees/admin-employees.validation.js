@@ -13,26 +13,23 @@ const createEmployeeSchema = Joi.object({
     "string.min": "Password must be at least 8 characters"
   }),
 
-  employeeCode: Joi.string().trim().min(2).max(50).required().messages({
-    "string.empty": "Employee code is required",
-    "string.min": "Employee code must be at least 2 characters"
+  firstName: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "First name is required",
+    "string.min": "First name must be at least 2 characters"
   }),
 
-  name: Joi.string().trim().min(2).max(100).required().messages({
-    "string.empty": "Employee name is required",
-    "string.min": "Employee name must be at least 2 characters"
+  lastName: Joi.string().trim().min(1).max(100).required().messages({
+    "string.empty": "Last name is required"
   }),
 
   phone: optionalText(30),
-  department: optionalText(100),
-  designation: optionalText(100),
-  fingerprintId: optionalText(100),
-
-  employmentStatus: Joi.string()
-    .trim()
-    .uppercase()
-    .valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED")
-    .default("ACTIVE")
+  address: optionalText(255),
+  photo: optionalText(255),
+  departmentId: Joi.number().integer().positive().required().messages({
+    "number.base": "Department is required",
+    "any.required": "Department is required"
+  }),
+  designation: optionalText(100)
 });
 
 module.exports = {
