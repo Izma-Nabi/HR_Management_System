@@ -1,92 +1,70 @@
 const { prisma } = require("../../../../database/prisma");
-
-const adminSelect = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  user: {
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      status: true
-    }
-  }
-};
-
-const employeeSelect = {
-  id: true,
-  departmentId: true,
-  firstName: true,
-  lastName: true,
-  user: {
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      status: true
-    }
-  }
-};
-
-const attachEmployees = async (departments) => {
-  const departmentList = Array.isArray(departments) ? departments : [departments];
-
-  if (departmentList.length === 0) {
-    return Array.isArray(departments) ? [] : null;
-  }
-
-  const departmentIds = departmentList.map((department) => department.id);
-
-  const employees = await prisma.employeeProfile.findMany({
-    where: {
-      departmentId: {
-        in: departmentIds
-      }
-    },
-    select: employeeSelect,
-    orderBy: [
-      {
-        firstName: "asc"
-      },
-      {
-        lastName: "asc"
-      }
-    ]
-  });
-
-  const employeesByDepartment = employees.reduce((grouped, employee) => {
-    const key = employee.departmentId || "";
-    const { departmentId, ...employeeData } = employee;
-
-    grouped[key] = grouped[key] || [];
-    grouped[key].push(employeeData);
-
-    return grouped;
-  }, {});
-
-  const mappedDepartments = departmentList.map((department) => {
-    return {
-      ...department,
-      employees: employeesByDepartment[department.id] || []
-    };
-  });
-
-  return Array.isArray(departments) ? mappedDepartments : mappedDepartments[0];
-};
+const { ROLE_KEYS, toRoleKey } = require("../../utils/roles");
 
 const departmentInclude = {
-  admins: {
-    select: adminSelect,
-    orderBy: [
-      {
-        firstName: "asc"
-      },
-      {
-        lastName: "asc"
+  adminDepartments: {
+    select: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          status: true,
+          role: {
+            select: {
+              id: true,
+              roleName: true
+            }
+          }
+        }
       }
-    ]
+    },
+    orderBy: {
+      user: {
+        firstName: "asc"
+      }
+    }
   }
+};
+
+const mapPerson = (user) => ({
+  id: user.id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  user: {
+    id: user.id,
+    email: user.email,
+    fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+    status: user.status
+  }
+});
+
+const mapDepartment = (department) => {
+  const people = department.adminDepartments.map((assignment) => assignment.user);
+  const admins = [];
+  const employees = [];
+
+  people.forEach((user) => {
+    const role = toRoleKey(user.role);
+
+    if (role === ROLE_KEYS.EMPLOYEE) {
+      employees.push(mapPerson(user));
+      return;
+    }
+
+    if (role === ROLE_KEYS.ADMIN || role === ROLE_KEYS.SUPER_ADMIN) {
+      admins.push(mapPerson(user));
+    }
+  });
+
+  const { adminDepartments, ...departmentData } = department;
+
+  return {
+    ...departmentData,
+    admins,
+    employees
+  };
 };
 
 const listDepartments = async () => {
@@ -97,7 +75,7 @@ const listDepartments = async () => {
     }
   });
 
-  return attachEmployees(departments);
+  return departments.map(mapDepartment);
 };
 
 const findDepartmentById = async (id, dbClient = prisma) => {
@@ -112,7 +90,7 @@ const findDepartmentById = async (id, dbClient = prisma) => {
     return null;
   }
 
-  return attachEmployees(department);
+  return mapDepartment(department);
 };
 
 const findDepartmentByName = async (departmentName) => {
@@ -124,13 +102,15 @@ const findDepartmentByName = async (departmentName) => {
 };
 
 const createDepartment = async (data) => {
-  return prisma.department.create({
+  const department = await prisma.department.create({
     data: {
       departmentName: data.departmentName,
       description: data.description
     },
     include: departmentInclude
   });
+
+  return mapDepartment(department);
 };
 
 const updateDepartment = async (id, data) => {
@@ -145,7 +125,7 @@ const updateDepartment = async (id, data) => {
     include: departmentInclude
   });
 
-  return attachEmployees(updatedDepartment);
+  return mapDepartment(updatedDepartment);
 };
 
 const deleteDepartment = async (id) => {

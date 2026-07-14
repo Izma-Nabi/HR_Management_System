@@ -2,49 +2,48 @@ const { prisma } = require("../../../../database/prisma");
 const { ROLE_KEYS, roleNameCandidates, toRoleKey } = require("../../utils/roles");
 const { generateNextEmployeeCode } = require("../../utils/employee-code");
 
-const employeeSelect = {
+const userProfileSelect = {
   id: true,
-  userId: true,
-  employeeCode: true,
+  userCode: true,
   firstName: true,
   lastName: true,
+  email: true,
   phone: true,
   address: true,
   photo: true,
-  departmentId: true,
-  department: {
-    select: {
-      id: true,
-      departmentName: true,
-      description: true
-    }
-  },
   designation: true,
   joiningDate: true,
+  employmentStatus: true,
+  status: true,
   createdAt: true,
-  updatedAt: true
-};
-
-const userSelect = {
-  id: true,
-  fullName: true,
-  email: true,
+  updatedAt: true,
   role: {
     select: {
       id: true,
       roleName: true
     }
   },
-  status: true,
-  createdAt: true,
-  updatedAt: true
+  adminDepartments: {
+    select: {
+      departmentId: true,
+      department: {
+        select: {
+          id: true,
+          departmentName: true,
+          description: true
+        }
+      }
+    },
+    take: 1
+  }
 };
 
-const employeeAccountSelect = {
-  ...employeeSelect,
-  user: {
-    select: userSelect
-  }
+const fullNameFromUser = (user) => {
+  return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+};
+
+const firstDepartmentAssignment = (user) => {
+  return user?.adminDepartments?.[0] || null;
 };
 
 const toSafeUser = (user) => {
@@ -54,7 +53,7 @@ const toSafeUser = (user) => {
 
   return {
     id: user.id,
-    fullName: user.fullName,
+    fullName: fullNameFromUser(user),
     email: user.email,
     role: toRoleKey(user.role),
     status: user.status,
@@ -63,16 +62,31 @@ const toSafeUser = (user) => {
   };
 };
 
-const mapEmployeeAccount = (employee) => {
-  if (!employee) {
+const mapEmployeeAccount = (user) => {
+  if (!user) {
     return null;
   }
 
-  const { user, ...employeeData } = employee;
+  const assignment = firstDepartmentAssignment(user);
 
   return {
     user: toSafeUser(user),
-    employee: employeeData
+    employee: {
+      id: user.id,
+      userId: user.id,
+      employeeCode: user.userCode,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      address: user.address,
+      photo: user.photo,
+      departmentId: assignment?.departmentId || null,
+      department: assignment?.department || null,
+      designation: user.designation,
+      joiningDate: user.joiningDate,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    }
   };
 };
 
@@ -115,8 +129,34 @@ const findEmployeeRole = async (dbClient = prisma) => {
   });
 };
 
+const replaceDepartmentAssignment = async (dbClient, userId, departmentId) => {
+  await dbClient.adminDepartment.deleteMany({
+    where: {
+      userId: Number(userId)
+    }
+  });
+
+  if (!departmentId) {
+    return;
+  }
+
+  await dbClient.adminDepartment.create({
+    data: {
+      userId: Number(userId),
+      departmentId: Number(departmentId)
+    }
+  });
+};
+
 const listEmployeeAccounts = async () => {
-  const employees = await prisma.employeeProfile.findMany({
+  const employees = await prisma.user.findMany({
+    where: {
+      role: {
+        roleName: {
+          in: roleNameCandidates(ROLE_KEYS.EMPLOYEE)
+        }
+      }
+    },
     orderBy: [
       {
         firstName: "asc"
@@ -125,14 +165,14 @@ const listEmployeeAccounts = async () => {
         lastName: "asc"
       }
     ],
-    select: employeeAccountSelect
+    select: userProfileSelect
   });
 
   return employees.map(mapEmployeeAccount);
 };
 
 const createEmployeeAccount = async ({ user, employee }) => {
-  const createdEmployee = await prisma.$transaction(
+  const createdUser = await prisma.$transaction(
     async (tx) => {
       const employeeRole = await findEmployeeRole(tx);
 
@@ -142,11 +182,18 @@ const createEmployeeAccount = async ({ user, employee }) => {
 
       const employeeCode = await generateNextEmployeeCode(tx);
 
-      const createdUser = await tx.user.create({
+      const created = await tx.user.create({
         data: {
-          fullName: user.fullName,
+          userCode: employeeCode,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
           email: user.email,
           passwordHash: user.passwordHash,
+          phone: employee.phone,
+          address: employee.address,
+          photo: employee.photo,
+          designation: employee.designation,
+          employmentStatus: "ACTIVE",
           roleId: employeeRole.id,
           status: "ACTIVE"
         },
@@ -155,19 +202,13 @@ const createEmployeeAccount = async ({ user, employee }) => {
         }
       });
 
-      return tx.employeeProfile.create({
-        data: {
-          userId: createdUser.id,
-          employeeCode,
-          firstName: employee.firstName,
-          lastName: employee.lastName,
-          phone: employee.phone,
-          address: employee.address,
-          photo: employee.photo,
-          departmentId: employee.departmentId ? Number(employee.departmentId) : null,
-          designation: employee.designation
+      await replaceDepartmentAssignment(tx, created.id, employee.departmentId);
+
+      return tx.user.findUnique({
+        where: {
+          id: created.id
         },
-        select: employeeAccountSelect
+        select: userProfileSelect
       });
     },
     {
@@ -176,7 +217,7 @@ const createEmployeeAccount = async ({ user, employee }) => {
     }
   );
 
-  return mapEmployeeAccount(createdEmployee);
+  return mapEmployeeAccount(createdUser);
 };
 
 module.exports = {

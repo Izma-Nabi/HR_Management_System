@@ -2,6 +2,7 @@ const Joi = require("joi");
 
 const optionalText = (max) => Joi.string().trim().max(max).empty("").allow(null).default(null);
 const optionalUpdateText = (max) => Joi.string().trim().max(max).empty("").allow(null).optional();
+const employmentStatus = Joi.string().trim().uppercase().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED");
 
 const createAdminSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
@@ -28,7 +29,7 @@ const createAdminSchema = Joi.object({
   }),
 
   designation: optionalText(100),
-  employmentStatus: optionalText(50),
+  employmentStatus: employmentStatus.empty("").default("ACTIVE"),
   joiningDate: Joi.date().allow(null).optional(),
   photo: optionalText(255)
 });
@@ -48,7 +49,7 @@ const updateAdminSchema = Joi.object({
   address: optionalUpdateText(255),
   departmentId: Joi.number().integer().positive().allow(null).optional(),
   designation: optionalUpdateText(100),
-  employmentStatus: optionalUpdateText(50),
+  employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().allow(null).optional(),
   photo: optionalUpdateText(255),
   status: Joi.string().valid("ACTIVE", "INACTIVE", "SUSPENDED").optional()

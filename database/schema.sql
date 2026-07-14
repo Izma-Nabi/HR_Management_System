@@ -38,15 +38,24 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 
 CREATE TABLE IF NOT EXISTS users (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  full_name VARCHAR(100) NOT NULL,
+  userCode VARCHAR(20) NULL,
+  firstName VARCHAR(100) NULL,
+  lastName VARCHAR(100) NULL,
   email VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  phone VARCHAR(20) NULL,
+  address VARCHAR(255) NULL,
+  photo VARCHAR(255) NULL,
+  designation VARCHAR(100) NULL,
+  joiningDate DATE NULL,
+  employmentStatus ENUM('ACTIVE', 'INACTIVE', 'RESIGNED', 'TERMINATED') NOT NULL DEFAULT 'ACTIVE',
   role_id INT UNSIGNED NOT NULL,
   status ENUM('ACTIVE', 'INACTIVE', 'SUSPENDED') NOT NULL DEFAULT 'ACTIVE',
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY users_email_key (email),
+  UNIQUE KEY users_userCode_key (userCode),
   KEY users_role_id_idx (role_id),
   KEY users_status_idx (status),
   CONSTRAINT users_role_id_fkey
@@ -62,59 +71,20 @@ CREATE TABLE IF NOT EXISTS departments (
   UNIQUE KEY departments_department_name_key (department_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS admin_profiles (
+CREATE TABLE IF NOT EXISTS admin_departments (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id INT UNSIGNED NOT NULL,
-  admin_code VARCHAR(20) NOT NULL,
-  first_name VARCHAR(100) NOT NULL,
-  last_name VARCHAR(100) NULL,
-  phone VARCHAR(30) NULL,
-  address VARCHAR(255) NULL,
-  department_id INT UNSIGNED NULL,
-  designation VARCHAR(100) NULL,
-  employment_status VARCHAR(50) NULL DEFAULT 'Active',
-  joining_date DATE NULL,
-  photo VARCHAR(255) NULL,
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  department_id INT UNSIGNED NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY admin_profiles_user_id_key (user_id),
-  UNIQUE KEY admin_profiles_admin_code_key (admin_code),
-  KEY admin_profiles_department_id_idx (department_id),
-  CONSTRAINT admin_profiles_user_id_fkey
+  UNIQUE KEY admin_departments_user_id_department_id_key (user_id, department_id),
+  KEY admin_departments_user_id_idx (user_id),
+  KEY admin_departments_department_id_idx (department_id),
+  CONSTRAINT admin_departments_user_id_fkey
     FOREIGN KEY (user_id)
     REFERENCES users(id)
     ON DELETE CASCADE,
-  CONSTRAINT admin_profiles_department_id_fkey
+  CONSTRAINT admin_departments_department_id_fkey
     FOREIGN KEY (department_id)
     REFERENCES departments(id)
-    ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS employee_profiles (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id INT UNSIGNED NOT NULL,
-  employee_code VARCHAR(50) NOT NULL,
-  first_name VARCHAR(100) NOT NULL,
-  last_name VARCHAR(100) NOT NULL,
-  phone VARCHAR(30) NULL,
-  address VARCHAR(255) NULL,
-  photo VARCHAR(255) NULL,
-  department_id INT UNSIGNED NULL,
-  designation VARCHAR(100) NULL,
-  joining_date DATE NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY employee_profiles_user_id_unique (user_id),
-  UNIQUE KEY employee_profiles_employee_code_unique (employee_code),
-  KEY employee_profiles_department_id_idx (department_id),
-  CONSTRAINT employee_profiles_user_id_fk
-    FOREIGN KEY (user_id)
-    REFERENCES users(id)
-    ON DELETE CASCADE,
-  CONSTRAINT employee_profiles_department_id_fkey
-    FOREIGN KEY (department_id)
-    REFERENCES departments(id)
-    ON DELETE SET NULL
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

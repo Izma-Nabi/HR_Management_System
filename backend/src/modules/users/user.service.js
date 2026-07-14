@@ -16,6 +16,14 @@ const buildFullName = ({ firstName, lastName }) => {
   return `${firstName || ""} ${lastName || ""}`.trim();
 };
 
+const normalizeEmploymentStatus = (value) => {
+  if (!value) {
+    return "ACTIVE";
+  }
+
+  return String(value).trim().toUpperCase().replace(/\s+/g, "_");
+};
+
 const ensureDepartmentExists = async (departmentId) => {
   if (!departmentId) {
     return null;
@@ -61,6 +69,7 @@ const createAdmin = async (payload) => {
 
   return repository.createAdmin({
     ...payload,
+    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
     fullName,
     passwordHash,
     roleId: role.id
@@ -92,6 +101,10 @@ const updateAdmin = async (id, payload) => {
 
   const data = { ...payload };
   delete data.password;
+
+  if (data.employmentStatus !== undefined) {
+    data.employmentStatus = normalizeEmploymentStatus(data.employmentStatus);
+  }
 
   const firstName = data.firstName !== undefined ? data.firstName : admin.firstName;
   const lastName = data.lastName !== undefined ? data.lastName : admin.lastName;
@@ -133,6 +146,7 @@ const createEmployee = async (payload) => {
 
   return repository.createEmployee({
     ...payload,
+    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
     fullName,
     passwordHash,
     roleId: role.id

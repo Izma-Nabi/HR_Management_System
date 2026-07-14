@@ -19,6 +19,10 @@ const normalizeDatabaseError = (error) => {
       return new ApiError(409, "Email is already registered");
     }
 
+    if (target.includes("userCode")) {
+      return new ApiError(409, "User code is already registered");
+    }
+
     if (target.includes("employeeCode")) {
       return new ApiError(409, "Employee code is already registered");
     }

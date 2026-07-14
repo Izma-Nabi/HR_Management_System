@@ -47,7 +47,7 @@ const createEmployee = async (payload) => {
 
       const target = Array.isArray(error.meta?.target) ? error.meta.target.join(", ") : "";
       const isGeneratedCodeCollision = error.code === "P2002"
-        && (target.includes("employeeCode") || target.includes("employee_code"));
+        && (target.includes("employeeCode") || target.includes("employee_code") || target.includes("userCode"));
 
       if (isGeneratedCodeCollision && attempt < 3) {
         continue;

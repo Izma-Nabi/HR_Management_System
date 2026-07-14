@@ -3,17 +3,37 @@ const { ROLE_KEYS, roleNameCandidates, toRoleKey } = require("../../utils/roles"
 
 const safeUserSelect = {
   id: true,
-  fullName: true,
+  userCode: true,
+  firstName: true,
+  lastName: true,
   email: true,
+  phone: true,
+  address: true,
+  photo: true,
+  designation: true,
+  joiningDate: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
   role: {
     select: {
       id: true,
       roleName: true
     }
   },
-  status: true,
-  createdAt: true,
-  updatedAt: true
+  adminDepartments: {
+    select: {
+      departmentId: true,
+      department: {
+        select: {
+          id: true,
+          departmentName: true,
+          description: true
+        }
+      }
+    },
+    take: 1
+  }
 };
 
 const userWithPasswordSelect = {
@@ -21,34 +41,12 @@ const userWithPasswordSelect = {
   passwordHash: true
 };
 
-const employeeSelect = {
-  id: true,
-  userId: true,
-  employeeCode: true,
-  firstName: true,
-  lastName: true,
-  phone: true,
-  address: true,
-  photo: true,
-  departmentId: true,
-  department: {
-    select: {
-      id: true,
-      departmentName: true,
-      description: true
-    }
-  },
-  designation: true,
-  joiningDate: true,
-  createdAt: true,
-  updatedAt: true
+const fullNameFromUser = (user) => {
+  return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
 };
 
-const employeeAccountSelect = {
-  ...safeUserSelect,
-  employeeProfile: {
-    select: employeeSelect
-  }
+const firstDepartmentAssignment = (user) => {
+  return user?.adminDepartments?.[0] || null;
 };
 
 const toSafeUser = (user) => {
@@ -58,7 +56,7 @@ const toSafeUser = (user) => {
 
   return {
     id: user.id,
-    fullName: user.fullName,
+    fullName: fullNameFromUser(user),
     email: user.email,
     role: toRoleKey(user.role),
     status: user.status,
@@ -79,13 +77,30 @@ const toUserWithPassword = (user) => {
 };
 
 const mapEmployeeAccount = (user) => {
-  if (!user || !user.employeeProfile) {
+  if (!user) {
     return null;
   }
 
+  const assignment = firstDepartmentAssignment(user);
+
   return {
     user: toSafeUser(user),
-    employee: user.employeeProfile
+    employee: {
+      id: user.id,
+      userId: user.id,
+      employeeCode: user.userCode,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      address: user.address,
+      photo: user.photo,
+      departmentId: assignment?.departmentId || null,
+      department: assignment?.department || null,
+      designation: user.designation,
+      joiningDate: user.joiningDate,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    }
   };
 };
 
@@ -121,7 +136,7 @@ const findEmployeeAccountByUserId = async (userId, dbClient = prisma) => {
         }
       }
     },
-    select: employeeAccountSelect
+    select: safeUserSelect
   });
 
   return mapEmployeeAccount(user);

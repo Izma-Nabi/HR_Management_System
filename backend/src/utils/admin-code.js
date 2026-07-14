@@ -10,9 +10,9 @@ const generateNextAdminCode = async (dbClient) => {
   const codePattern = `^${ADMIN_CODE_PREFIX}[0-9]+$`;
 
   const rows = await dbClient.$queryRaw`
-    SELECT COALESCE(MAX(CAST(SUBSTRING(admin_code, ${prefixOffset}) AS UNSIGNED)), 0) AS maxNumber
-    FROM admin_profiles
-    WHERE admin_code REGEXP ${codePattern}
+    SELECT COALESCE(MAX(CAST(SUBSTRING(userCode, ${prefixOffset}) AS UNSIGNED)), 0) AS maxNumber
+    FROM users
+    WHERE userCode REGEXP ${codePattern}
   `;
 
   const maxNumber = Number(rows[0]?.maxNumber || 0);
