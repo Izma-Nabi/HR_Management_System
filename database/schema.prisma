@@ -7,12 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
 enum EmploymentStatus {
   ACTIVE
   INACTIVE
@@ -69,7 +63,7 @@ model User {
   joiningDate DateTime? @map("joiningDate") @db.Date
 
   employmentStatus EmploymentStatus @default(ACTIVE) @map("employmentStatus")
-  status             UserStatus       @default(ACTIVE)
+  status           EmploymentStatus @default(ACTIVE)
 
   roleId Int @map("role_id") @db.UnsignedInt
   role   Role @relation(fields: [roleId], references: [id])
