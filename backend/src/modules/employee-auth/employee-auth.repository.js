@@ -81,8 +81,7 @@ const mapEmployeeAccount = (user) => {
     return null;
   }
 
-  const assignment = firstDepartmentAssignment(user);
-
+  const managedDepartments = user.adminDepartments || [];
   return {
     user: toSafeUser(user),
     employee: {
@@ -96,6 +95,7 @@ const mapEmployeeAccount = (user) => {
       photo: user.photo,
       departmentId: assignment?.departmentId || null,
       department: assignment?.department || null,
+      managedDepartments:user.adminDepartments.map(item=>item.department),
       designation: user.designation,
       joiningDate: user.joiningDate,
       createdAt: user.createdAt,

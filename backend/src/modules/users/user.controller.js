@@ -2,7 +2,7 @@ const { sendSuccess } = require("../../utils/apiResponse");
 const asyncHandler = require("../../utils/asyncHandler");
 const userService = require("./user.service");
 
-const createAdmin = asyncHandler(async (req, res) => {
+const createAdmin = asyncHandler(async (req,res)=>{
 
   const result = await userService.createAdmin(req.body);
 
@@ -41,9 +41,12 @@ const getAdmin = asyncHandler(async (req, res) => {
 
 });
 
-const updateAdmin = asyncHandler(async (req, res) => {
+const updateAdmin = asyncHandler(async (req,res)=>{
 
-  const result = await userService.updateAdmin(req.params.id, req.body);
+  const result = await userService.updateAdmin(
+    req.params.id,
+    req.body
+  );
 
   return sendSuccess(
     res,

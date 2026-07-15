@@ -11,6 +11,7 @@ type AdminProfile = {
   phone: string | null;
   address: string | null;
   departmentId: number | null;
+  managedDepartmentIds: number[];
   designation: string | null;
   joiningDate: string | null;
   user: {
@@ -38,7 +39,8 @@ const form = reactive({
   lastName: "",
   phone: "",
   address: "",
-  departmentId: null as number | null,
+  selectedDepartmentId: null as number | null,
+  managedDepartmentIds: [] as number[],
   designation: "",
   joiningDate: "",
   photo: null as File | null
@@ -85,7 +87,8 @@ const loadAdmin = async (headers: Record<string, string>) => {
   form.lastName = admin.lastName || "";
   form.phone = admin.phone || "";
   form.address = admin.address || "";
-  form.departmentId = admin.departmentId;
+  form.managedDepartmentIds =
+  admin.managedDepartmentIds || [];
   form.designation = admin.designation || "";
   form.joiningDate = formatDate(admin.joiningDate);
   form.photo = null;
@@ -112,6 +115,41 @@ onMounted(async () => {
   }
 });
 
+const addDepartment = () => {
+
+  if (!form.selectedDepartmentId) {
+    return;
+  }
+
+  if (!form.managedDepartmentIds.includes(form.selectedDepartmentId)) {
+    form.managedDepartmentIds.push(
+      form.selectedDepartmentId
+    );
+  }
+
+  form.selectedDepartmentId = null;
+};
+
+
+const removeDepartment = (departmentId:number) => {
+
+  form.managedDepartmentIds =
+    form.managedDepartmentIds.filter(
+      id => id !== departmentId
+    );
+
+};
+
+
+const getDepartmentName = (id:number) => {
+
+  return departments.value.find(
+    department => department.id === id
+  )?.departmentName || "";
+
+};
+
+
 const saveAdmin = async () => {
   const headers = authHeaders();
 
@@ -131,9 +169,22 @@ const saveAdmin = async () => {
     body.append("lastName", form.lastName);
     body.append("phone", form.phone);
     body.append("address", form.address);
-    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
     body.append("designation", form.designation);
     body.append("joiningDate", form.joiningDate);
+
+    // Primary department (users.department_id)
+    body.append(
+      "departmentId",
+      form.managedDepartmentIds.length
+        ? String(form.managedDepartmentIds[0])
+        : ""
+    );
+
+    // Managed departments (admin_departments)
+    body.append(
+      "managedDepartmentIds",
+      JSON.stringify(form.managedDepartmentIds)
+    );
 
     if (form.photo) {
       body.append("photo", form.photo);
@@ -192,18 +243,65 @@ const saveAdmin = async () => {
           <input v-model="form.phone" type="tel" placeholder="03xxxxxxxxx">
         </label>
 
-        <label class="form-group">
-          <span>Department</span>
-          <select v-model.number="form.departmentId" required>
-            <option disabled :value="null">Select Department</option>
-            <option
-              v-for="department in departments"
-              :key="department.id"
-              :value="department.id"
+        <label class="form-group full">
+          <span>Departments</span>
+
+          <div class="department-picker">
+
+            <select v-model.number="form.selectedDepartmentId">
+
+              <option :value="null" disabled>
+                Select Department
+              </option>
+
+              <option
+                v-for="department in departments"
+                :key="department.id"
+                :value="department.id"
+              >
+                {{ department.departmentName }}
+              </option>
+
+            </select>
+
+
+            <button
+              type="button"
+              @click="addDepartment"
             >
-              {{ department.departmentName }}
-            </option>
-          </select>
+              +
+            </button>
+
+          </div>
+
+
+          <div
+            v-if="form.managedDepartmentIds.length"
+            class="department-list"
+          >
+
+            <div
+              v-for="departmentId in form.managedDepartmentIds"
+              :key="departmentId"
+              class="department-chip"
+            >
+
+              <span>
+                {{ getDepartmentName(departmentId) }}
+              </span>
+
+
+              <button
+                type="button"
+                @click="removeDepartment(departmentId)"
+              >
+                ×
+              </button>
+
+            </div>
+
+          </div>
+
         </label>
 
         <label class="form-group">

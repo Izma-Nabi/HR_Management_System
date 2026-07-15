@@ -65,16 +65,15 @@ const createAdmin = async (payload) => {
   await ensureDepartmentExists(payload.departmentId);
 
   const passwordHash = await hashPassword(payload.password);
-  const fullName = buildFullName(payload);
 
   return repository.createAdmin({
     ...payload,
     employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
-    fullName,
     passwordHash,
     roleId: role.id
   });
 };
+
 
 const listAdmins = async () => {
   return repository.listAdmins();

@@ -24,6 +24,16 @@ const userProfileSelect = {
       roleName: true
     }
   },
+ departmentId: true,
+
+department: {
+  select: {
+    id: true,
+    departmentName: true,
+    description: true
+  }
+},
+
   adminDepartments: {
     select: {
       departmentId: true,
@@ -34,17 +44,12 @@ const userProfileSelect = {
           description: true
         }
       }
-    },
-    take: 1
+    }
   }
 };
 
 const fullNameFromUser = (user) => {
   return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
-};
-
-const firstDepartmentAssignment = (user) => {
-  return user?.adminDepartments?.[0] || null;
 };
 
 const toSafeUser = (user) => {
@@ -68,25 +73,43 @@ const mapAdmin = (user) => {
     return null;
   }
 
-  const assignment = firstDepartmentAssignment(user);
+  const managedDepartments = user.adminDepartments?.map(
+    (item) => item.department
+  ) || [];
 
   return {
     id: user.id,
     userId: user.id,
     adminCode: user.userCode,
+
     firstName: user.firstName,
     lastName: user.lastName,
+
     phone: user.phone,
     address: user.address,
-    departmentId: assignment?.departmentId || null,
-    designation: user.designation,
-    employmentStatus: user.employmentStatus,
-    joiningDate: user.joiningDate,
     photo: user.photo,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    user: toSafeUser(user),
-    department: assignment?.department || null
+
+    // users table department
+    departmentId: user.departmentId || null,
+
+    // users table department object
+    department: user.department || null,
+
+    // admin_departments table departments
+    managedDepartments,
+
+    managedDepartmentIds: user.adminDepartments?.map(
+      (item)=>item.departmentId
+    ) || [],
+
+    designation: user.designation,
+    employmentStatus:user.employmentStatus,
+    joiningDate:user.joiningDate,
+
+    createdAt:user.createdAt,
+    updatedAt:user.updatedAt,
+
+    user:toSafeUser(user)
   };
 };
 
@@ -94,8 +117,6 @@ const mapEmployeeUser = (user) => {
   if (!user) {
     return null;
   }
-
-  const assignment = firstDepartmentAssignment(user);
 
   return {
     id: user.id,
@@ -106,14 +127,15 @@ const mapEmployeeUser = (user) => {
     phone: user.phone,
     address: user.address,
     photo: user.photo,
-    departmentId: assignment?.departmentId || null,
-    department: assignment?.department || null,
+    departmentId: user.departmentId,
+    department: user.department,
     designation: user.designation,
     joiningDate: user.joiningDate,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
 };
+
 
 const roleWhere = (roleName) => ({
   role: {
@@ -156,32 +178,46 @@ const findDepartmentById = async (id, dbClient = prisma) => {
   });
 };
 
-const replaceDepartmentAssignment = async (dbClient, userId, departmentId) => {
+
+const replaceDepartmentAssignment = async (
+  dbClient,
+  userId,
+  departmentIds
+) => {
+
   await dbClient.adminDepartment.deleteMany({
-    where: {
-      userId: Number(userId)
+    where:{
+      userId:Number(userId)
     }
   });
 
-  if (!departmentId) {
+
+  if(
+    !Array.isArray(departmentIds) ||
+    departmentIds.length === 0
+  ){
     return;
   }
 
-  await dbClient.adminDepartment.create({
-    data: {
-      userId: Number(userId),
-      departmentId: Number(departmentId)
-    }
+
+  await dbClient.adminDepartment.createMany({
+    data: departmentIds.map(id=>({
+      userId:Number(userId),
+      departmentId:Number(id)
+    }))
   });
 };
 
+
+
 const findAdminById = async (id, dbClient = prisma) => {
+
   const user = await dbClient.user.findFirst({
-    where: {
-      id: Number(id),
+    where:{
+      id:Number(id),
       ...roleWhere("ADMIN")
     },
-    select: userProfileSelect
+    select:userProfileSelect
   });
 
   return mapAdmin(user);
@@ -205,105 +241,148 @@ const listAdmins = async () => {
 };
 
 const createAdmin = async (data) => {
-  return prisma.$transaction(async (tx) => {
+
+  return prisma.$transaction(async (tx)=>{
+
     const adminCode = await generateNextAdminCode(tx);
 
+
     const user = await tx.user.create({
-      data: {
-        userCode: adminCode,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        passwordHash: data.passwordHash,
-        phone: data.phone,
-        address: data.address,
-        photo: data.photo,
-        designation: data.designation,
-        joiningDate: data.joiningDate ? new Date(data.joiningDate) : null,
-        employmentStatus: data.employmentStatus || "ACTIVE",
-        roleId: data.roleId,
-        status: "ACTIVE"
+
+      data:{
+        userCode:adminCode,
+        firstName:data.firstName,
+        lastName:data.lastName,
+        email:data.email,
+        passwordHash:data.passwordHash,
+        phone:data.phone,
+        address:data.address,
+        photo:data.photo,
+        designation:data.designation,
+
+        joiningDate:data.joiningDate
+          ? new Date(data.joiningDate)
+          : null,
+
+        employmentStatus:data.employmentStatus || "ACTIVE",
+
+        departmentId:data.departmentId
+          ? Number(data.departmentId)
+          : null,
+
+        roleId:data.roleId,
+
+        status:"ACTIVE"
       },
-      select: {
-        id: true
+
+      select:{
+        id:true
       }
+
     });
 
-    await replaceDepartmentAssignment(tx, user.id, data.departmentId);
 
-    return findAdminById(user.id, tx);
+    await replaceDepartmentAssignment(
+      tx,
+      user.id,
+      data.managedDepartmentIds
+    );
+
+
+    return findAdminById(user.id,tx);
+
   });
+
 };
 
 const updateAdmin = async (id, data) => {
-  return prisma.$transaction(async (tx) => {
-    const existingAdmin = await findAdminById(id, tx);
+  return prisma.$transaction(
+    async (tx) => {
 
-    if (!existingAdmin) {
-      return null;
+      const existingAdmin = await findAdminById(id, tx);
+
+      if (!existingAdmin) {
+        return null;
+      }
+
+      const userData = {};
+
+      if (data.firstName !== undefined) {
+        userData.firstName = data.firstName;
+      }
+
+      if (data.lastName !== undefined) {
+        userData.lastName = data.lastName;
+      }
+
+      if (data.email !== undefined) {
+        userData.email = data.email;
+      }
+
+      if (data.passwordHash !== undefined) {
+        userData.passwordHash = data.passwordHash;
+      }
+
+      if (data.phone !== undefined) {
+        userData.phone = data.phone;
+      }
+
+      if (data.address !== undefined) {
+        userData.address = data.address;
+      }
+
+      if (data.photo !== undefined) {
+        userData.photo = data.photo;
+      }
+
+      if (data.designation !== undefined) {
+        userData.designation = data.designation;
+      }
+
+      if (data.joiningDate !== undefined) {
+        userData.joiningDate = data.joiningDate
+          ? new Date(data.joiningDate)
+          : null;
+      }
+
+      if (data.employmentStatus !== undefined) {
+        userData.employmentStatus = data.employmentStatus;
+      }
+
+      if (data.status !== undefined) {
+        userData.status = data.status;
+      }
+
+
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({
+          where:{
+            id: existingAdmin.userId
+          },
+          data:userData
+        });
+      }
+
+
+      if (data.managedDepartmentIds !== undefined) {
+        await replaceDepartmentAssignment(
+          tx,
+          existingAdmin.userId,
+          data.managedDepartmentIds
+        );
+      }
+
+
+      return findAdminById(
+        existingAdmin.userId,
+        tx
+      );
+
+    },
+    {
+      timeout:15000
     }
-
-    const userData = {};
-
-    if (data.firstName !== undefined) {
-      userData.firstName = data.firstName;
-    }
-
-    if (data.lastName !== undefined) {
-      userData.lastName = data.lastName;
-    }
-
-    if (data.email !== undefined) {
-      userData.email = data.email;
-    }
-
-    if (data.passwordHash !== undefined) {
-      userData.passwordHash = data.passwordHash;
-    }
-
-    if (data.phone !== undefined) {
-      userData.phone = data.phone;
-    }
-
-    if (data.address !== undefined) {
-      userData.address = data.address;
-    }
-
-    if (data.photo !== undefined) {
-      userData.photo = data.photo;
-    }
-
-    if (data.designation !== undefined) {
-      userData.designation = data.designation;
-    }
-
-    if (data.joiningDate !== undefined) {
-      userData.joiningDate = data.joiningDate ? new Date(data.joiningDate) : null;
-    }
-
-    if (data.employmentStatus !== undefined) {
-      userData.employmentStatus = data.employmentStatus;
-    }
-
-    if (data.status !== undefined) {
-      userData.status = data.status;
-    }
-
-    if (Object.keys(userData).length > 0) {
-      await tx.user.update({
-        where: {
-          id: existingAdmin.userId
-        },
-        data: userData
-      });
-    }
-
-    if (data.departmentId !== undefined) {
-      await replaceDepartmentAssignment(tx, existingAdmin.userId, data.departmentId);
-    }
-
-    return findAdminById(existingAdmin.userId, tx);
-  });
+  );
 };
 
 const deleteAdmin = async (id) => {
@@ -339,6 +418,9 @@ const createEmployee = async (data) => {
         address: data.address,
         photo: data.photo,
         designation: data.designation,
+        departmentId: data.departmentId
+        ? Number(data.departmentId)
+        : null,
         employmentStatus: data.employmentStatus || "ACTIVE",
         roleId: data.roleId,
         status: "ACTIVE"

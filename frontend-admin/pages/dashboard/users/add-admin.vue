@@ -31,10 +31,12 @@ const form = reactive({
   lastName: "",
   phone: "",
   address: "",
-  departmentId: null as number | null,
+  primaryDepartmentId: null as number | null,
+  selectedDepartmentId: null as number | null,
+  managedDepartmentIds: [] as number[],
   designation: "",
   joiningDate: "",
-  photo: null as File | null
+  photo: null as File |null
 });
 
 const fieldErrorMap = computed(() => {
@@ -79,6 +81,42 @@ onMounted(async () => {
   }
 });
 
+const addDepartment = () => {
+  if (!form.selectedDepartmentId) {
+    return;
+  }
+
+  if (!form.managedDepartmentIds.includes(form.selectedDepartmentId)) {
+    form.managedDepartmentIds.push(form.selectedDepartmentId);
+
+    if (!form.primaryDepartmentId) {
+      form.primaryDepartmentId = form.selectedDepartmentId;
+    }
+  }
+
+  form.selectedDepartmentId = null;
+};
+
+const removeDepartment = (departmentId:number) => {
+  form.managedDepartmentIds =
+    form.managedDepartmentIds.filter(id => id !== departmentId);
+
+  if (form.primaryDepartmentId === departmentId) {
+    form.primaryDepartmentId =
+      form.managedDepartmentIds.length
+        ? form.managedDepartmentIds[0]
+        : null;
+  }
+};
+
+const getDepartmentName = (id:number) => {
+  return (
+    departments.value.find(d => d.id === id)?.departmentName ||
+    ""
+  );
+};
+
+
 const selectPhoto = (event: Event) => {
   const input = event.target as HTMLInputElement;
   form.photo = input.files?.[0] || null;
@@ -91,7 +129,9 @@ const resetForm = () => {
   form.lastName = "";
   form.phone = "";
   form.address = "";
-  form.departmentId = null;
+  form.primaryDepartmentId = null;
+  form.selectedDepartmentId = null;
+  form.managedDepartmentIds = [];
   form.designation = "";
   form.joiningDate = "";
   form.photo = null;
@@ -124,12 +164,12 @@ const validateForm = () => {
     });
   }
 
-  if (!form.departmentId) {
-    fieldErrors.value.push({
-      field: "departmentId",
-      message: "Department is required."
-    });
-  }
+if (form.managedDepartmentIds.length === 0) {
+  fieldErrors.value.push({
+    field: "managedDepartmentIds",
+    message: "Please select at least one department."
+  });
+}
 
   if (form.password && form.password.length < 8) {
     fieldErrors.value.push({
@@ -179,13 +219,16 @@ const saveAdmin = async () => {
   successMessage.value = "";
   fieldErrors.value = [];
 
-  // Frontend Validation
   if (!validateForm()) {
     loading.value = false;
     return;
   }
 
   try {
+  console.log("Selected Department:", form.selectedDepartmentId);
+console.log("Managed Departments:", form.managedDepartmentIds);
+console.log(form);
+console.log(form.managedDepartmentIds);
     const body = new FormData();
 
     body.append("email", form.email);
@@ -194,14 +237,30 @@ const saveAdmin = async () => {
     body.append("lastName", form.lastName);
     body.append("phone", form.phone);
     body.append("address", form.address);
-    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
     body.append("designation", form.designation);
     body.append("joiningDate", form.joiningDate);
 
+    // Primary department (users.department_id)
+    body.append(
+      "departmentId",
+      form.managedDepartmentIds.length
+        ? String(form.managedDepartmentIds[0])
+        : ""
+    );
+
+    // Managed departments (admin_departments)
+    body.append(
+      "managedDepartmentIds",
+      JSON.stringify(form.managedDepartmentIds)
+    );
+console.log(body.get("managedDepartmentIds"));
     if (form.photo) {
       body.append("photo", form.photo);
     }
 
+console.log("Selected Department:", form.selectedDepartmentId);
+console.log("Managed Departments:", form.managedDepartmentIds);
+console.log("FORM DATA MANAGED:", body.get("managedDepartmentIds"));
     const response = await $fetch<{ message: string }>(
       `${config.public.apiBase}/users/admin`,
       {
@@ -212,13 +271,13 @@ const saveAdmin = async () => {
     );
 
     successMessage.value =
-    response.message || "Administrator created successfully";
+      response.message || "Administrator created successfully";
 
-  resetForm();
+    resetForm();
 
-  setTimeout(async () => {
-    await navigateTo("/dashboard/admins");
-  }, 1500);
+    setTimeout(async () => {
+      await navigateTo("/dashboard/admins");
+    }, 1500);
   } catch (error: any) {
     errorMessage.value =
       error?.data?.message || "Unable to create administrator";
@@ -277,19 +336,59 @@ const saveAdmin = async () => {
           <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
         </label>
 
-        <label class="form-group">
+       <label class="form-group full">
           <span>Department</span>
-          <select v-model.number="form.departmentId" required>
-            <option disabled :value="null">Select Department</option>
-            <option
-              v-for="department in departments"
-              :key="department.id"
-              :value="department.id"
+
+          <div class="department-picker">
+            <select v-model.number="form.selectedDepartmentId">
+              <option :value="null" disabled>
+                Select Department
+              </option>
+
+              <option
+                v-for="department in departments"
+                :key="department.id"
+                :value="department.id"
+              >
+                {{ department.departmentName }}
+              </option>
+            </select>
+
+            <button
+              type="button"
+              class="add-btn"
+              @click="addDepartment"
             >
-              {{ department.departmentName }}
-            </option>
-          </select>
-          <small v-if="fieldErrorMap.departmentId">{{ fieldErrorMap.departmentId }}</small>
+              +
+            </button>
+          </div>
+
+          <div
+            v-if="form.managedDepartmentIds.length"
+            class="department-list"
+          >
+            <div
+              v-for="departmentId in form.managedDepartmentIds"
+              :key="departmentId"
+              class="department-chip"
+            >
+              <span>
+                {{ getDepartmentName(departmentId) }}
+              </span>
+
+              <button
+                type="button"
+                class="remove-btn"
+                @click="removeDepartment(departmentId)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <small v-if="fieldErrorMap.managedDepartmentIds">
+            {{ fieldErrorMap.managedDepartmentIds }}
+          </small>
         </label>
 
         <label class="form-group">
@@ -489,6 +588,52 @@ button:disabled {
 
   .buttons {
     flex-direction: column-reverse;
+  }
+  .department-picker{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  }
+
+  .department-picker select{
+  flex:1;
+  }
+
+  .add-btn{
+  width:42px;
+  height:42px;
+  border:none;
+  border-radius:8px;
+  background:#2563eb;
+  color:#fff;
+  font-size:22px;
+  cursor:pointer;
+  }
+
+  .department-list{
+  margin-top:12px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  }
+
+  .department-chip{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 14px;
+  background:#eef2ff;
+  border-radius:999px;
+  font-size:14px;
+  }
+
+  .remove-btn{
+  border:none;
+  background:none;
+  cursor:pointer;
+  font-size:18px;
+  color:#ef4444;
+  font-weight:bold;
   }
 }
 </style>

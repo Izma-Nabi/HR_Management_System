@@ -5,45 +5,46 @@ const { generateNextEmployeeCode } = require("../../utils/employee-code");
 const userProfileSelect = {
   id: true,
   userCode: true,
+
   firstName: true,
   lastName: true,
+
   email: true,
+
   phone: true,
   address: true,
   photo: true,
+
   designation: true,
   joiningDate: true,
+
   employmentStatus: true,
+
   status: true,
+
+  departmentId: true,
+
   createdAt: true,
   updatedAt: true,
+
   role: {
     select: {
       id: true,
       roleName: true
     }
   },
-  adminDepartments: {
+
+  department: {
     select: {
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true,
-          description: true
-        }
-      }
-    },
-    take: 1
+      id: true,
+      departmentName: true,
+      description: true
+    }
   }
 };
 
 const fullNameFromUser = (user) => {
   return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
-};
-
-const firstDepartmentAssignment = (user) => {
-  return user?.adminDepartments?.[0] || null;
 };
 
 const toSafeUser = (user) => {
@@ -67,7 +68,6 @@ const mapEmployeeAccount = (user) => {
     return null;
   }
 
-  const assignment = firstDepartmentAssignment(user);
 
   return {
     user: toSafeUser(user),
@@ -80,8 +80,8 @@ const mapEmployeeAccount = (user) => {
       phone: user.phone,
       address: user.address,
       photo: user.photo,
-      departmentId: assignment?.departmentId || null,
-      department: assignment?.department || null,
+      departmentId: user.departmentId,
+      department: user.department,
       designation: user.designation,
       joiningDate: user.joiningDate,
       createdAt: user.createdAt,
@@ -129,24 +129,6 @@ const findEmployeeRole = async (dbClient = prisma) => {
   });
 };
 
-const replaceDepartmentAssignment = async (dbClient, userId, departmentId) => {
-  await dbClient.adminDepartment.deleteMany({
-    where: {
-      userId: Number(userId)
-    }
-  });
-
-  if (!departmentId) {
-    return;
-  }
-
-  await dbClient.adminDepartment.create({
-    data: {
-      userId: Number(userId),
-      departmentId: Number(departmentId)
-    }
-  });
-};
 
 const listEmployeeAccounts = async () => {
   const employees = await prisma.user.findMany({
@@ -183,26 +165,31 @@ const createEmployeeAccount = async ({ user, employee }) => {
       const employeeCode = await generateNextEmployeeCode(tx);
 
       const created = await tx.user.create({
-        data: {
-          userCode: employeeCode,
-          firstName: employee.firstName,
-          lastName: employee.lastName,
-          email: user.email,
-          passwordHash: user.passwordHash,
-          phone: employee.phone,
-          address: employee.address,
-          photo: employee.photo,
-          designation: employee.designation,
-          employmentStatus: "ACTIVE",
-          roleId: employeeRole.id,
-          status: "ACTIVE"
-        },
-        select: {
-          id: true
-        }
-      });
+    data: {
+        userCode: employeeCode,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: user.email,
+        passwordHash: user.passwordHash,
+        phone: employee.phone,
+        address: employee.address,
+        photo: employee.photo,
+        designation: employee.designation,
+        joiningDate: employee.joiningDate,
+        employmentStatus: "ACTIVE",
 
-      await replaceDepartmentAssignment(tx, created.id, employee.departmentId);
+        roleId: employeeRole.id,
+
+        departmentId: employee.departmentId
+            ? Number(employee.departmentId)
+            : null,
+
+          status: "ACTIVE"
+          },
+          select: {
+              id: true
+          }
+      });
 
       return tx.user.findUnique({
         where: {

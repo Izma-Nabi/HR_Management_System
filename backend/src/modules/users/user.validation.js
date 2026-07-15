@@ -23,10 +23,21 @@ const createAdminSchema = Joi.object({
   phone: optionalText(30),
   address: optionalText(255),
 
-  departmentId: Joi.number().integer().positive().required().messages({
-    "number.base": "Department is required",
-    "any.required": "Department is required"
-  }),
+ departmentId: Joi.number().integer().positive().required().messages({
+  "number.base": "Department is required",
+  "any.required": "Department is required"
+}),
+
+  managedDepartmentIds: Joi.array()
+    .items(
+      Joi.number().integer().positive()
+    )
+    .min(1)
+    .required()
+    .messages({
+      "array.min": "At least one department is required",
+      "any.required": "Departments are required"
+    }),
 
   designation: optionalText(100),
   employmentStatus: employmentStatus.empty("").default("ACTIVE"),
@@ -48,6 +59,11 @@ const updateAdminSchema = Joi.object({
   phone: optionalUpdateText(30),
   address: optionalUpdateText(255),
   departmentId: Joi.number().integer().positive().allow(null).optional(),
+  managedDepartmentIds: Joi.array()
+  .items(
+    Joi.number().integer().positive()
+  )
+  .optional(),
   designation: optionalUpdateText(100),
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().allow(null).optional(),

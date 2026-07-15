@@ -4,11 +4,23 @@ const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
 const { uploadAdminPhoto } = require("../../middlewares/upload.middleware");
 const userController = require("./user.controller");
+const parseAdminDepartments = require("../../middlewares/parse-admin-departments.middleware");
 const {
   createAdminSchema,
   updateAdminSchema,
   createEmployeeSchema
 } = require("./user.validation");
+
+
+const parseDepartments = (req,res,next)=>{
+  if(req.body.managedDepartmentIds){
+    req.body.managedDepartmentIds =
+      JSON.parse(req.body.managedDepartmentIds);
+  }
+
+  next();
+};
+
 
 const router = express.Router();
 
@@ -17,9 +29,11 @@ router.use(authMiddleware, allowRoles("SUPER_ADMIN"));
 router.post(
   "/admin",
   uploadAdminPhoto,
+  parseAdminDepartments,
   validate(createAdminSchema),
   userController.createAdmin
 );
+
 
 router.get(
   "/admins",
@@ -39,6 +53,7 @@ router.get(
 router.put(
   "/admin/:id",
   uploadAdminPhoto,
+  parseAdminDepartments,
   validate(updateAdminSchema),
   userController.updateAdmin
 );
@@ -46,6 +61,7 @@ router.put(
 router.patch(
   "/admin/:id",
   uploadAdminPhoto,
+  parseAdminDepartments,
   validate(updateAdminSchema),
   userController.updateAdmin
 );
