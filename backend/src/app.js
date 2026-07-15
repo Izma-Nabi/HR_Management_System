@@ -9,6 +9,7 @@ const userRoutes = require("./modules/users/user.routes");
 const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.routes");
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
 const departmentRoutes = require("./modules/departments/departments.routes");
+const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 
 const {
   notFoundHandler,
@@ -28,8 +29,12 @@ const corsOptions = env.corsOrigin === "*"
       credentials: true
     };
 
-app.use(cors(corsOptions));
-
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true
+  })
+);
 // Parse JSON request bodies. The small limit reduces abuse risk.
 app.use(express.json({ limit: "10kb" }));
 
@@ -39,6 +44,7 @@ app.use(express.urlencoded({ extended: false }));
 // Serve uploaded employee photos.
 app.use("/uploads", express.static(uploadsRoot));
 
+app.use("/api/dashboard", dashboardRoutes);
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));

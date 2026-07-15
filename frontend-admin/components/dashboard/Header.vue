@@ -35,13 +35,29 @@ const logout = () => {
 
 <style scoped>
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 30px;
+  position: fixed;
+  top: 0;
+  left: 250px;
+  right: 0;
+  height: 80px;
   background: white;
+  z-index: 40;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
   border-bottom: 1px solid #ececec;
 }
+
+
+.header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+}
+
 
 .right {
   display: flex;
@@ -49,11 +65,20 @@ const logout = () => {
   gap: 25px;
 }
 
+
 .profile {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
+
+.profile h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+}
+
 
 img {
   width: 45px;
@@ -61,10 +86,12 @@ img {
   border-radius: 50%;
 }
 
+
 .bell {
   font-size: 22px;
   cursor: pointer;
 }
+
 
 .logout-btn {
   padding: 8px 16px;
@@ -77,6 +104,7 @@ img {
   cursor: pointer;
   transition: background 0.2s ease;
 }
+
 
 .logout-btn:hover {
   background: #c82333;
