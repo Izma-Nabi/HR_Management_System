@@ -21,6 +21,8 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const fieldErrors = ref<FieldError[]>([]);
 const photoInputKey = ref(0);
+const today = new Date().toISOString().split("T")[0];
+
 
 const form = reactive({
   email: "",
@@ -98,6 +100,72 @@ const resetForm = () => {
   photoInputKey.value += 1;
 };
 
+const validateForm = () => {
+  fieldErrors.value = [];
+
+  if (!form.firstName.trim()) {
+    fieldErrors.value.push({
+      field: "firstName",
+      message: "First Name is required."
+    });
+  }
+
+  if (!form.email.trim()) {
+    fieldErrors.value.push({
+      field: "email",
+      message: "Email is required."
+    });
+  }
+
+  if (!form.password.trim()) {
+    fieldErrors.value.push({
+      field: "password",
+      message: "Password is required."
+    });
+  }
+
+  if (!form.departmentId) {
+    fieldErrors.value.push({
+      field: "departmentId",
+      message: "Department is required."
+    });
+  }
+
+  if (form.password && form.password.length < 8) {
+    fieldErrors.value.push({
+      field: "password",
+      message: "Password must be at least 8 characters."
+    });
+  }
+
+  if (
+    form.phone &&
+    !/^03\d{9}$/.test(form.phone)
+  ) {
+    fieldErrors.value.push({
+      field: "phone",
+      message: "Enter a valid phone number."
+    });
+  }
+
+  if (form.address && form.address.trim().length < 5) {
+    fieldErrors.value.push({
+      field: "address",
+      message: "Address is too short."
+    });
+  }
+
+  if (form.joiningDate && form.joiningDate < today) {
+    fieldErrors.value.push({
+      field: "joiningDate",
+      message: "Joining date cannot be before today."
+    });
+  }
+
+  return fieldErrors.value.length === 0;
+};
+
+
 const saveAdmin = async () => {
   const headers = authHeaders();
 
@@ -110,6 +178,12 @@ const saveAdmin = async () => {
   errorMessage.value = "";
   successMessage.value = "";
   fieldErrors.value = [];
+
+  // Frontend Validation
+  if (!validateForm()) {
+    loading.value = false;
+    return;
+  }
 
   try {
     const body = new FormData();
@@ -128,18 +202,30 @@ const saveAdmin = async () => {
       body.append("photo", form.photo);
     }
 
-    const response = await $fetch<{ message: string }>(`${config.public.apiBase}/users/admin`, {
-      method: "POST",
-      headers,
-      body
-    });
+    const response = await $fetch<{ message: string }>(
+      `${config.public.apiBase}/users/admin`,
+      {
+        method: "POST",
+        headers,
+        body
+      }
+    );
 
-    successMessage.value = response.message || "Administrator created successfully";
-    resetForm();
+    successMessage.value =
+    response.message || "Administrator created successfully";
+
+  resetForm();
+
+  setTimeout(async () => {
     await navigateTo("/dashboard/admins");
+  }, 1500);
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to create administrator";
-    fieldErrors.value = Array.isArray(error?.data?.errors) ? error.data.errors : [];
+    errorMessage.value =
+      error?.data?.message || "Unable to create administrator";
+
+    fieldErrors.value = Array.isArray(error?.data?.errors)
+      ? error.data.errors
+      : [];
   } finally {
     loading.value = false;
   }
@@ -214,7 +300,7 @@ const saveAdmin = async () => {
 
         <label class="form-group">
           <span>Joining Date</span>
-          <input v-model="form.joiningDate" type="date">
+          <input  v-model="form.joiningDate"  type="date"  :min="today"/>
           <small v-if="fieldErrorMap.joiningDate">{{ fieldErrorMap.joiningDate }}</small>
         </label>
 

@@ -1,89 +1,84 @@
 <template>
-
-<header class="header">
-
+  <header class="header">
     <h2>Admin Dashboard</h2>
 
     <div class="right">
+      <span class="bell">🔔</span>
 
-        <span class="bell">🔔</span>
+      <div class="profile">
+        <img
+          src="https://ui-avatars.com/api/?name=Admin"
+          alt="Admin"
+        />
 
-        <div class="profile">
-
-            <img
-            src="https://ui-avatars.com/api/?name=Admin"
-            />
-
-            <div>
-
-                <h4>Administrator</h4>
-
-                <small>Online</small>
-
-            </div>
-
+        <div>
+          <h4>Administrator</h4>
         </div>
+      </div>
 
+      <!-- Logout Button -->
+      <button class="logout-btn" @click="logout">
+        Logout
+      </button>
     </div>
-
-</header>
-
+  </header>
 </template>
 
+<script setup>
+const logout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user"); // Remove if you store user data
+
+  navigateTo("/login");
+};
+</script>
+
 <style scoped>
-
-.header{
-
-display:flex;
-
-justify-content:space-between;
-
-align-items:center;
-
-padding:20px 30px;
-
-background:white;
-
-border-bottom:1px solid #ececec;
-
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: white;
+  border-bottom: 1px solid #ececec;
 }
 
-.right{
-
-display:flex;
-
-align-items:center;
-
-gap:30px;
-
+.right {
+  display: flex;
+  align-items: center;
+  gap: 25px;
 }
 
-.profile{
-
-display:flex;
-
-align-items:center;
-
-gap:10px;
-
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-img{
-
-width:45px;
-
-height:45px;
-
-border-radius:50%;
-
+img {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
 }
 
-.bell{
-
-font-size:22px;
-
-cursor:pointer;
-
+.bell {
+  font-size: 22px;
+  cursor: pointer;
 }
 
+.logout-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #dc3545;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.logout-btn:hover {
+  background: #c82333;
+}
 </style>
