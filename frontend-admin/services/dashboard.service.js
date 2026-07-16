@@ -1,4 +1,4 @@
-const getDashboardSummary = async () => {
+const getDashboardSummary  = async () => {
 
   const config = useRuntimeConfig();
 
@@ -44,8 +44,23 @@ const getAttendanceTrend = async () => {
   return response.data;
 };
 
+const getTopLateEmployees = async () => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/dashboard/top-late-employees`,
+    {
+      method: "GET",
+      credentials: "include"
+    }
+  );
+
+  return response.data;
+};
+
 export default {
   getDashboardSummary,
   getAttendanceTrend,
-  getDepartmentAttendance
+  getDepartmentAttendance,
+  getTopLateEmployees
 };

@@ -133,23 +133,16 @@ model AdminDepartment {
 
 model Attendance {
   id               Int              @id @default(autoincrement()) @db.UnsignedInt
-
   userCode         String           @map("user_code") @db.VarChar(50)
   fullName         String           @map("full_name") @db.VarChar(100)
   role             String           @db.VarChar(50)
   department       String           @db.VarChar(100)
-
   attendanceDate   DateTime         @map("attendance_date") @db.Date
-
   checkIn          DateTime?        @map("check_in") @db.Time(0)
   checkOut         DateTime?        @map("check_out") @db.Time(0)
-
   status           AttendanceStatus
-
   remarks          String?          @db.Text
-
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
-
   @@map("attendance")
 }

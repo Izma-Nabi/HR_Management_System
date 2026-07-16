@@ -33,8 +33,13 @@ const getDepartmentAttendance = async () => {
 
 };
 
+const getTopLateEmployees = async () => {
+  return await dashboardRepository.getTopLateEmployees();
+};
+
 module.exports = {
   getSummary,
   getAttendanceTrend,
-  getDepartmentAttendance
+  getDepartmentAttendance,
+  getTopLateEmployees
 };
