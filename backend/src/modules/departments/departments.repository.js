@@ -10,7 +10,7 @@ const departmentInclude = {
           firstName: true,
           lastName: true,
           email: true,
-          status: true,
+          employmentStatus: true,
           role: {
             select: {
               id: true,
@@ -36,7 +36,7 @@ const mapPerson = (user) => ({
     id: user.id,
     email: user.email,
     fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
-    status: user.status
+    status: user.employmentStatus
   }
 });
 

@@ -1,2 +1,3 @@
 ALTER TABLE `users`
-  MODIFY `status` ENUM('ACTIVE', 'INACTIVE', 'RESIGNED', 'TERMINATED') NOT NULL DEFAULT 'ACTIVE';
+  DROP INDEX `users_status_idx`,
+  DROP COLUMN `status`;

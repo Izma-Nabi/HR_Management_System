@@ -26,6 +26,10 @@
         🏢 Departments
       </NuxtLink>
 
+      <NuxtLink to="/dashboard/leaves" class="nav-item">
+        Leave Requests
+      </NuxtLink>
+
       <NuxtLink to="/dashboard/attendance" class="nav-item">
         🕒 Attendance
       </NuxtLink>

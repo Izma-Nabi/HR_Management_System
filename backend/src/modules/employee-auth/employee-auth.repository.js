@@ -12,7 +12,7 @@ const safeUserSelect = {
   photo: true,
   designation: true,
   joiningDate: true,
-  status: true,
+  employmentStatus: true,
   createdAt: true,
   updatedAt: true,
   role: {
@@ -59,7 +59,7 @@ const toSafeUser = (user) => {
     fullName: fullNameFromUser(user),
     email: user.email,
     role: toRoleKey(user.role),
-    status: user.status,
+    status: user.employmentStatus,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };

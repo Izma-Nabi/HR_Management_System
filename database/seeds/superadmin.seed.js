@@ -72,7 +72,7 @@ const main = async () => {
       lastName: "Admin",
       passwordHash,
       roleId: superAdminRole.id,
-      status: "ACTIVE"
+      employmentStatus: "ACTIVE"
     },
 
     create: {
@@ -82,7 +82,7 @@ const main = async () => {
       email,
       passwordHash,
       roleId: superAdminRole.id,
-      status: "ACTIVE"
+      employmentStatus: "ACTIVE"
     }
   });
 

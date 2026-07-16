@@ -15,7 +15,6 @@ const userProfileSelect = {
   designation: true,
   joiningDate: true,
   employmentStatus: true,
-  status: true,
   createdAt: true,
   updatedAt: true,
   role: {
@@ -62,7 +61,7 @@ const toSafeUser = (user) => {
     fullName: fullNameFromUser(user),
     email: user.email,
     role: toRoleKey(user.role),
-    status: user.status,
+    status: user.employmentStatus,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -270,9 +269,7 @@ const createAdmin = async (data) => {
           ? Number(data.departmentId)
           : null,
 
-        roleId:data.roleId,
-
-        status:"ACTIVE"
+        roleId:data.roleId
       },
 
       select:{
@@ -349,11 +346,6 @@ const updateAdmin = async (id, data) => {
         userData.employmentStatus = data.employmentStatus;
       }
 
-      if (data.status !== undefined) {
-        userData.status = data.status;
-      }
-
-
       if (Object.keys(userData).length > 0) {
         await tx.user.update({
           where:{
@@ -422,8 +414,7 @@ const createEmployee = async (data) => {
         ? Number(data.departmentId)
         : null,
         employmentStatus: data.employmentStatus || "ACTIVE",
-        roleId: data.roleId,
-        status: "ACTIVE"
+        roleId: data.roleId
       },
       select: {
         id: true

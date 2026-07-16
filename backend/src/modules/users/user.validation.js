@@ -67,8 +67,7 @@ const updateAdminSchema = Joi.object({
   designation: optionalUpdateText(100),
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().allow(null).optional(),
-  photo: optionalUpdateText(255),
-  status: Joi.string().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED").optional()
+  photo: optionalUpdateText(255)
 }).min(1).messages({
   "object.min": "At least one field is required"
 });

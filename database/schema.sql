@@ -50,14 +50,12 @@ CREATE TABLE IF NOT EXISTS users (
   joiningDate DATE NULL,
   employmentStatus ENUM('ACTIVE', 'INACTIVE', 'RESIGNED', 'TERMINATED') NOT NULL DEFAULT 'ACTIVE',
   role_id INT UNSIGNED NOT NULL,
-  status ENUM('ACTIVE', 'INACTIVE', 'RESIGNED', 'TERMINATED') NOT NULL DEFAULT 'ACTIVE',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY users_email_key (email),
   UNIQUE KEY users_userCode_key (userCode),
   KEY users_role_id_idx (role_id),
-  KEY users_status_idx (status),
   CONSTRAINT users_role_id_fkey
     FOREIGN KEY (role_id)
     REFERENCES roles(id)
@@ -87,4 +85,32 @@ CREATE TABLE IF NOT EXISTS admin_departments (
     FOREIGN KEY (department_id)
     REFERENCES departments(id)
     ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS leave_requests (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  requester_id INT UNSIGNED NOT NULL,
+  approver_id INT UNSIGNED NULL,
+  type ENUM('ANNUAL', 'SICK', 'CASUAL', 'UNPAID', 'OTHER') NOT NULL DEFAULT 'OTHER',
+  status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  reason TEXT NULL,
+  decision_note TEXT NULL,
+  decided_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY leave_requests_requester_id_idx (requester_id),
+  KEY leave_requests_approver_id_idx (approver_id),
+  KEY leave_requests_status_idx (status),
+  KEY leave_requests_start_date_end_date_idx (start_date, end_date),
+  CONSTRAINT leave_requests_requester_id_fkey
+    FOREIGN KEY (requester_id)
+    REFERENCES users(id)
+    ON DELETE RESTRICT,
+  CONSTRAINT leave_requests_approver_id_fkey
+    FOREIGN KEY (approver_id)
+    REFERENCES users(id)
+    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -20,8 +20,6 @@ const userProfileSelect = {
 
   employmentStatus: true,
 
-  status: true,
-
   departmentId: true,
 
   createdAt: true,
@@ -57,7 +55,7 @@ const toSafeUser = (user) => {
     fullName: fullNameFromUser(user),
     email: user.email,
     role: toRoleKey(user.role),
-    status: user.status,
+    status: user.employmentStatus,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -182,9 +180,7 @@ const createEmployeeAccount = async ({ user, employee }) => {
 
         departmentId: employee.departmentId
             ? Number(employee.departmentId)
-            : null,
-
-          status: "ACTIVE"
+            : null
           },
           select: {
               id: true

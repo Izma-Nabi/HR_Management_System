@@ -21,6 +21,20 @@ enum AttendanceStatus {
   Leave
 }
 
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveRequestType {
+  ANNUAL
+  SICK
+  CASUAL
+  UNPAID
+  OTHER
+}
 
 model Role {
   id       Int    @id @default(autoincrement()) @db.UnsignedInt
@@ -71,7 +85,6 @@ model User {
   joiningDate DateTime? @map("joiningDate") @db.Date
 
   employmentStatus EmploymentStatus @default(ACTIVE) @map("employmentStatus")
-  status           EmploymentStatus @default(ACTIVE)
 
   roleId Int @map("role_id") @db.UnsignedInt
   role   Role @relation(fields: [roleId], references: [id])
@@ -83,13 +96,14 @@ model User {
   // Admin manages many departments
   adminDepartments AdminDepartment[]
 
+  leaveRequestsMade     LeaveRequest[] @relation("LeaveRequester")
+  leaveRequestsApproved LeaveRequest[] @relation("LeaveApprover")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@index([roleId])
   @@index([departmentId])
-  @@index([status])
-
   @@map("users")
 }
 
@@ -124,7 +138,6 @@ model AdminDepartment {
   @@map("admin_departments")
 }
 
-
 model Attendance {
   id               Int              @id @default(autoincrement()) @db.UnsignedInt
 
@@ -146,4 +159,33 @@ model Attendance {
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
   @@map("attendance")
+}
+
+model LeaveRequest {
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  requesterId Int  @map("requester_id") @db.UnsignedInt
+  requester   User @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+
+  approverId Int?  @map("approver_id") @db.UnsignedInt
+  approver   User? @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
+
+  type   LeaveRequestType   @default(OTHER)
+  status LeaveRequestStatus @default(PENDING)
+
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  reason       String? @db.Text
+  decisionNote String? @map("decision_note") @db.Text
+
+  decidedAt DateTime? @map("decided_at") @db.Timestamp(0)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([requesterId])
+  @@index([approverId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
 }

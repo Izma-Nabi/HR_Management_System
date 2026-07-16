@@ -1,6 +1,10 @@
 {
   "name": "bookme-pk",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend-admin"
+  ],
   "description": "Root-level database and global configuration tooling for Bookme.pk.",
   "scripts": {
     "prisma:generate": "node -r ./global/env ./node_modules/prisma/build/index.js generate --schema ./database/schema.prisma",
