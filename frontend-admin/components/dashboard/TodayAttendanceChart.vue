@@ -1,22 +1,98 @@
 <script setup>
-const present = 76;
-const absent = 24;
+import { ref, computed, onMounted } from "vue";
+import dashboardService from "~/services/dashboard.service";
+
+const total = ref(0);
+const present = ref(0);
+const absent = ref(0);
+const late = ref(0);
+const leave = ref(0);
+
+const presentPercent = computed(() =>
+  total.value ? Math.round((present.value / total.value) * 100) : 0
+);
+
+const absentPercent = computed(() =>
+  total.value ? Math.round((absent.value / total.value) * 100) : 0
+);
+
+const latePercent = computed(() =>
+  total.value ? Math.round((late.value / total.value) * 100) : 0
+);
+
+const leavePercent = computed(() =>
+  total.value ? Math.round((leave.value / total.value) * 100) : 0
+);
+
+const chartStyle = computed(() => ({
+  background: `conic-gradient(
+    #16a34a 0% ${presentPercent.value}%,
+    #f59e0b ${presentPercent.value}% ${presentPercent.value + latePercent.value}%,
+    #ef4444 ${presentPercent.value + latePercent.value}% ${
+      presentPercent.value + latePercent.value + absentPercent.value
+    }%,
+    #3b82f6 ${
+      presentPercent.value + latePercent.value + absentPercent.value
+    }% 100%
+  )`
+}));
+
+onMounted(async () => {
+  try {
+    const summary = await dashboardService.getDashboardSummary();
+
+    total.value = summary.total;
+    present.value = summary.present;
+    absent.value = summary.absent;
+    late.value = summary.late;
+    leave.value = summary.leave;
+  } catch (err) {
+    console.error(err);
+  }
+});
 </script>
 
 <template>
   <div class="donut-layout">
-    <div class="donut-chart" :style="{ background: `conic-gradient(#16a34a 0 ${present}%, #ef4444 ${present}% 100%)` }">
+    <div
+      class="donut-chart"
+      :style="chartStyle"
+    >
       <div class="donut-inner">
-        <div class="donut-value">{{ present }}%</div>
-        <div class="donut-text">Present</div>
+        <div class="donut-value">
+          {{ total }}
+        </div>
+
+        <div class="donut-text">
+          Today
+        </div>
       </div>
     </div>
+
     <div class="donut-legend">
-      <div class="legend-item"><span class="dot present"></span> Present {{ present }}%</div>
-      <div class="legend-item"><span class="dot absent"></span> Absent {{ absent }}%</div>
+      <div class="legend-item">
+        <span class="dot present"></span>
+        Present {{ present }} ({{ presentPercent }}%)
+      </div>
+
+      <div class="legend-item">
+        <span class="dot late"></span>
+        Late {{ late }} ({{ latePercent }}%)
+      </div>
+
+      <div class="legend-item">
+        <span class="dot absent"></span>
+        Absent {{ absent }} ({{ absentPercent }}%)
+      </div>
+
+      <div class="legend-item">
+        <span class="dot leave"></span>
+        Leave {{ leave }} ({{ leavePercent }}%)
+      </div>
     </div>
   </div>
 </template>
+
 
 <style scoped>
 .donut-layout {
@@ -74,7 +150,15 @@ const absent = 24;
 .present {
   background: #16a34a;
 }
+
 .absent {
   background: #ef4444;
+}
+.late {
+  background: #f59e0b;
+}
+
+.leave {
+  background: #3b82f6;
 }
 </style>

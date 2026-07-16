@@ -22,5 +22,8 @@ router.get(
   dashboardController.getDepartmentAttendance
 );
 
-
+router.get(
+  "/top-late-employees",
+  dashboardController.getTopLateEmployees
+);
 module.exports = router;

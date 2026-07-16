@@ -41,8 +41,20 @@ const getDepartmentAttendance = asyncHandler(async (req,res)=>{
   );
 
 });
+
+const getTopLateEmployees = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getTopLateEmployees();
+
+  res.status(200).json({
+    success: true,
+    data
+  });
+});
+
+
 module.exports = {
   getSummary,
   getAttendanceTrend,
-  getDepartmentAttendance
+  getDepartmentAttendance,
+  getTopLateEmployees
 };
