@@ -13,8 +13,13 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "apexcharts": "^5.16.0",
     "bcrypt": "^6.0.0",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "echarts": "^6.1.0",
+    "node-cron": "^4.6.0",
+    "vue-echarts": "^8.0.1",
+    "vue3-apexcharts": "^1.11.1"
   },
   "devDependencies": {
     "prisma": "^6.19.3"

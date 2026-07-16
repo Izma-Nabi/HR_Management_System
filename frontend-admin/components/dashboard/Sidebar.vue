@@ -43,7 +43,7 @@
 
 <style scoped>
 .sidebar{
-  width:200px;
+  width:250px;
   background:#fff;
   border-right:1px solid #ececec;
   height:100vh;
@@ -51,6 +51,8 @@
   left:0;
   top:0;
   padding:25px;
+  box-sizing:border-box;
+  z-index:100;
 }
 
 .logo{
