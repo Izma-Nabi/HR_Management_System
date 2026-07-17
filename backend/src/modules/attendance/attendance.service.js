@@ -1,8 +1,9 @@
-const XLSX = require("xlsx");
-
 const { ApiError } = require("../../utils/apiResponse");
-
+const XLSX = require("xlsx");
+const axios = require("axios");
 const attendanceRepository = require("./attendance.repository");
+
+const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1uNA77aFV8J1Mj8uKKKc0gnOQIXaD0WZ7uYgCWdNQE7w/export?format=xlsx";
 
 const parseExcelDate = (value) => {
   if (!value) return null;
@@ -115,71 +116,69 @@ const validateRow = (row, rowNumber) => {
 };
 
 
-const importAttendance = async (file) => {
-  const workbook = XLSX.readFile(file.path);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(worksheet, {
-    defval: null
-  });
+const importAttendance = async () => {
 
-  if (!rows.length) {
-    return {
-      totalRows: 0,
-      insertedRows: 0
-    };
-  }
-
-  const attendanceRecords = [];
-  const attendanceDates = new Set();
-
-  for (let index = 0; index < rows.length; index++) {
-
-    const row = rows[index];
-
-    validateRow(row, index + 2);
-
-    const attendanceDate = parseExcelDate(row["Date"]);
-
-    if (!attendanceDate || isNaN(attendanceDate.getTime())) {
-    throw new ApiError(
-        400,
-        `Row ${index + 2}: Invalid Date.`
-    );
-    }
-
-attendanceDates.add(attendanceDate.toISOString().split("T")[0]);
-
-    attendanceDates.add(attendanceDate.toISOString().split("T")[0]);
-
-    attendanceRecords.push({
-        userCode: row["User Code"].toString().trim(),
-
-        fullName: row["Full Name"].toString().trim(),
-
-        role: row["Role"].toString().trim(),
-
-        department: row["Department"].toString().trim(),
-
-        attendanceDate,
-
-        checkIn: parseExcelTime(row["Check-In"]),
-
-        checkOut: parseExcelTime(row["Check-Out"]),
-
-        status: row["Status"],
-
-        remarks: row["Remarks"]?.toString().trim() || null
+    const response = await axios.get(GOOGLE_SHEET_URL, {
+        responseType: "arraybuffer"
     });
 
-    }
+    const workbook = XLSX.read(response.data, {
+        type: "buffer"
+    });
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    const rows = XLSX.utils.sheet_to_json(worksheet, {
+        defval: null
+    });
+
+    if (!rows.length) {
+  return {
+    totalRows: 0,
+    insertedRows: 0
+  };
+}
+
+const attendanceRecords = [];
+const attendanceDates = new Set();
+
+for (let index = 0; index < rows.length; index++) {
+
+  const row = rows[index];
+
+  validateRow(row, index + 2);
+
+  const attendanceDate = parseExcelDate(row["Date"]);
+
+  if (!attendanceDate || isNaN(attendanceDate.getTime())) {
+    throw new ApiError(
+      400,
+      `Row ${index + 2}: Invalid Date.`
+    );
+  }
+
+  attendanceDates.add(attendanceDate.toISOString().split("T")[0]);
+
+    attendanceRecords.push({
+      userCode: row["User Code"].toString().trim(),
+      fullName: row["Full Name"].toString().trim(),
+      role: row["Role"].toString().trim(),
+      department: row["Department"].toString().trim(),
+      attendanceDate,
+      checkIn: parseExcelTime(row["Check-In"]),
+      checkOut: parseExcelTime(row["Check-Out"]),
+      status: row["Status"],
+      remarks: row["Remarks"]?.toString().trim() || null
+    });
+  }
 
   const dates = [...attendanceDates].map(date => new Date(date));
 
   await attendanceRepository.replaceAttendance(
     dates,
     attendanceRecords
-    );
+  );
 
   return {
     totalRows: rows.length,

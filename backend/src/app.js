@@ -10,6 +10,7 @@ const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
 const departmentRoutes = require("./modules/departments/departments.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
+const attendanceRoutes = require("./modules/attendance/attendance.routes");
 
 const {
   notFoundHandler,
@@ -43,6 +44,8 @@ app.use(express.urlencoded({ extended: false }));
 
 // Serve uploaded employee photos.
 app.use("/uploads", express.static(uploadsRoot));
+
+app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", authRoutes);
