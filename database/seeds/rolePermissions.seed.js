@@ -3,106 +3,84 @@ const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
+const permissionsByRole = {
+  "SUPER ADMIN": [
+    "MANAGE_ADMINS",
+    "MANAGE_DEPARTMENTS",
+    "MANAGE_EMPLOYEES",
+    "VIEW_SYSTEM_SUMMARY",
+    "VIEW_TEAM_ATTENDANCE",
+    "VIEW_OWN_ATTENDANCE",
+    "VIEW_REPORTS"
+  ],
+  ADMIN: [
+    "MANAGE_EMPLOYEES",
+    "VIEW_SYSTEM_SUMMARY",
+    "VIEW_REPORTS"
+  ],
+  "PROJECT MANAGER": [
+    "VIEW_TEAM_ATTENDANCE"
+  ],
+  EMPLOYEE: [
+    "VIEW_OWN_ATTENDANCE"
+  ]
+};
+
 const main = async () => {
-
-  // Find roles
-  const superAdmin = await prisma.role.findUnique({
+  const roles = await prisma.role.findMany({
     where: {
-      roleName: "SUPER ADMIN"
+      roleName: {
+        in: Object.keys(permissionsByRole)
+      }
     }
   });
 
-  const admin = await prisma.role.findUnique({
+  const permissions = await prisma.permission.findMany({
     where: {
-      roleName: "ADMIN"
+      permissionName: {
+        in: Object.values(permissionsByRole).flat()
+      }
     }
   });
 
-  if (!superAdmin || !admin) {
-    throw new Error("Run roles.seed.js first.");
-  }
+  const roleMap = Object.fromEntries(
+    roles.map((role) => [role.roleName, role.id])
+  );
+  const permissionMap = Object.fromEntries(
+    permissions.map((permission) => [permission.permissionName, permission.id])
+  );
 
-  // Find permissions
-  const permissions = await prisma.permission.findMany();
+  for (const [roleName, permissionNames] of Object.entries(permissionsByRole)) {
+    const roleId = roleMap[roleName];
 
-  const permissionMap = {};
-
-  permissions.forEach((permission) => {
-    permissionMap[permission.permissionName] = permission.id;
-  });
-
-  const rolePermissions = [
-
-    // SUPER ADMIN
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.create_admin
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.edit_admin
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.delete_admin
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.create_employee
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.edit_employee
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.delete_employee
-    },
-    {
-      roleId: superAdmin.id,
-      permissionId: permissionMap.view_reports
-    },
-
-    // ADMIN
-    {
-      roleId: admin.id,
-      permissionId: permissionMap.create_employee
-    },
-    {
-      roleId: admin.id,
-      permissionId: permissionMap.edit_employee
-    },
-    {
-      roleId: admin.id,
-      permissionId: permissionMap.view_reports
+    if (!roleId) {
+      throw new Error(`Run roles.seed.js first. Missing role: ${roleName}`);
     }
 
-  ];
+    for (const permissionName of permissionNames) {
+      const permissionId = permissionMap[permissionName];
 
-  for (const rp of rolePermissions) {
-
-    await prisma.rolePermission.upsert({
-
-      where: {
-        roleId_permissionId: {
-          roleId: rp.roleId,
-          permissionId: rp.permissionId
-        }
-      },
-
-      update: {},
-
-      create: {
-        roleId: rp.roleId,
-        permissionId: rp.permissionId
+      if (!permissionId) {
+        throw new Error(`Run permissions.seed.js first. Missing permission: ${permissionName}`);
       }
 
-    });
-
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId,
+            permissionId
+          }
+        },
+        update: {},
+        create: {
+          roleId,
+          permissionId
+        }
+      });
+    }
   }
 
-  console.log("✅ Role Permissions seeded successfully.");
-
+  console.log("Role permissions seeded successfully.");
 };
 
 main()

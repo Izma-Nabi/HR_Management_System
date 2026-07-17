@@ -2,25 +2,22 @@ import dashboardService from "~/services/dashboard.service";
 
 export const useDashboard = () => {
 
-  const summary = ref({});
+  const dashboard = ref({
+    sections: {}
+  });
   const loading = ref(false);
   const error = ref(null);
 
-  const fetchSummary = async () => {
+  const sections = computed(() => dashboard.value?.sections || {});
+
+  const fetchDashboard = async () => {
 
     loading.value = true;
     error.value = null;
 
     try {
 
-      const response = await dashboardService.getDashboardSummary();
-
-      // If service returns only data
-      summary.value = response || {};
-
-      // If service returns { success, message, data }
-      // then use:
-      // summary.value = response.data || {};
+      dashboard.value = await dashboardService.getDashboard();
 
     } catch (err) {
 
@@ -36,10 +33,11 @@ export const useDashboard = () => {
   };
 
   return {
-    summary,
+    dashboard,
+    sections,
     loading,
     error,
-    fetchSummary
+    fetchDashboard
   };
 
 };

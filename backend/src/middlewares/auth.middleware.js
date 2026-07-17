@@ -1,7 +1,7 @@
 const asyncHandler = require("../utils/asyncHandler");
 const { ApiError } = require("../utils/apiResponse");
 const { verifyAccessToken } = require("../utils/jwt");
-const employeeAuthRepository = require("../modules/employee-auth/employee-auth.repository");
+const authRepository = require("../modules/auth/auth.repository");
 
 // This middleware protects routes that require a logged-in user.
 // It expects: Authorization: Bearer <jwt_token>
@@ -18,7 +18,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
   // The JWT contains the user id in the standard "sub" claim.
   // We still load the user from the database so disabled accounts cannot
   // keep using old tokens.
-  const user = await employeeAuthRepository.findUserById(decodedToken.sub);
+  const user = await authRepository.findUserById(decodedToken.sub);
 
   if (!user) {
     throw new ApiError(401, "User account no longer exists");
@@ -39,4 +39,3 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = authMiddleware;
-

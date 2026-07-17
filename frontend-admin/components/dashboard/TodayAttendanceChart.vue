@@ -1,12 +1,18 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import dashboardService from "~/services/dashboard.service";
+import { computed } from "vue";
 
-const total = ref(0);
-const present = ref(0);
-const absent = ref(0);
-const late = ref(0);
-const leave = ref(0);
+const props = defineProps({
+  summary: {
+    type: Object,
+    default: () => ({})
+  }
+});
+
+const total = computed(() => props.summary.total || 0);
+const present = computed(() => props.summary.present || 0);
+const absent = computed(() => props.summary.absent || 0);
+const late = computed(() => props.summary.late || 0);
+const leave = computed(() => props.summary.leave || 0);
 
 const presentPercent = computed(() =>
   total.value ? Math.round((present.value / total.value) * 100) : 0
@@ -36,20 +42,6 @@ const chartStyle = computed(() => ({
     }% 100%
   )`
 }));
-
-onMounted(async () => {
-  try {
-    const summary = await dashboardService.getDashboardSummary();
-
-    total.value = summary.total;
-    present.value = summary.present;
-    absent.value = summary.absent;
-    late.value = summary.late;
-    leave.value = summary.leave;
-  } catch (err) {
-    console.error(err);
-  }
-});
 </script>
 
 <template>

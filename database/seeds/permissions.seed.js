@@ -4,15 +4,13 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const permissions = [
-  { permissionName: "create_admin" },
-  { permissionName: "edit_admin" },
-  { permissionName: "delete_admin" },
-
-  { permissionName: "create_employee" },
-  { permissionName: "edit_employee" },
-  { permissionName: "delete_employee" },
-
-  { permissionName: "view_reports" }
+  { permissionName: "MANAGE_ADMINS" },
+  { permissionName: "MANAGE_DEPARTMENTS" },
+  { permissionName: "MANAGE_EMPLOYEES" },
+  { permissionName: "VIEW_SYSTEM_SUMMARY" },
+  { permissionName: "VIEW_TEAM_ATTENDANCE" },
+  { permissionName: "VIEW_OWN_ATTENDANCE" },
+  { permissionName: "VIEW_REPORTS" }
 ];
 
 const main = async () => {

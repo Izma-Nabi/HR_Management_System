@@ -1,14 +1,8 @@
 <script setup>
-import { ref, onMounted } from "vue";
-import dashboardService from "~/services/dashboard.service";
-
-const employees = ref([]);
-
-onMounted(async () => {
-  try {
-    employees.value = await dashboardService.getTopLateEmployees();
-  } catch (err) {
-    console.error(err);
+defineProps({
+  employees: {
+    type: Array,
+    default: () => []
   }
 });
 </script>

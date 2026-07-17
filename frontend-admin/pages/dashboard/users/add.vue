@@ -1,3 +1,23 @@
+<script setup>
+definePageMeta({
+  layout: "dashboard"
+});
+
+const { hasPermission, hasAnyPermission } = useAuthUser();
+
+const canCreateAdmin = computed(() => hasPermission("MANAGE_ADMINS"));
+const canCreateEmployee = computed(() => hasPermission("MANAGE_EMPLOYEES"));
+const canAccessAddUser = computed(() =>
+  hasAnyPermission("MANAGE_ADMINS", "MANAGE_EMPLOYEES")
+);
+
+onMounted(async () => {
+  if (!canAccessAddUser.value) {
+    await navigateTo("/dashboard", { replace: true });
+  }
+});
+</script>
+
 <template>
   <div class="page">
     <div class="header">
@@ -9,10 +29,11 @@
 
     <div class="cards">
       <NuxtLink
+        v-if="canCreateAdmin"
         to="/dashboard/users/add-admin"
         class="card"
       >
-        <div class="icon">👨‍💼</div>
+        <div class="icon">Admin</div>
 
         <h2>Administrator</h2>
 
@@ -24,10 +45,11 @@
       </NuxtLink>
 
       <NuxtLink
+        v-if="canCreateEmployee"
         to="/dashboard/users/add-employee"
         class="card"
       >
-        <div class="icon">👤</div>
+        <div class="icon">Employee</div>
 
         <h2>Employee</h2>
 
@@ -37,18 +59,18 @@
 
         <button>Create Employee</button>
       </NuxtLink>
+
+      <div
+        v-if="!canAccessAddUser"
+        class="empty-state"
+      >
+        You do not have permission to create users.
+      </div>
     </div>
   </div>
 </template>
 
-<script setup>
-definePageMeta({
-  layout: "dashboard"
-})
-</script>
-
 <style scoped>
-
 .page{
   padding:10px;
 }
@@ -73,11 +95,15 @@ definePageMeta({
   gap:25px;
 }
 
-.card{
+.card,
+.empty-state{
   background:#fff;
   border:1px solid #E5E7EB;
   border-radius:14px;
   padding:35px;
+}
+
+.card{
   text-decoration:none;
   color:inherit;
   transition:.25s;
@@ -90,8 +116,16 @@ definePageMeta({
 }
 
 .icon{
-  font-size:45px;
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
   margin-bottom:20px;
+  padding:6px 10px;
+  color:#4F46E5;
+  background:#EEF2FF;
+  border-radius:8px;
+  font-size:14px;
+  font-weight:800;
 }
 
 .card h2{
@@ -99,9 +133,13 @@ definePageMeta({
   color:#111827;
 }
 
-.card p{
+.card p,
+.empty-state{
   color:#6B7280;
   line-height:1.6;
+}
+
+.card p{
   margin-bottom:25px;
 }
 
@@ -118,5 +156,4 @@ button{
 button:hover{
   background:#655DA2;
 }
-
 </style>

@@ -11,6 +11,9 @@ const main = async()=>{
             roleName:'ADMIN'
         },
         {
+            roleName:'PROJECT MANAGER'
+        },
+        {
             roleName:'EMPLOYEE'
         }
     ];

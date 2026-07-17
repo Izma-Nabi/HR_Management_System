@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed } from "vue";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { BarChart } from "echarts/charts";
@@ -9,7 +9,6 @@ import {
   TitleComponent
 } from "echarts/components";
 import VChart from "vue-echarts";
-import dashboardService from "~/services/dashboard.service";
 
 use([
   CanvasRenderer,
@@ -19,53 +18,49 @@ use([
   TitleComponent
 ]);
 
-const option = ref({});
-
-onMounted(async () => {
-  try {
-    const data = await dashboardService.getDepartmentAttendance();
-
-    option.value = {
-      tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "shadow"
-        }
-      },
-
-      grid: {
-        left: "22%",
-        right: "5%",
-        top: "5%",
-        bottom: "5%",
-        containLabel: true
-      },
-
-      xAxis: {
-        type: "value"
-      },
-
-      yAxis: {
-        type: "category",
-        data: data.map(item => item.department)
-      },
-
-      series: [
-        {
-          type: "bar",
-          data: data.map(item => item.present),
-          barWidth: 18,
-          itemStyle: {
-            borderRadius: [0, 8, 8, 0]
-          }
-        }
-      ]
-    };
-
-  } catch (err) {
-    console.error(err);
+const props = defineProps({
+  data: {
+    type: Array,
+    default: () => []
   }
 });
+
+const option = computed(() => ({
+  tooltip: {
+    trigger: "axis",
+    axisPointer: {
+      type: "shadow"
+    }
+  },
+
+  grid: {
+    left: "22%",
+    right: "5%",
+    top: "5%",
+    bottom: "5%",
+    containLabel: true
+  },
+
+  xAxis: {
+    type: "value"
+  },
+
+  yAxis: {
+    type: "category",
+    data: props.data.map(item => item.department)
+  },
+
+  series: [
+    {
+      type: "bar",
+      data: props.data.map(item => item.present),
+      barWidth: 18,
+      itemStyle: {
+        borderRadius: [0, 8, 8, 0]
+      }
+    }
+  ]
+}));
 </script>
 
 <template>

@@ -1,27 +1,31 @@
 <script setup lang="ts">
+import authService from "~/services/auth.service";
+
 type LoginResponse = {
   success: boolean;
   message: string;
   data: {
     token: string;
-    user?: {
-      id: number;
-      fullName: string;
-      email: string;
-      role: string;
-      status: string;
-    };
-    administrator?: {
-      id: number;
-      fullName: string;
-      email: string;
-      role: string;
-      status: string;
-    };
+    user: AuthUser;
   };
 };
 
-const config = useRuntimeConfig();
+type MeResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    user: AuthUser;
+  };
+};
+
+type AuthUser = {
+  id: number;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+  permissions?: string[];
+};
 
 const form = reactive({
   email: "",
@@ -39,26 +43,33 @@ onMounted(async () => {
   }
 });
 
-const loginAdmin = async () => {
+const loginUser = async () => {
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    const response = await $fetch<LoginResponse>(`${config.public.apiBase}/auth/login`, {
-      method: "POST",
-      body: {
-        email: form.email,
-        password: form.password
-      }
+    const loginResponse = await authService.login({
+      email: form.email,
+      password: form.password
     });
 
-    const user = response.data.user || response.data.administrator;
+    const token = (loginResponse as LoginResponse).data.token;
 
-    localStorage.setItem("token", response.data.token);
-    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("token", token);
+
+    const meResponse = await authService.me() as MeResponse;
+
+    authService.setSession({
+      token,
+      user: meResponse.data.user
+    });
+
+    const authUser = useState<AuthUser | null>("auth.user", () => null);
+    authUser.value = meResponse.data.user;
 
     await navigateTo("/dashboard");
   } catch (error: any) {
+    authService.clearSession();
     errorMessage.value = error?.data?.message || "Invalid email or password";
   } finally {
     loading.value = false;
@@ -73,11 +84,11 @@ const loginAdmin = async () => {
         <span class="brand-mark">B</span>
         <div>
           <p class="eyebrow">Bookme HR</p>
-          <h1>Administrator Login</h1>
+          <h1>Sign in</h1>
         </div>
       </div>
 
-      <form class="login-form" @submit.prevent="loginAdmin">
+      <form class="login-form" @submit.prevent="loginUser">
         <label class="field">
           <span>Email</span>
           <input

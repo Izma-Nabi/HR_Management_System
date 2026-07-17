@@ -1,29 +1,14 @@
 const express = require("express");
 
+const authMiddleware = require("../../middlewares/auth.middleware");
 const dashboardController = require("./dashboard.controller");
 
 const router = express.Router();
 
-
 router.get(
-  "/summary",
-  dashboardController.getSummary
+  "/",
+  authMiddleware,
+  dashboardController.getDashboard
 );
 
-
-router.get(
-  "/attendance-trend",
-  dashboardController.getAttendanceTrend
-);
-
-
-router.get(
-  "/department-attendance",
-  dashboardController.getDepartmentAttendance
-);
-
-router.get(
-  "/top-late-employees",
-  dashboardController.getTopLateEmployees
-);
 module.exports = router;

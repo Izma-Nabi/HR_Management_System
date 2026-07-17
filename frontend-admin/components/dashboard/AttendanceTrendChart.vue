@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed } from "vue";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { LineChart } from "echarts/charts";
@@ -9,7 +9,6 @@ import {
   LegendComponent
 } from "echarts/components";
 import VChart from "vue-echarts";
-import dashboardService from "~/services/dashboard.service";
 
 use([
   CanvasRenderer,
@@ -19,53 +18,49 @@ use([
   LegendComponent
 ]);
 
-const option = ref({});
-
-onMounted(async () => {
-  try {
-    const data = await dashboardService.getAttendanceTrend();
-
-    option.value = {
-      tooltip: {
-        trigger: "axis"
-      },
-
-      grid: {
-        left: "5%",
-        right: "5%",
-        top: "10%",
-        bottom: "10%",
-        containLabel: true
-      },
-
-      xAxis: {
-        type: "category",
-        data: data.map(item => item.date),
-        boundaryGap: false
-      },
-
-      yAxis: {
-        type: "value"
-      },
-
-      series: [
-        {
-          name: "Attendance",
-          type: "line",
-          smooth: true,
-          data: data.map(item => item.count),
-          areaStyle: {},
-          lineStyle: {
-            width: 4
-          }
-        }
-      ]
-    };
-
-  } catch (err) {
-    console.error(err);
+const props = defineProps({
+  data: {
+    type: Array,
+    default: () => []
   }
 });
+
+const option = computed(() => ({
+  tooltip: {
+    trigger: "axis"
+  },
+
+  grid: {
+    left: "5%",
+    right: "5%",
+    top: "10%",
+    bottom: "10%",
+    containLabel: true
+  },
+
+  xAxis: {
+    type: "category",
+    data: props.data.map(item => item.date),
+    boundaryGap: false
+  },
+
+  yAxis: {
+    type: "value"
+  },
+
+  series: [
+    {
+      name: "Attendance",
+      type: "line",
+      smooth: true,
+      data: props.data.map(item => item.count),
+      areaStyle: {},
+      lineStyle: {
+        width: 4
+      }
+    }
+  ]
+}));
 </script>
 
 <template>

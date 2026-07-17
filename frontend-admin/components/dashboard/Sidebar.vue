@@ -1,3 +1,11 @@
+<script setup>
+const { hasAnyPermission } = useAuthUser();
+
+const canAddUser = computed(() =>
+  hasAnyPermission("MANAGE_ADMINS", "MANAGE_EMPLOYEES")
+);
+</script>
+
 <template>
   <aside class="sidebar">
     <div class="logo">
@@ -7,23 +15,27 @@
 
     <nav>
       <NuxtLink to="/dashboard" class="nav-item">
-        📊 Dashboard
+        Dashboard
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/users/add" class="nav-item">
-        ➕ Add User
+      <NuxtLink
+        v-if="canAddUser"
+        to="/dashboard/users/add"
+        class="nav-item"
+      >
+        Add User
       </NuxtLink>
 
       <NuxtLink to="/dashboard/admins" class="nav-item">
-        👨‍💼 Administrators
+        Administrators
       </NuxtLink>
 
       <NuxtLink to="/dashboard/employees" class="nav-item">
-        👥 Employees
+        Employees
       </NuxtLink>
 
       <NuxtLink to="/dashboard/departments" class="nav-item">
-        🏢 Departments
+        Departments
       </NuxtLink>
 
       <NuxtLink to="/dashboard/leaves" class="nav-item">
@@ -31,15 +43,15 @@
       </NuxtLink>
 
       <NuxtLink to="/dashboard/attendance" class="nav-item">
-        🕒 Attendance
+        Attendance
       </NuxtLink>
 
       <NuxtLink to="/dashboard/reports" class="nav-item">
-        📈 Reports
+        Reports
       </NuxtLink>
 
       <NuxtLink to="/dashboard/settings" class="nav-item">
-        ⚙️ Settings
+        Settings
       </NuxtLink>
     </nav>
   </aside>

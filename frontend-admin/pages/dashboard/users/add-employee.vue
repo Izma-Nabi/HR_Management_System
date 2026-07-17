@@ -26,6 +26,8 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
+const canCreateEmployee = computed(() => hasPermission("MANAGE_EMPLOYEES"));
 
 const defaultForm = (): EmployeeForm => ({
   firstName: "",
@@ -65,6 +67,11 @@ const loadDepartments = async (token: string) => {
 };
 
 onMounted(async () => {
+  if (!canCreateEmployee.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
   const token = localStorage.getItem("token");
 
   if (!token) {

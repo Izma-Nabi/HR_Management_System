@@ -4,7 +4,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const env = require("../../global/env");
 const { uploadsRoot } = require("./middlewares/upload.middleware");
-const adminAuthRoutes = require("./modules/admin-auth/admin-auth.routes");
+const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/user.routes");
 const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.routes");
 const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
@@ -45,6 +45,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use("/uploads", express.static(uploadsRoot));
 
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api", authRoutes);
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
@@ -57,6 +58,8 @@ app.get("/", (req, res) => {
     message: "Bookme backend is running",
     data: {
       health: "/health",
+      login: "/api/login",
+      me: "/api/me",
       adminLogin: "/api/auth/login",
       adminEmployees: "/api/admin/employees",
       departments: "/api/departments",
@@ -77,20 +80,20 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Admin routes.
-// These power the admin frontend. /api/auth keeps the old admin backend path,
-// while /api/admin/auth is the clearer combined-backend path.
-app.use("/api/auth", adminAuthRoutes);
+// Auth routes.
+// /api/login and /api/me are the canonical paths. The older admin auth paths
+// stay mounted to the same router so existing clients do not break.
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/departments", departmentRoutes);
-app.use("/api/admin/auth", adminAuthRoutes);
+app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/departments", departmentRoutes);
 
 // Compatibility for the current admin frontend page that calls /api/api/auth.
-app.use("/api/api/auth", adminAuthRoutes);
+app.use("/api/api/auth", authRoutes);
 
 // Compatibility for the old administrator signup route intent.
-app.use("/api/administrator", adminAuthRoutes);
+app.use("/api/administrator", authRoutes);
 
 // Super Admin employee management routes.
 app.use("/api/admin/employees", adminEmployeesRoutes);

@@ -1,57 +1,14 @@
-const getDashboardSummary  = async () => {
+import authService from "~/services/auth.service";
+
+const getDashboard = async () => {
 
   const config = useRuntimeConfig();
 
   const response = await $fetch(
-    `${config.public.apiBase}/dashboard/summary`,
+    `${config.public.apiBase}/dashboard`,
     {
       method: "GET",
-      credentials: "include"
-    }
-  );
-
-  return response.data;
-};
-
-const getDepartmentAttendance = async () => {
-
-  const config = useRuntimeConfig();
-
-  const response = await $fetch(
-    `${config.public.apiBase}/dashboard/department-attendance`,
-    {
-      method: "GET",
-      credentials: "include"
-    }
-  );
-
-  return response.data;
-};
-
-
-const getAttendanceTrend = async () => {
-
-  const config = useRuntimeConfig();
-
-  const response = await $fetch(
-    `${config.public.apiBase}/dashboard/attendance-trend`,
-    {
-      method: "GET",
-      credentials: "include"
-    }
-  );
-
-  return response.data;
-};
-
-const getTopLateEmployees = async () => {
-  const config = useRuntimeConfig();
-
-  const response = await $fetch(
-    `${config.public.apiBase}/dashboard/top-late-employees`,
-    {
-      method: "GET",
-      credentials: "include"
+      headers: authService.getAuthHeaders()
     }
   );
 
@@ -59,8 +16,5 @@ const getTopLateEmployees = async () => {
 };
 
 export default {
-  getDashboardSummary,
-  getAttendanceTrend,
-  getDepartmentAttendance,
-  getTopLateEmployees
+  getDashboard
 };

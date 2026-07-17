@@ -20,7 +20,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  allowRoles("SUPER_ADMIN"),
+  allowRoles("SUPER_ADMIN", "ADMIN"),
   uploadEmployeePhoto,
   validate(createEmployeeSchema),
   adminEmployeesController.createEmployee

@@ -1,12 +1,10 @@
 const { ApiError } = require("../../utils/apiResponse");
 const { comparePassword, hashPassword } = require("../../utils/password");
 const { signAccessToken } = require("../../utils/jwt");
-const adminAuthRepository = require("./admin-auth.repository");
+const authRepository = require("./auth.repository");
 
-// Admin service: rules for SUPER ADMIN and ADMIN accounts.
-
-const loginAdmin = async ({ email, password }) => {
-  const user = await adminAuthRepository.findAdminByEmail(email);
+const login = async ({ email, password }) => {
+  const user = await authRepository.findUserByEmail(email);
 
   if (!user) {
     throw new ApiError(401, "Invalid email or password");
@@ -27,31 +25,53 @@ const loginAdmin = async ({ email, password }) => {
     role: user.role
   });
 
+  const { passwordHash, ...safeUser } = user;
+
   return {
     token,
-    user: adminAuthRepository.toSafeUser(user)
+    user: safeUser
   };
 };
 
-const createAdmin = async ({ fullName, email, password, role }) => {
-  const existingUser = await adminAuthRepository.findUserByEmail(email);
+const getCurrentUser = async (userId) => {
+  const user = await authRepository.findUserById(userId);
+
+  if (!user) {
+    throw new ApiError(404, "User account not found");
+  }
+
+  return {
+    user
+  };
+};
+
+const signup = async ({ fullName, email, password, role }) => {
+  const existingUser = await authRepository.findUserByEmail(email);
 
   if (existingUser) {
     throw new ApiError(409, "Email already exists");
   }
 
   const passwordHash = await hashPassword(password);
-  const admin = await adminAuthRepository.createAdmin({
+  const admin = await authRepository.createAdmin({
     fullName,
     email,
     passwordHash,
     role: role || "ADMIN"
   });
 
-  return adminAuthRepository.toSafeUser(admin);
+  return {
+    user: authRepository.toSafeUser(admin)
+  };
+};
+
+const logout = async () => {
+  return {};
 };
 
 module.exports = {
-  loginAdmin,
-  createAdmin
+  login,
+  getCurrentUser,
+  signup,
+  logout
 };

@@ -1,6 +1,5 @@
 const Joi = require("joi");
 
-// Admin login validates the current admin frontend payload.
 const loginSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
     "string.email": "Email must be a valid email address",
@@ -12,7 +11,6 @@ const loginSchema = Joi.object({
   })
 });
 
-// Admin signup creates ADMIN by default; SUPER ADMIN is allowed for seed/setup.
 const signupSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100).required().messages({
     "string.empty": "Full name is required"

@@ -1,7 +1,7 @@
 const { prisma } = require("../../../../database/prisma");
 
 
-const getSummary = async () => {
+const getSummary = async (scopeWhere = {}) => {
   const targetDate = new Date();
 
   // Sunday -> Saturday
@@ -16,6 +16,7 @@ const getSummary = async () => {
   endOfDay.setHours(23, 59, 59, 999);
 
   const where = {
+    ...scopeWhere,
     attendanceDate: {
       gte: startOfDay,
       lte: endOfDay
@@ -63,7 +64,7 @@ const getSummary = async () => {
   };
 };
 
-const getAttendanceTrend = async () => {
+const getAttendanceTrend = async (scopeWhere = {}) => {
   const today = new Date();
 
   // If Sunday, use Saturday
@@ -84,6 +85,7 @@ const getAttendanceTrend = async () => {
   const rows = await prisma.attendance.groupBy({
     by: ["attendanceDate"],
     where: {
+      ...scopeWhere,
       attendanceDate: {
         gte: monday,
         lte: saturday
@@ -119,12 +121,13 @@ const getAttendanceTrend = async () => {
   return result;
 };
 
-const getDepartmentAttendance = async () => {
+const getDepartmentAttendance = async (scopeWhere = {}) => {
   const result = await prisma.attendance.groupBy({
     by: [
       "department"
     ],
     where: {
+      ...scopeWhere,
       status: "Present"
     },
     _count: {
@@ -137,10 +140,11 @@ const getDepartmentAttendance = async () => {
   }));
 };
 
-const getTopLateEmployees = async () => {
+const getTopLateEmployees = async (scopeWhere = {}) => {
   const rows = await prisma.attendance.groupBy({
     by: ["userCode", "fullName"],
     where: {
+      ...scopeWhere,
       status: "Late"
     },
     _count: {
@@ -160,10 +164,38 @@ const getTopLateEmployees = async () => {
   }));
 };
 
+const getRecentAttendance = async (scopeWhere = {}, take = 10) => {
+  return prisma.attendance.findMany({
+    where: scopeWhere,
+    orderBy: [
+      {
+        attendanceDate: "desc"
+      },
+      {
+        id: "desc"
+      }
+    ],
+    take,
+    select: {
+      id: true,
+      userCode: true,
+      fullName: true,
+      role: true,
+      department: true,
+      attendanceDate: true,
+      checkIn: true,
+      checkOut: true,
+      status: true,
+      remarks: true
+    }
+  });
+};
+
 
 module.exports = {
   getSummary,
   getAttendanceTrend,
   getDepartmentAttendance,
-  getTopLateEmployees
+  getTopLateEmployees,
+  getRecentAttendance
 };

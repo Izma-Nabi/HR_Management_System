@@ -14,6 +14,8 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
+const canCreateAdmin = computed(() => hasPermission("MANAGE_ADMINS"));
 
 const departments = ref<Department[]>([]);
 const loading = ref(false);
@@ -74,6 +76,11 @@ const loadDepartments = async () => {
 };
 
 onMounted(async () => {
+  if (!canCreateAdmin.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
   try {
     await loadDepartments();
   } catch (error: any) {
