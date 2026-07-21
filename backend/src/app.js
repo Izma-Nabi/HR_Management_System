@@ -11,6 +11,7 @@ const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes
 const departmentRoutes = require("./modules/departments/departments.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const attendanceRoutes = require("./modules/attendance/attendance.routes");
+const leaveRoutes = require("./modules/leaves/leave.routes");
 
 const {
   notFoundHandler,
@@ -49,6 +50,10 @@ app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", authRoutes);
+
+app.use("/api/leaves", leaveRoutes);
+
+
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));

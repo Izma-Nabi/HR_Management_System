@@ -28,10 +28,22 @@ enum LeaveRequestStatus {
   CANCELLED
 }
 
+enum LeaveApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LeaveAction {
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum LeaveRequestType {
   ANNUAL
-  SICK
   CASUAL
+  SICK
   UNPAID
   OTHER
 }
@@ -96,8 +108,14 @@ model User {
   // Admin manages many departments
   adminDepartments AdminDepartment[]
 
-  leaveRequestsMade     LeaveRequest[] @relation("LeaveRequester")
-  leaveRequestsApproved LeaveRequest[] @relation("LeaveApprover")
+  // leaves 
+  leaveRequests LeaveRequest[] @relation("LeaveRequester")
+
+  currentLeaveApprovals LeaveRequest[] @relation("CurrentLeaveApprover")
+
+  leaveApprovals LeaveApproval[] @relation("LeaveApprovalRefersTo")
+
+  leaveApprovalHistory LeaveApprovalHistory[] @relation("LeaveHistoryRefersTo")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
@@ -155,30 +173,140 @@ model Attendance {
 }
 
 model LeaveRequest {
+
   id Int @id @default(autoincrement()) @db.UnsignedInt
 
-  requesterId Int  @map("requester_id") @db.UnsignedInt
-  requester   User @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  userId Int @map("user_id") @db.UnsignedInt
+  user User
+    @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
 
-  approverId Int?  @map("approver_id") @db.UnsignedInt
-  approver   User? @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
-
-  type   LeaveRequestType   @default(OTHER)
-  status LeaveRequestStatus @default(PENDING)
+  type LeaveRequestType
 
   startDate DateTime @map("start_date") @db.Date
-  endDate   DateTime @map("end_date") @db.Date
+  endDate DateTime @map("end_date") @db.Date
 
-  reason       String? @db.Text
-  decisionNote String? @map("decision_note") @db.Text
+  totalDays Int @map("total_days")
 
-  decidedAt DateTime? @map("decided_at") @db.Timestamp(0)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+  reason String? @db.Text
 
-  @@index([requesterId])
-  @@index([approverId])
+  status LeaveRequestStatus @default(PENDING)
+
+  currentApprovalLevel Int
+    @default(1)
+    @map("current_approval_level")
+
+  currentRefersTo Int?
+    @map("current_refers_to")
+    @db.UnsignedInt
+
+  currentApprover User?
+    @relation(
+      "CurrentLeaveApprover",
+      fields: [currentRefersTo],
+      references: [id],
+      onDelete: SetNull
+    )
+
+  approvals LeaveApproval[]
+
+  history LeaveApprovalHistory[]
+
+  createdAt DateTime
+    @default(now())
+    @map("created_at")
+
+  updatedAt DateTime
+    @updatedAt
+    @map("updated_at")
+
+  @@index([userId])
+  @@index([currentRefersTo])
   @@index([status])
-  @@index([startDate, endDate])
   @@map("leave_requests")
+}
+
+model LeaveApproval {
+
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  leaveRequestId Int
+    @map("leave_request_id")
+    @db.UnsignedInt
+
+  leaveRequest LeaveRequest
+    @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  refersTo Int
+    @map("refers_to")
+    @db.UnsignedInt
+
+  approver User
+    @relation(
+      "LeaveApprovalRefersTo",
+      fields: [refersTo],
+      references: [id]
+    )
+
+  approvalLevel Int
+    @map("approval_level")
+
+  status LeaveApprovalStatus
+    @default(PENDING)
+
+  decisionNote String?
+    @map("decision_note")
+    @db.Text
+
+  decidedAt DateTime?
+    @map("decided_at")
+
+  createdAt DateTime
+    @default(now())
+    @map("created_at")
+
+  @@index([leaveRequestId])
+  @@index([refersTo])
+  @@index([status])
+
+  @@map("leave_approvals")
+}
+
+model LeaveApprovalHistory {
+
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  leaveRequestId Int
+    @map("leave_request_id")
+    @db.UnsignedInt
+
+  leaveRequest LeaveRequest
+    @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  refersTo Int
+    @map("refers_to")
+    @db.UnsignedInt
+
+  user User
+    @relation(
+      "LeaveHistoryRefersTo",
+      fields: [refersTo],
+      references: [id]
+    )
+
+  approvalLevel Int
+    @map("approval_level")
+
+  action LeaveAction
+
+  remarks String?
+    @db.Text
+
+  createdAt DateTime
+    @default(now())
+    @map("created_at")
+
+  @@index([leaveRequestId])
+  @@index([refersTo])
+
+  @@map("leave_approval_history")
 }
