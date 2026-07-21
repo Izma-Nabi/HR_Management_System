@@ -4,6 +4,8 @@ definePageMeta({
 });
 
 const router = useRouter();
+const { hasPermission } = useAuthUser();
+const canApplyLeave = computed(() => hasPermission("CREATE_LEAVE"));
 
 const form = reactive({
   type: "",
@@ -13,6 +15,10 @@ const form = reactive({
 });
 
 const submitLeave = () => {
+  if (!canApplyLeave.value) {
+    return;
+  }
+
   console.log(form);
 
   // TODO
@@ -20,6 +26,12 @@ const submitLeave = () => {
 
   router.push("/dashboard/leaves");
 };
+
+onMounted(() => {
+  if (!canApplyLeave.value) {
+    router.replace("/dashboard/leaves");
+  }
+});
 </script>
 
 <template>
@@ -35,7 +47,7 @@ const submitLeave = () => {
         class="back-btn"
         @click="router.push('/dashboard/leaves')"
       >
-        ← Back
+        Back
       </button>
     </div>
 
@@ -60,8 +72,8 @@ const submitLeave = () => {
           <label>Start Date</label>
 
           <input
-            type="date"
             v-model="form.startDate"
+            type="date"
           >
         </div>
 
@@ -69,8 +81,8 @@ const submitLeave = () => {
           <label>End Date</label>
 
           <input
-            type="date"
             v-model="form.endDate"
+            type="date"
           >
         </div>
 
@@ -80,8 +92,8 @@ const submitLeave = () => {
         <label>Reason</label>
 
         <textarea
-          rows="5"
           v-model="form.reason"
+          rows="5"
           placeholder="Enter reason for leave..."
         />
       </div>
@@ -96,6 +108,7 @@ const submitLeave = () => {
 
         <button
           class="submit-btn"
+          :disabled="!canApplyLeave"
           @click="submitLeave"
         >
           Apply Leave
@@ -154,7 +167,7 @@ const submitLeave = () => {
 
 .row {
   display: grid;
-  grid-template-columns: repeat(2,1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
@@ -219,6 +232,11 @@ textarea {
 
 .submit-btn:hover {
   background: #4338ca;
+}
+
+.submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 @media (max-width: 768px) {

@@ -10,9 +10,12 @@ export const useDashboard = () => {
 
   const sections = computed(() => dashboard.value?.sections || {});
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async ({ silent = false } = {}) => {
 
-    loading.value = true;
+    if (!silent) {
+      loading.value = true;
+    }
+
     error.value = null;
 
     try {
@@ -26,7 +29,9 @@ export const useDashboard = () => {
 
     } finally {
 
-      loading.value = false;
+      if (!silent) {
+        loading.value = false;
+      }
 
     }
 

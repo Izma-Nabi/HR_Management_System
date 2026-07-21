@@ -18,11 +18,13 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 
 const loading = ref(true);
 const search = ref("");
 const admins = ref<AdminProfile[]>([]);
 const errorMessage = ref("");
+const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -60,7 +62,14 @@ const loadAdmins = async () => {
   }
 };
 
-onMounted(loadAdmins);
+onMounted(async () => {
+  if (!canManageAdmins.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
+  await loadAdmins();
+});
 
 const filteredAdmins = computed(() => {
   const keyword = search.value.toLowerCase();

@@ -167,57 +167,29 @@ model Attendance {
   checkOut         DateTime?        @map("check_out") @db.Time(0)
   status           AttendanceStatus
   remarks          String?          @db.Text
+  sourceKey        String?          @unique @map("source_key") @db.VarChar(128)
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
   @@map("attendance")
 }
 
 model LeaveRequest {
-
-  id Int @id @default(autoincrement()) @db.UnsignedInt
-
-  userId Int @map("user_id") @db.UnsignedInt
-  user User
-    @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
-
-  type LeaveRequestType
-
-  startDate DateTime @map("start_date") @db.Date
-  endDate DateTime @map("end_date") @db.Date
-
-  totalDays Int @map("total_days")
-
-  reason String? @db.Text
-
-  status LeaveRequestStatus @default(PENDING)
-
-  currentApprovalLevel Int
-    @default(1)
-    @map("current_approval_level")
-
-  currentRefersTo Int?
-    @map("current_refers_to")
-    @db.UnsignedInt
-
-  currentApprover User?
-    @relation(
-      "CurrentLeaveApprover",
-      fields: [currentRefersTo],
-      references: [id],
-      onDelete: SetNull
-    )
-
-  approvals LeaveApproval[]
-
-  history LeaveApprovalHistory[]
-
-  createdAt DateTime
-    @default(now())
-    @map("created_at")
-
-  updatedAt DateTime
-    @updatedAt
-    @map("updated_at")
+  id                   Int                @id @default(autoincrement()) @db.UnsignedInt
+  userId               Int                @map("user_id") @db.UnsignedInt
+  user                 User               @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
+  type                 LeaveRequestType
+  startDate            DateTime           @map("start_date") @db.Date
+  endDate              DateTime           @map("end_date") @db.Date
+  totalDays            Int                @map("total_days")
+  reason               String?            @db.Text
+  status               LeaveRequestStatus @default(PENDING)
+  currentApprovalLevel Int                @default(1) @map("current_approval_level")
+  currentRefersTo      Int?               @map("current_refers_to") @db.UnsignedInt
+  currentApprover      User?              @relation("CurrentLeaveApprover", fields: [currentRefersTo], references: [id], onDelete: SetNull)
+  approvals            LeaveApproval[]
+  history              LeaveApprovalHistory[]
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@index([userId])
   @@index([currentRefersTo])
@@ -226,87 +198,35 @@ model LeaveRequest {
 }
 
 model LeaveApproval {
-
-  id Int @id @default(autoincrement()) @db.UnsignedInt
-
-  leaveRequestId Int
-    @map("leave_request_id")
-    @db.UnsignedInt
-
-  leaveRequest LeaveRequest
-    @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
-
-  refersTo Int
-    @map("refers_to")
-    @db.UnsignedInt
-
-  approver User
-    @relation(
-      "LeaveApprovalRefersTo",
-      fields: [refersTo],
-      references: [id]
-    )
-
-  approvalLevel Int
-    @map("approval_level")
-
-  status LeaveApprovalStatus
-    @default(PENDING)
-
-  decisionNote String?
-    @map("decision_note")
-    @db.Text
-
-  decidedAt DateTime?
-    @map("decided_at")
-
-  createdAt DateTime
-    @default(now())
-    @map("created_at")
+  id             Int                 @id @default(autoincrement()) @db.UnsignedInt
+  leaveRequestId Int                 @map("leave_request_id") @db.UnsignedInt
+  leaveRequest   LeaveRequest        @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  refersTo       Int                 @map("refers_to") @db.UnsignedInt
+  approver       User                @relation("LeaveApprovalRefersTo", fields: [refersTo], references: [id], onDelete: Cascade)
+  approvalLevel  Int                 @map("approval_level")
+  status         LeaveApprovalStatus @default(PENDING)
+  decisionNote   String?             @map("decision_note") @db.Text
+  decidedAt      DateTime?           @map("decided_at") @db.DateTime(0)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
 
   @@index([leaveRequestId])
   @@index([refersTo])
   @@index([status])
-
   @@map("leave_approvals")
 }
 
 model LeaveApprovalHistory {
-
-  id Int @id @default(autoincrement()) @db.UnsignedInt
-
-  leaveRequestId Int
-    @map("leave_request_id")
-    @db.UnsignedInt
-
-  leaveRequest LeaveRequest
-    @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
-
-  refersTo Int
-    @map("refers_to")
-    @db.UnsignedInt
-
-  user User
-    @relation(
-      "LeaveHistoryRefersTo",
-      fields: [refersTo],
-      references: [id]
-    )
-
-  approvalLevel Int
-    @map("approval_level")
-
-  action LeaveAction
-
-  remarks String?
-    @db.Text
-
-  createdAt DateTime
-    @default(now())
-    @map("created_at")
+  id             Int          @id @default(autoincrement()) @db.UnsignedInt
+  leaveRequestId Int          @map("leave_request_id") @db.UnsignedInt
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  refersTo       Int          @map("refers_to") @db.UnsignedInt
+  user           User         @relation("LeaveHistoryRefersTo", fields: [refersTo], references: [id], onDelete: Cascade)
+  approvalLevel  Int          @map("approval_level")
+  action         LeaveAction
+  remarks        String?      @db.Text
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
 
   @@index([leaveRequestId])
   @@index([refersTo])
-
   @@map("leave_approval_history")
 }

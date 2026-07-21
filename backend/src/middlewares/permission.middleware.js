@@ -1,78 +1,35 @@
-const prisma = require("../../../database/prisma");
+const { ApiError } = require("../utils/apiResponse");
 
-const requirePermission = (permissionName) => {
-
-  return async (req, res, next) => {
-
-    try {
-
-      const userId = req.user.id;
-
-
-      const user = await prisma.user.findUnique({
-
-        where:{
-          id:userId
-        },
-
-        include:{
-          role:{
-            include:{
-              rolePermissions:{
-                include:{
-                  permission:true
-                }
-              }
-            }
-          }
-        }
-
-      });
-
-
-
-      if(!user){
-        return res.status(401).json({
-          message:"User not found"
-        });
-      }
-
-
-
-      const hasPermission =
-        user.role.rolePermissions.some(
-          rp =>
-          rp.permission.permissionName === permissionName
-        );
-
-
-
-      if(!hasPermission){
-
-        return res.status(403).json({
-
-          message:"You do not have permission for this action"
-
-        });
-
-      }
-
-
-
-      next();
-
-
-    } catch(error){
-
-      next(error);
-
-    }
-
-  };
-
+const normalizePermission = (permission) => {
+  return String(permission || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 };
 
+const userPermissionSet = (user) => {
+  return new Set((user?.permissions || []).map(normalizePermission));
+};
+
+const requireAnyPermission = (...requiredPermissions) => {
+  const required = requiredPermissions.map(normalizePermission).filter(Boolean);
+
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new ApiError(401, "Authentication is required"));
+    }
+
+    const permissions = userPermissionSet(req.user);
+    const allowed = required.some((permission) => permissions.has(permission));
+
+    if (!allowed) {
+      return next(new ApiError(403, "You do not have permission to access this resource"));
+    }
+
+    return next();
+  };
+};
+
+const requirePermission = (permission) => requireAnyPermission(permission);
 
 module.exports = {
-  requirePermission
+  requirePermission,
+  requireAnyPermission
 };

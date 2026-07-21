@@ -4,9 +4,11 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 
 const loading = ref(false);
 const errorMessage = ref("");
+const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
 
 const form = reactive({
   departmentName: "",
@@ -24,6 +26,12 @@ const authHeaders = () => {
     Authorization: `Bearer ${token}`
   };
 };
+
+onMounted(async () => {
+  if (!canManageDepartments.value) {
+    await navigateTo("/dashboard", { replace: true });
+  }
+});
 
 const saveDepartment = async () => {
   const headers = authHeaders();

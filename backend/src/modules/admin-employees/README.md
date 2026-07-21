@@ -1,6 +1,6 @@
 # Admin Employees Module
 
-This module lets a logged-in Super Admin create employee login accounts.
+This module lets a logged-in user with `MANAGE_EMPLOYEES` create employee login accounts.
 
 It creates both records inside one database transaction:
 
@@ -12,7 +12,7 @@ It creates both records inside one database transaction:
 
 ```http
 POST /api/admin/employees
-Authorization: Bearer <super_admin_token>
+Authorization: Bearer <token_with_manage_employees>
 Content-Type: multipart/form-data
 ```
 
@@ -22,7 +22,7 @@ Compatibility route:
 POST /api/v1/admin/employees
 ```
 
-Only `SUPER_ADMIN` users can call this route.
+Only users with `MANAGE_EMPLOYEES` can call this route.
 
 ## Request Body
 
@@ -65,7 +65,7 @@ For `photo`, submit the request as `multipart/form-data` with a file field named
 ```text
 POST /api/admin/employees
   -> authMiddleware
-  -> allowRoles("SUPER_ADMIN")
+  -> requirePermission("MANAGE_EMPLOYEES")
   -> uploadEmployeePhoto
   -> Joi validation
   -> controller

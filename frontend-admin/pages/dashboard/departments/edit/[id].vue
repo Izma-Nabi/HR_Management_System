@@ -5,10 +5,12 @@ definePageMeta({
 
 const route = useRoute();
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 
 const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
+const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
 
 const form = reactive({
   departmentName: "",
@@ -52,7 +54,14 @@ const loadDepartment = async () => {
   }
 };
 
-onMounted(loadDepartment);
+onMounted(async () => {
+  if (!canManageDepartments.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
+  await loadDepartment();
+});
 
 const updateDepartment = async () => {
   const headers = authHeaders();

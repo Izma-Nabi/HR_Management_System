@@ -27,11 +27,13 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 
 const employees = ref<EmployeeAccount[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
+const canManageEmployees = computed(() => hasPermission("MANAGE_EMPLOYEES"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -89,7 +91,14 @@ const loadEmployees = async () => {
   }
 };
 
-onMounted(loadEmployees);
+onMounted(async () => {
+  if (!canManageEmployees.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
+  await loadEmployees();
+});
 
 const filteredEmployees = computed(() => {
   const keyword = search.value.toLowerCase();

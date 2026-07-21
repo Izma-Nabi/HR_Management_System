@@ -21,11 +21,13 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 
 const departments = ref<Department[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
+const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -63,7 +65,14 @@ const loadDepartments = async () => {
   }
 };
 
-onMounted(loadDepartments);
+onMounted(async () => {
+  if (!canManageDepartments.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
+  await loadDepartments();
+});
 
 const filteredDepartments = computed(() => {
   const keyword = search.value.toLowerCase();

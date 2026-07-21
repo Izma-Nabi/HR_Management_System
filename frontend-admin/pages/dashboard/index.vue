@@ -83,8 +83,20 @@ const recentAttendance = computed(() =>
   []
 );
 
+let dashboardRefreshTimer = null;
+
 onMounted(async () => {
   await fetchDashboard();
+
+  dashboardRefreshTimer = window.setInterval(() => {
+    fetchDashboard({ silent: true });
+  }, 30000);
+});
+
+onUnmounted(() => {
+  if (dashboardRefreshTimer) {
+    window.clearInterval(dashboardRefreshTimer);
+  }
 });
 
 </script>
@@ -244,7 +256,7 @@ onMounted(async () => {
             class="border-t"
           >
             <td class="px-4 py-3 text-gray-700">
-              {{ new Date(item.attendanceDate).toLocaleDateString() }}
+              {{ item.attendanceDate }}
             </td>
             <td class="px-4 py-3 text-gray-700">
               {{ item.fullName }}

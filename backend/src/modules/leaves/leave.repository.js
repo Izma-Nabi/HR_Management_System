@@ -1,4 +1,4 @@
-const prisma = require("../../../database/prisma");
+const { prisma } = require("../../../../database/prisma");
 
 const createLeave = (data) => {
   return prisma.leaveRequest.create({

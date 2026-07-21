@@ -1,7 +1,10 @@
 const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
-const allowRoles = require("../../middlewares/role.middleware");
+const {
+  requirePermission,
+  requireAnyPermission
+} = require("../../middlewares/permission.middleware");
 const departmentsController = require("./departments.controller");
 const {
   createDepartmentSchema,
@@ -10,13 +13,45 @@ const {
 
 const router = express.Router();
 
-router.use(authMiddleware, allowRoles("SUPER_ADMIN", "ADMIN"));
+router.use(authMiddleware);
 
-router.get("/", departmentsController.listDepartments);
-router.post("/", validate(createDepartmentSchema), departmentsController.createDepartment);
-router.get("/:id", departmentsController.getDepartment);
-router.put("/:id", validate(updateDepartmentSchema), departmentsController.updateDepartment);
-router.patch("/:id", validate(updateDepartmentSchema), departmentsController.updateDepartment);
-router.delete("/:id", departmentsController.deleteDepartment);
+router.get(
+  "/",
+  requireAnyPermission("MANAGE_DEPARTMENTS", "MANAGE_ADMINS", "MANAGE_EMPLOYEES"),
+  departmentsController.listDepartments
+);
+
+router.post(
+  "/",
+  requirePermission("MANAGE_DEPARTMENTS"),
+  validate(createDepartmentSchema),
+  departmentsController.createDepartment
+);
+
+router.get(
+  "/:id",
+  requireAnyPermission("MANAGE_DEPARTMENTS", "MANAGE_ADMINS", "MANAGE_EMPLOYEES"),
+  departmentsController.getDepartment
+);
+
+router.put(
+  "/:id",
+  requirePermission("MANAGE_DEPARTMENTS"),
+  validate(updateDepartmentSchema),
+  departmentsController.updateDepartment
+);
+
+router.patch(
+  "/:id",
+  requirePermission("MANAGE_DEPARTMENTS"),
+  validate(updateDepartmentSchema),
+  departmentsController.updateDepartment
+);
+
+router.delete(
+  "/:id",
+  requirePermission("MANAGE_DEPARTMENTS"),
+  departmentsController.deleteDepartment
+);
 
 module.exports = router;

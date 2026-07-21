@@ -1,7 +1,7 @@
 const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
-const allowRoles = require("../../middlewares/role.middleware");
+const { requirePermission } = require("../../middlewares/permission.middleware");
 const { uploadEmployeePhoto } = require("../../middlewares/upload.middleware");
 const adminEmployeesController = require("./admin-employees.controller");
 const {
@@ -13,14 +13,14 @@ const router = express.Router();
 router.get(
   "/",
   authMiddleware,
-  allowRoles("SUPER_ADMIN", "ADMIN"),
+  requirePermission("MANAGE_EMPLOYEES"),
   adminEmployeesController.listEmployees
 );
 
 router.post(
   "/",
   authMiddleware,
-  allowRoles("SUPER_ADMIN", "ADMIN"),
+  requirePermission("MANAGE_EMPLOYEES"),
   uploadEmployeePhoto,
   validate(createEmployeeSchema),
   adminEmployeesController.createEmployee

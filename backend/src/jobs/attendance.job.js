@@ -1,86 +1,40 @@
-const fs = require("fs");
-const path = require("path");
+const cron = require("node-cron");
 
 const attendanceService = require("../modules/attendance/attendance.service");
 
-const importAttendanceFile = async () => {
+let syncRunning = false;
+
+const syncAttendanceFromSheet = async () => {
+  if (syncRunning) {
+    console.log("Attendance sync skipped because a previous sync is still running.");
+    return null;
+  }
+
+  syncRunning = true;
+
   try {
-    const filePath = path.join(
-      __dirname,
-      "../../uploads/attendance/Employee_Attendance_Weekly.xlsx"
+    const result = await attendanceService.importAttendance();
+
+    console.log(
+      `Attendance synced. Total sheet rows: ${result.totalRows}, inserted: ${result.insertedRows}, matched existing: ${result.matchedRows}, skipped: ${result.skippedRows}`
     );
 
-    if (!fs.existsSync(filePath)) {
-      console.log("Attendance file not found.");
-      return;
-    }
-
-    const result = await attendanceService.importAttendance({
-      path: filePath
-    });
-
-    console.log("==================================");
-    console.log("Attendance imported successfully.");
-    console.log(`Total Rows: ${result.totalRows}`);
-    console.log(`Inserted Rows: ${result.insertedRows}`);
-    console.log("==================================");
-
+    return result;
   } catch (error) {
-    console.error("Attendance Import Failed");
-    console.error(error.message);
+    console.error("Attendance sync failed:", error.message);
+    return null;
+  } finally {
+    syncRunning = false;
   }
 };
 
-module.exports = {
-  importAttendanceFile
+const startAttendanceScheduler = () => {
+  console.log("Attendance scheduler started. Syncing Google Sheet every 30 seconds.");
+
+  cron.schedule("*/30 * * * * *", syncAttendanceFromSheet);
 };
 
-
-
-
-// const fs = require("fs");
-// const path = require("path");
-// const cron = require("node-cron");
-
-// const attendanceService = require("../modules/attendance/attendance.service");
-
-// const attendanceFilePath = path.join(
-//   __dirname,
-//   "../../uploads/attendance/Employee_Attendance_Weekly.xlsx"
-// );
-
-// const importAttendanceFile = async () => {
-//   try {
-//     if (!fs.existsSync(attendanceFilePath)) {
-//       console.log("Attendance Excel file not found.");
-//       return;
-//     }
-
-//     console.log("Starting attendance import...");
-
-//     const result = await attendanceService.importAttendance({
-//       path: attendanceFilePath
-//     });
-
-//     console.log(
-//       `Attendance imported successfully. Total: ${result.totalRows}, Inserted: ${result.insertedRows}`
-//     );
-//   } catch (error) {
-//     console.error("Attendance import failed:", error.message);
-//   }
-// };
-
-// const startAttendanceScheduler = () => {
-//   console.log("Attendance Scheduler Started.");
-
-//   // Every day at 12:05 AM
-//   cron.schedule("5 0 * * *", async () => {
-//     console.log("Running scheduled attendance import...");
-//     await importAttendanceFile();
-//   });
-// };
-
-// module.exports = {
-//   importAttendanceFile,
-//   startAttendanceScheduler
-// };
+module.exports = {
+  startAttendanceScheduler,
+  syncAttendanceFromSheet
+};

@@ -25,6 +25,7 @@ definePageMeta({
 
 const route = useRoute();
 const config = useRuntimeConfig();
+const { hasPermission } = useAuthUser();
 const id = route.params.id;
 
 const departments = ref<Department[]>([]);
@@ -32,6 +33,7 @@ const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
 const photoInputKey = ref(0);
+const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
 
 const form = reactive({
   email: "",
@@ -96,6 +98,11 @@ const loadAdmin = async (headers: Record<string, string>) => {
 };
 
 onMounted(async () => {
+  if (!canManageAdmins.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
   const headers = authHeaders();
 
   if (!headers) {

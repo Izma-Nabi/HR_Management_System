@@ -10,7 +10,14 @@ const permissions = [
   { permissionName: "VIEW_SYSTEM_SUMMARY" },
   { permissionName: "VIEW_TEAM_ATTENDANCE" },
   { permissionName: "VIEW_OWN_ATTENDANCE" },
-  { permissionName: "VIEW_REPORTS" }
+  { permissionName: "VIEW_REPORTS" },
+  { permissionName: "CREATE_LEAVE" },
+  { permissionName: "VIEW_OWN_LEAVE" },
+  { permissionName: "VIEW_TEAM_LEAVE" },
+  { permissionName: "VIEW_ALL_LEAVES" },
+  { permissionName: "APPROVE_LEAVE" },
+  { permissionName: "REJECT_LEAVE" },
+  { permissionName: "CANCEL_LEAVE" }
 ];
 
 const main = async () => {
@@ -23,7 +30,9 @@ const main = async () => {
         permissionName: permission.permissionName
       },
 
-      update: {},
+      update: {
+        permissionName: permission.permissionName
+      },
 
       create: {
         permissionName: permission.permissionName

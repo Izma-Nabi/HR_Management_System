@@ -1,8 +1,19 @@
 <script setup>
-const { hasAnyPermission } = useAuthUser();
+const { hasPermission, hasAnyPermission } = useAuthUser();
 
 const canAddUser = computed(() =>
   hasAnyPermission("MANAGE_ADMINS", "MANAGE_EMPLOYEES")
+);
+const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
+const canManageEmployees = computed(() => hasPermission("MANAGE_EMPLOYEES"));
+const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
+const canViewLeaves = computed(() =>
+  hasAnyPermission(
+    "CREATE_LEAVE",
+    "VIEW_OWN_LEAVE",
+    "VIEW_TEAM_LEAVE",
+    "VIEW_ALL_LEAVES"
+  )
 );
 </script>
 
@@ -26,19 +37,35 @@ const canAddUser = computed(() =>
         Add User
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/admins" class="nav-item">
+      <NuxtLink
+        v-if="canManageAdmins"
+        to="/dashboard/admins"
+        class="nav-item"
+      >
         Administrators
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/employees" class="nav-item">
+      <NuxtLink
+        v-if="canManageEmployees"
+        to="/dashboard/employees"
+        class="nav-item"
+      >
         Employees
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/departments" class="nav-item">
+      <NuxtLink
+        v-if="canManageDepartments"
+        to="/dashboard/departments"
+        class="nav-item"
+      >
         Departments
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/leaves" class="nav-item">
+      <NuxtLink
+        v-if="canViewLeaves"
+        to="/dashboard/leaves"
+        class="nav-item"
+      >
         Leave Requests
       </NuxtLink>
 

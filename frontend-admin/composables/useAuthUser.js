@@ -21,11 +21,18 @@ export const useAuthUser = () => {
 
   hydrateAuthUser();
 
+  const normalizePermission = (permission) => {
+    return String(permission || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  };
+
   const permissions = computed(() => authUser.value?.permissions || []);
+  const permissionSet = computed(() =>
+    new Set(permissions.value.map(normalizePermission))
+  );
   const role = computed(() => authUser.value?.role || null);
 
   const hasPermission = (permission) => {
-    return permissions.value.includes(permission);
+    return permissionSet.value.has(normalizePermission(permission));
   };
 
   const hasAnyPermission = (...requiredPermissions) => {

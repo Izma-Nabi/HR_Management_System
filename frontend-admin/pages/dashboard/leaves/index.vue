@@ -6,33 +6,46 @@ import LeaveReviewPanel from "~/components/leaves/LeaveReviewPanel.vue";
 import ApplyLeaveModal from "~/components/leaves/ApplyLeaveModal.vue";
 
 const showApplyModal = ref(false);
-const user = process.client
-  ? JSON.parse(localStorage.getItem("user") || "{}")
-  : {};
+const {
+  authUser,
+  role,
+  hasPermission,
+  hasAnyPermission
+} = useAuthUser();
 
-const role = computed(() => String(user.role || "").toUpperCase());
+const roleKey = computed(() => String(role.value || "").toUpperCase());
+const userCode = computed(() => authUser.value?.userCode || "");
 
-const isSuperAdmin = computed(() => role.value === "SUPER_ADMIN");
-const isHR = computed(() => role.value === "HR");
-const isProjectManager = computed(() => role.value === "Project_Managergit switch -c leaves");
-const isEmployee = computed(() => role.value === "EMPLOYEE");
+const isSuperAdmin = computed(() => roleKey.value === "SUPER_ADMIN");
+const isEmployee = computed(() => roleKey.value === "EMPLOYEE");
 
-// Only these roles can approve/reject
 const canApprove = computed(() =>
-  isSuperAdmin.value ||
-  isHR.value ||
-  isProjectManager .value
+  hasAnyPermission("APPROVE_LEAVE", "REJECT_LEAVE")
 );
 
-// Everyone can apply except Super Admin
 const canCreateLeave = computed(() =>
-  !isSuperAdmin.value
+  hasPermission("CREATE_LEAVE")
 );
 
-// Hide filters from employees
 const canFilter = computed(() =>
-  !isEmployee.value
+  hasAnyPermission("VIEW_ALL_LEAVES", "VIEW_TEAM_LEAVE")
 );
+
+const currentApproverLabel = computed(() => {
+  if (roleKey.value === "SUPER_ADMIN") {
+    return "Super Admin";
+  }
+
+  if (roleKey.value === "ADMIN") {
+    return "Admin";
+  }
+
+  if (roleKey.value === "PROJECT_MANAGER") {
+    return "Project Manager";
+  }
+
+  return "Approver";
+});
 
 type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 type LeaveType = "ANNUAL" | "SICK" | "CASUAL" | "UNPAID" | "OTHER";
@@ -117,11 +130,7 @@ const leaveRequests = ref<LeaveRequest[]>([
     days: 1,
     reason: "Personal work.",
     submittedAt: "2026-07-12 11:10",
-    approverName: isSuperAdmin.value
-    ? "Super Admin"
-    : isHR.value
-      ? "HR"
-      : "Project Manager",
+    approverName: currentApproverLabel.value,
     decisionNote: "Coverage confirmed with Finance team.",
     decidedAt: "2026-07-13 10:05"
   },
@@ -157,7 +166,7 @@ const filteredRequests = computed(() => {
 
   if (isEmployee.value) {
     requests = requests.filter(
-      r => r.requesterCode === user.userCode
+      r => r.requesterCode === userCode.value
     );
   }
 
@@ -240,7 +249,7 @@ const updateDecision = (status: "APPROVED" | "REJECTED") => {
     return {
       ...request,
       status,
-      approverName: "Super Admin",
+      approverName: currentApproverLabel.value,
       decisionNote: decisionNote.value.trim() || null,
       decidedAt: now
     };

@@ -1,7 +1,7 @@
 const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
-const allowRoles = require("../../middlewares/role.middleware");
+const { requirePermission } = require("../../middlewares/permission.middleware");
 const { uploadAdminPhoto } = require("../../middlewares/upload.middleware");
 const userController = require("./user.controller");
 const parseAdminDepartments = require("../../middlewares/parse-admin-departments.middleware");
@@ -24,10 +24,11 @@ const parseDepartments = (req,res,next)=>{
 
 const router = express.Router();
 
-router.use(authMiddleware, allowRoles("SUPER_ADMIN"));
+router.use(authMiddleware);
 
 router.post(
   "/admin",
+  requirePermission("MANAGE_ADMINS"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(createAdminSchema),
@@ -37,21 +38,25 @@ router.post(
 
 router.get(
   "/admins",
+  requirePermission("MANAGE_ADMINS"),
   userController.listAdmins
 );
 
 router.get(
   "/admin/:id",
+  requirePermission("MANAGE_ADMINS"),
   userController.getAdmin
 );
 
 router.get(
   "/admins/:id",
+  requirePermission("MANAGE_ADMINS"),
   userController.getAdmin
 );
 
 router.put(
   "/admin/:id",
+  requirePermission("MANAGE_ADMINS"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(updateAdminSchema),
@@ -60,6 +65,7 @@ router.put(
 
 router.patch(
   "/admin/:id",
+  requirePermission("MANAGE_ADMINS"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(updateAdminSchema),
@@ -68,6 +74,7 @@ router.patch(
 
 router.patch(
   "/admins/:id",
+  requirePermission("MANAGE_ADMINS"),
   uploadAdminPhoto,
   validate(updateAdminSchema),
   userController.updateAdmin
@@ -75,16 +82,19 @@ router.patch(
 
 router.delete(
   "/admin/:id",
+  requirePermission("MANAGE_ADMINS"),
   userController.deleteAdmin
 );
 
 router.delete(
   "/admins/:id",
+  requirePermission("MANAGE_ADMINS"),
   userController.deleteAdmin
 );
 
 router.post(
   "/employee",
+  requirePermission("MANAGE_EMPLOYEES"),
   validate(createEmployeeSchema),
   userController.createEmployee
 );
