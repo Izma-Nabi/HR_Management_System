@@ -7,7 +7,6 @@ const { uploadsRoot } = require("./middlewares/upload.middleware");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/user.routes");
 const adminEmployeesRoutes = require("./modules/admin-employees/admin-employees.routes");
-const employeeAuthRoutes = require("./modules/employee-auth/employee-auth.routes");
 const departmentRoutes = require("./modules/departments/departments.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const attendanceRoutes = require("./modules/attendance/attendance.routes");
@@ -70,8 +69,7 @@ app.get("/", (req, res) => {
       me: "/api/me",
       adminLogin: "/api/auth/login",
       adminEmployees: "/api/admin/employees",
-      departments: "/api/departments",
-      employeeLogin: "/api/v1/employee/auth/login"
+      departments: "/api/departments"
     }
   });
 });
@@ -107,10 +105,6 @@ app.use("/api/administrator", authRoutes);
 app.use("/api/admin/employees", adminEmployeesRoutes);
 app.use("/api/v1/admin/employees", adminEmployeesRoutes);
 app.use("/api/v1/departments", departmentRoutes);
-
-// Employee routes.
-// These keep the employee frontend's existing /api/v1/employee/auth path.
-app.use("/api/v1/employee/auth", employeeAuthRoutes);
 
 // These must be after all real routes.
 app.use(notFoundHandler);

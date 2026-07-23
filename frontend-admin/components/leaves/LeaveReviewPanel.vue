@@ -120,7 +120,7 @@ const emit = defineEmits<{
         </span>
       </section>
 
-      <!-- Only HR / Team Lead / Super Admin can approve -->
+      <!-- Only Admin / Super Admin can approve -->
       <section
         v-if="canApprove && selectedRequest.status === 'PENDING'"
         class="decision-box"

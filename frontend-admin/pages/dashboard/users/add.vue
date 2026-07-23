@@ -5,10 +5,10 @@ definePageMeta({
 
 const { hasPermission, hasAnyPermission } = useAuthUser();
 
-const canCreateAdmin = computed(() => hasPermission("MANAGE_ADMINS"));
-const canCreateEmployee = computed(() => hasPermission("MANAGE_EMPLOYEES"));
+const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
+const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
 const canAccessAddUser = computed(() =>
-  hasAnyPermission("MANAGE_ADMINS", "MANAGE_EMPLOYEES")
+  hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
 );
 
 onMounted(async () => {

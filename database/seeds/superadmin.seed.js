@@ -39,10 +39,11 @@ const main = async () => {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Find the SUPER_ADMIN role
-  const superAdminRole = await prisma.role.findUnique({
+  const superAdminRole = await prisma.role.findFirst({
     where: {
-      roleName: "SUPER ADMIN"
+      roleName: {
+        in: ["Super Admin", "SUPER ADMIN", "SUPER_ADMIN"]
+      }
     }
   });
 

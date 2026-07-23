@@ -79,8 +79,8 @@ CREATE TABLE `leave_approval_history` (
 
 INSERT IGNORE INTO `permissions` (`permission_name`) VALUES
   ('CREATE_LEAVE'),
-  ('VIEW_OWN_LEAVE'),
-  ('VIEW_TEAM_LEAVE'),
+  ('VIEW_OWN_LEAVES'),
+  ('VIEW_TEAM_LEAVES'),
   ('VIEW_ALL_LEAVES'),
   ('APPROVE_LEAVE'),
   ('REJECT_LEAVE'),
@@ -93,7 +93,7 @@ JOIN `permissions`
 WHERE `roles`.`role_name` = 'SUPER ADMIN'
   AND `permissions`.`permission_name` IN (
     'VIEW_ALL_LEAVES',
-    'VIEW_TEAM_LEAVE',
+    'VIEW_TEAM_LEAVES',
     'APPROVE_LEAVE',
     'REJECT_LEAVE'
   );
@@ -105,9 +105,9 @@ JOIN `permissions`
 WHERE `roles`.`role_name` = 'ADMIN'
   AND `permissions`.`permission_name` IN (
     'CREATE_LEAVE',
-    'VIEW_OWN_LEAVE',
+    'VIEW_OWN_LEAVES',
     'VIEW_ALL_LEAVES',
-    'VIEW_TEAM_LEAVE',
+    'VIEW_TEAM_LEAVES',
     'APPROVE_LEAVE',
     'REJECT_LEAVE',
     'CANCEL_LEAVE'
@@ -120,8 +120,8 @@ JOIN `permissions`
 WHERE `roles`.`role_name` = 'PROJECT MANAGER'
   AND `permissions`.`permission_name` IN (
     'CREATE_LEAVE',
-    'VIEW_OWN_LEAVE',
-    'VIEW_TEAM_LEAVE',
+    'VIEW_OWN_LEAVES',
+    'VIEW_TEAM_LEAVES',
     'APPROVE_LEAVE',
     'REJECT_LEAVE',
     'CANCEL_LEAVE'
@@ -134,6 +134,6 @@ JOIN `permissions`
 WHERE `roles`.`role_name` = 'EMPLOYEE'
   AND `permissions`.`permission_name` IN (
     'CREATE_LEAVE',
-    'VIEW_OWN_LEAVE',
+    'VIEW_OWN_LEAVES',
     'CANCEL_LEAVE'
   );

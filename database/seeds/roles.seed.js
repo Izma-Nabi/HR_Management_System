@@ -5,16 +5,13 @@ const prisma = new PrismaClient();
 const main = async()=>{
     const roles=[
         {
-            roleName:'SUPER ADMIN'
+            roleName:'Super Admin'
         },
         {
-            roleName:'ADMIN'
+            roleName:'Admin'
         },
         {
-            roleName:'PROJECT MANAGER'
-        },
-        {
-            roleName:'EMPLOYEE'
+            roleName:'Employee'
         }
     ];
 

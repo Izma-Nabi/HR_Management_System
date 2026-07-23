@@ -27,7 +27,7 @@ definePageMeta({
 
 const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
-const canCreateEmployee = computed(() => hasPermission("MANAGE_EMPLOYEES"));
+const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
 
 const defaultForm = (): EmployeeForm => ({
   firstName: "",

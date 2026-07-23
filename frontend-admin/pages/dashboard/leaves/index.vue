@@ -28,7 +28,7 @@ const canCreateLeave = computed(() =>
 );
 
 const canFilter = computed(() =>
-  hasAnyPermission("VIEW_ALL_LEAVES", "VIEW_TEAM_LEAVE")
+  hasAnyPermission("VIEW_ALL_LEAVES", "VIEW_TEAM_LEAVES")
 );
 
 const currentApproverLabel = computed(() => {
@@ -38,10 +38,6 @@ const currentApproverLabel = computed(() => {
 
   if (roleKey.value === "ADMIN") {
     return "Admin";
-  }
-
-  if (roleKey.value === "PROJECT_MANAGER") {
-    return "Project Manager";
   }
 
   return "Approver";

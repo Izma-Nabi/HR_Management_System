@@ -4,35 +4,40 @@ const { generateNextAdminCode } = require("../../utils/admin-code");
 
 const ROLE_PERMISSION_FALLBACKS = {
   [ROLE_KEYS.SUPER_ADMIN]: [
-    "MANAGE_ADMINS",
-    "MANAGE_DEPARTMENTS",
-    "MANAGE_EMPLOYEES",
+    "CREATE_ADMIN",
+    "VIEW_ADMINS",
+    "UPDATE_ADMIN",
+    "DELETE_ADMIN",
+    "CREATE_DEPARTMENT",
+    "VIEW_DEPARTMENTS",
+    "UPDATE_DEPARTMENT",
+    "DELETE_DEPARTMENT",
+    "CREATE_EMPLOYEE",
+    "VIEW_EMPLOYEES",
+    "UPDATE_EMPLOYEE",
+    "DELETE_EMPLOYEE",
+    "IMPORT_ATTENDANCE",
     "VIEW_SYSTEM_SUMMARY",
     "VIEW_TEAM_ATTENDANCE",
     "VIEW_OWN_ATTENDANCE",
     "VIEW_REPORTS",
     "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVE",
+    "VIEW_TEAM_LEAVES",
     "APPROVE_LEAVE",
     "REJECT_LEAVE"
   ],
   [ROLE_KEYS.ADMIN]: [
     "CREATE_LEAVE",
-    "MANAGE_EMPLOYEES",
+    "CREATE_EMPLOYEE",
+    "VIEW_EMPLOYEES",
+    "UPDATE_EMPLOYEE",
+    "DELETE_EMPLOYEE",
+    "IMPORT_ATTENDANCE",
     "VIEW_SYSTEM_SUMMARY",
     "VIEW_REPORTS",
-    "VIEW_OWN_LEAVE",
+    "VIEW_OWN_LEAVES",
     "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVE",
-    "APPROVE_LEAVE",
-    "REJECT_LEAVE",
-    "CANCEL_LEAVE"
-  ],
-  [ROLE_KEYS.PROJECT_MANAGER]: [
-    "CREATE_LEAVE",
-    "VIEW_TEAM_ATTENDANCE",
-    "VIEW_OWN_LEAVE",
-    "VIEW_TEAM_LEAVE",
+    "VIEW_TEAM_LEAVES",
     "APPROVE_LEAVE",
     "REJECT_LEAVE",
     "CANCEL_LEAVE"
@@ -40,19 +45,9 @@ const ROLE_PERMISSION_FALLBACKS = {
   [ROLE_KEYS.EMPLOYEE]: [
     "CREATE_LEAVE",
     "VIEW_OWN_ATTENDANCE",
-    "VIEW_OWN_LEAVE",
+    "VIEW_OWN_LEAVES",
     "CANCEL_LEAVE"
   ]
-};
-
-const LEGACY_PERMISSION_MAP = {
-  CREATE_ADMIN: "MANAGE_ADMINS",
-  EDIT_ADMIN: "MANAGE_ADMINS",
-  DELETE_ADMIN: "MANAGE_ADMINS",
-  CREATE_EMPLOYEE: "MANAGE_EMPLOYEES",
-  EDIT_EMPLOYEE: "MANAGE_EMPLOYEES",
-  DELETE_EMPLOYEE: "MANAGE_EMPLOYEES",
-  VIEW_REPORTS: "VIEW_SYSTEM_SUMMARY"
 };
 
 const safeUserSelect = {
@@ -136,6 +131,11 @@ const toPermissionKey = (permissionName) => {
 
 const permissionsFromRole = (role) => {
   const roleKey = toRoleKey(role);
+
+  if (!roleKey) {
+    return [];
+  }
+
   const permissions = new Set(ROLE_PERMISSION_FALLBACKS[roleKey] || []);
   const rolePermissions = role?.rolePermissions || [];
 
@@ -147,12 +147,6 @@ const permissionsFromRole = (role) => {
     }
 
     permissions.add(permissionKey);
-
-    const appPermission = LEGACY_PERMISSION_MAP[permissionKey];
-
-    if (appPermission) {
-      permissions.add(appPermission);
-    }
   }
 
   return Array.from(permissions).sort();

@@ -13,14 +13,14 @@ const router = express.Router();
 router.get(
   "/",
   authMiddleware,
-  requirePermission("MANAGE_EMPLOYEES"),
+  requirePermission("VIEW_EMPLOYEES"),
   adminEmployeesController.listEmployees
 );
 
 router.post(
   "/",
   authMiddleware,
-  requirePermission("MANAGE_EMPLOYEES"),
+  requirePermission("CREATE_EMPLOYEE"),
   uploadEmployeePhoto,
   validate(createEmployeeSchema),
   adminEmployeesController.createEmployee

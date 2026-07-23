@@ -8,7 +8,7 @@ const { hasPermission } = useAuthUser();
 
 const loading = ref(false);
 const errorMessage = ref("");
-const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
+const canCreateDepartment = computed(() => hasPermission("CREATE_DEPARTMENT"));
 
 const form = reactive({
   departmentName: "",
@@ -28,7 +28,7 @@ const authHeaders = () => {
 };
 
 onMounted(async () => {
-  if (!canManageDepartments.value) {
+  if (!canCreateDepartment.value) {
     await navigateTo("/dashboard", { replace: true });
   }
 });

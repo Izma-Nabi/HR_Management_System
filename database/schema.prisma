@@ -14,6 +14,12 @@ enum EmploymentStatus {
   TERMINATED
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
 enum AttendanceStatus {
   Present
   Absent
@@ -97,12 +103,13 @@ model User {
   joiningDate DateTime? @map("joiningDate") @db.Date
 
   employmentStatus EmploymentStatus @default(ACTIVE) @map("employmentStatus")
+  status           UserStatus?      @default(ACTIVE)
 
-  roleId Int @map("role_id") @db.UnsignedInt
+  roleId Int  @map("role_id") @db.UnsignedInt
   role   Role @relation(fields: [roleId], references: [id])
 
   // User belongs to one department
-  departmentId Int? @map("department_id") @db.UnsignedInt
+  departmentId Int?        @map("department_id") @db.UnsignedInt
   department   Department? @relation(fields: [departmentId], references: [id])
 
   // Admin manages many departments
@@ -128,7 +135,7 @@ model User {
 model Department {
   id Int @id @default(autoincrement()) @db.UnsignedInt
 
-  departmentName String @unique @map("department_name") @db.VarChar(100)
+  departmentName String  @unique @map("department_name") @db.VarChar(100)
   description    String? @db.VarChar(255)
 
   // Users belonging to this department
@@ -146,50 +153,50 @@ model AdminDepartment {
   userId       Int @map("user_id") @db.UnsignedInt
   departmentId Int @map("department_id") @db.UnsignedInt
 
-  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, departmentId])
   @@index([userId])
   @@index([departmentId])
-
   @@map("admin_departments")
 }
 
 model Attendance {
-  id               Int              @id @default(autoincrement()) @db.UnsignedInt
-  userCode         String           @map("user_code") @db.VarChar(50)
-  fullName         String           @map("full_name") @db.VarChar(100)
-  role             String           @db.VarChar(50)
-  department       String           @db.VarChar(100)
-  attendanceDate   DateTime         @map("attendance_date") @db.Date
-  checkIn          DateTime?        @map("check_in") @db.Time(0)
-  checkOut         DateTime?        @map("check_out") @db.Time(0)
-  status           AttendanceStatus
-  remarks          String?          @db.Text
-  sourceKey        String?          @unique @map("source_key") @db.VarChar(128)
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  id             Int              @id @default(autoincrement())
+  userCode       String           @map("user_code") @db.VarChar(50)
+  fullName       String           @map("full_name") @db.VarChar(100)
+  role           String           @db.VarChar(50)
+  department     String           @db.VarChar(100)
+  attendanceDate DateTime         @map("attendance_date") @db.Date
+  checkIn        DateTime?        @map("check_in") @db.Time(0)
+  checkOut       DateTime?        @map("check_out") @db.Time(0)
+  status         AttendanceStatus
+  remarks        String?          @db.Text
+  sourceKey      String?          @unique @map("source_key") @db.VarChar(128)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
   @@map("attendance")
 }
 
 model LeaveRequest {
-  id                   Int                @id @default(autoincrement()) @db.UnsignedInt
-  userId               Int                @map("user_id") @db.UnsignedInt
-  user                 User               @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
+  id                   Int                    @id @default(autoincrement()) @db.UnsignedInt
+  userId               Int                    @map("user_id") @db.UnsignedInt
+  user                 User                   @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
   type                 LeaveRequestType
-  startDate            DateTime           @map("start_date") @db.Date
-  endDate              DateTime           @map("end_date") @db.Date
-  totalDays            Int                @map("total_days")
-  reason               String?            @db.Text
-  status               LeaveRequestStatus @default(PENDING)
-  currentApprovalLevel Int                @default(1) @map("current_approval_level")
-  currentRefersTo      Int?               @map("current_refers_to") @db.UnsignedInt
-  currentApprover      User?              @relation("CurrentLeaveApprover", fields: [currentRefersTo], references: [id], onDelete: SetNull)
+  startDate            DateTime               @map("start_date") @db.Date
+  endDate              DateTime               @map("end_date") @db.Date
+  totalDays            Int                    @map("total_days")
+  reason               String?                @db.Text
+  status               LeaveRequestStatus     @default(PENDING)
+  currentApprovalLevel Int                    @default(1) @map("current_approval_level")
+  currentRefersTo      Int?                   @map("current_refers_to") @db.UnsignedInt
+  currentApprover      User?                  @relation("CurrentLeaveApprover", fields: [currentRefersTo], references: [id], onDelete: SetNull)
   approvals            LeaveApproval[]
   history              LeaveApprovalHistory[]
-  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@index([userId])
   @@index([currentRefersTo])

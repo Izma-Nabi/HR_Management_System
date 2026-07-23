@@ -33,7 +33,7 @@ const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
 const photoInputKey = ref(0);
-const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
+const canUpdateAdmin = computed(() => hasPermission("UPDATE_ADMIN"));
 
 const form = reactive({
   email: "",
@@ -98,7 +98,7 @@ const loadAdmin = async (headers: Record<string, string>) => {
 };
 
 onMounted(async () => {
-  if (!canManageAdmins.value) {
+  if (!canUpdateAdmin.value) {
     await navigateTo("/dashboard", { replace: true });
     return;
   }

@@ -19,7 +19,7 @@ leaveController.createLeave
 router.get(
 "/my",
 auth,
-requirePermission("VIEW_OWN_LEAVE"),
+requirePermission("VIEW_OWN_LEAVES"),
 leaveController.myLeaves
 );
 
@@ -28,7 +28,7 @@ leaveController.myLeaves
 router.get(
 "/team",
 auth,
-requirePermission("VIEW_TEAM_LEAVE"),
+requirePermission("VIEW_TEAM_LEAVES"),
 leaveController.teamLeaves
 );
 

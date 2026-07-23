@@ -15,7 +15,7 @@ definePageMeta({
 
 const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
-const canCreateAdmin = computed(() => hasPermission("MANAGE_ADMINS"));
+const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
 
 const departments = ref<Department[]>([]);
 const loading = ref(false);

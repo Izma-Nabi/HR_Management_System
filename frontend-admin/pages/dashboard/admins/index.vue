@@ -24,7 +24,10 @@ const loading = ref(true);
 const search = ref("");
 const admins = ref<AdminProfile[]>([]);
 const errorMessage = ref("");
-const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
+const canViewAdmins = computed(() => hasPermission("VIEW_ADMINS"));
+const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
+const canUpdateAdmin = computed(() => hasPermission("UPDATE_ADMIN"));
+const canDeleteAdmin = computed(() => hasPermission("DELETE_ADMIN"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -63,7 +66,7 @@ const loadAdmins = async () => {
 };
 
 onMounted(async () => {
-  if (!canManageAdmins.value) {
+  if (!canViewAdmins.value) {
     await navigateTo("/dashboard", { replace: true });
     return;
   }
@@ -118,7 +121,7 @@ const deleteAdmin = async (id: number) => {
         <p>{{ admins.length }} Administrator(s)</p>
       </div>
 
-      <NuxtLink to="/dashboard/users/add-admin" class="add-btn">
+      <NuxtLink v-if="canCreateAdmin" to="/dashboard/users/add-admin" class="add-btn">
         + Add Administrator
       </NuxtLink>
     </div>
@@ -161,10 +164,10 @@ const deleteAdmin = async (id: number) => {
             </span>
           </td>
           <td class="actions">
-            <NuxtLink class="edit" :to="`/dashboard/admins/edit/${admin.id}`">
+            <NuxtLink v-if="canUpdateAdmin" class="edit" :to="`/dashboard/admins/edit/${admin.id}`">
               Edit Profile
             </NuxtLink>
-            <button class="delete" type="button" @click="deleteAdmin(admin.id)">
+            <button v-if="canDeleteAdmin" class="delete" type="button" @click="deleteAdmin(admin.id)">
               Delete
             </button>
           </td>

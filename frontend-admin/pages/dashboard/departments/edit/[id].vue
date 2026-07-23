@@ -10,7 +10,7 @@ const { hasPermission } = useAuthUser();
 const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
-const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
+const canUpdateDepartment = computed(() => hasPermission("UPDATE_DEPARTMENT"));
 
 const form = reactive({
   departmentName: "",
@@ -55,7 +55,7 @@ const loadDepartment = async () => {
 };
 
 onMounted(async () => {
-  if (!canManageDepartments.value) {
+  if (!canUpdateDepartment.value) {
     await navigateTo("/dashboard", { replace: true });
     return;
   }

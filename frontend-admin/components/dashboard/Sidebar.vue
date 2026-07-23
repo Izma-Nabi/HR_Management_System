@@ -2,16 +2,27 @@
 const { hasPermission, hasAnyPermission } = useAuthUser();
 
 const canAddUser = computed(() =>
-  hasAnyPermission("MANAGE_ADMINS", "MANAGE_EMPLOYEES")
+  hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
 );
-const canManageAdmins = computed(() => hasPermission("MANAGE_ADMINS"));
-const canManageEmployees = computed(() => hasPermission("MANAGE_EMPLOYEES"));
-const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
+const canManageAdmins = computed(() =>
+  hasAnyPermission("VIEW_ADMINS", "CREATE_ADMIN", "UPDATE_ADMIN", "DELETE_ADMIN")
+);
+const canManageEmployees = computed(() =>
+  hasAnyPermission("VIEW_EMPLOYEES", "CREATE_EMPLOYEE", "UPDATE_EMPLOYEE", "DELETE_EMPLOYEE")
+);
+const canManageDepartments = computed(() =>
+  hasAnyPermission(
+    "VIEW_DEPARTMENTS",
+    "CREATE_DEPARTMENT",
+    "UPDATE_DEPARTMENT",
+    "DELETE_DEPARTMENT"
+  )
+);
 const canViewLeaves = computed(() =>
   hasAnyPermission(
     "CREATE_LEAVE",
-    "VIEW_OWN_LEAVE",
-    "VIEW_TEAM_LEAVE",
+    "VIEW_OWN_LEAVES",
+    "VIEW_TEAM_LEAVES",
     "VIEW_ALL_LEAVES"
   )
 );

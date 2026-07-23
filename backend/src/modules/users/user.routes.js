@@ -28,7 +28,7 @@ router.use(authMiddleware);
 
 router.post(
   "/admin",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("CREATE_ADMIN"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(createAdminSchema),
@@ -38,25 +38,25 @@ router.post(
 
 router.get(
   "/admins",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("VIEW_ADMINS"),
   userController.listAdmins
 );
 
 router.get(
   "/admin/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("VIEW_ADMINS"),
   userController.getAdmin
 );
 
 router.get(
   "/admins/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("VIEW_ADMINS"),
   userController.getAdmin
 );
 
 router.put(
   "/admin/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("UPDATE_ADMIN"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(updateAdminSchema),
@@ -65,7 +65,7 @@ router.put(
 
 router.patch(
   "/admin/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("UPDATE_ADMIN"),
   uploadAdminPhoto,
   parseAdminDepartments,
   validate(updateAdminSchema),
@@ -74,7 +74,7 @@ router.patch(
 
 router.patch(
   "/admins/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("UPDATE_ADMIN"),
   uploadAdminPhoto,
   validate(updateAdminSchema),
   userController.updateAdmin
@@ -82,19 +82,19 @@ router.patch(
 
 router.delete(
   "/admin/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("DELETE_ADMIN"),
   userController.deleteAdmin
 );
 
 router.delete(
   "/admins/:id",
-  requirePermission("MANAGE_ADMINS"),
+  requirePermission("DELETE_ADMIN"),
   userController.deleteAdmin
 );
 
 router.post(
   "/employee",
-  requirePermission("MANAGE_EMPLOYEES"),
+  requirePermission("CREATE_EMPLOYEE"),
   validate(createEmployeeSchema),
   userController.createEmployee
 );

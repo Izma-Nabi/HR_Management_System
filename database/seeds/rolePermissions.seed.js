@@ -13,54 +13,56 @@ const normalizePermissionName = (permissionName) => {
 
 const rolePermissionGroups = [
   {
-    roleNames: ["SUPER_ADMIN", "SUPER ADMIN", "Super Admin"],
+    roleNames: ["Super Admin", "SUPER_ADMIN", "SUPER ADMIN"],
     permissions: [
-    "MANAGE_ADMINS",
-    "MANAGE_DEPARTMENTS",
-    "MANAGE_EMPLOYEES",
+    "CREATE_ADMIN",
+    "VIEW_ADMINS",
+    "UPDATE_ADMIN",
+    "DELETE_ADMIN",
+    "CREATE_DEPARTMENT",
+    "VIEW_DEPARTMENTS",
+    "UPDATE_DEPARTMENT",
+    "DELETE_DEPARTMENT",
+    "CREATE_EMPLOYEE",
+    "VIEW_EMPLOYEES",
+    "UPDATE_EMPLOYEE",
+    "DELETE_EMPLOYEE",
+    "IMPORT_ATTENDANCE",
     "VIEW_SYSTEM_SUMMARY",
     "VIEW_TEAM_ATTENDANCE",
     "VIEW_OWN_ATTENDANCE",
     "VIEW_REPORTS",
     "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVE",
+    "VIEW_TEAM_LEAVES",
     "APPROVE_LEAVE",
     "REJECT_LEAVE"
     ]
   },
   {
-    roleNames: ["ADMIN", "Admin", "HR", "Hr"],
+    roleNames: ["Admin", "ADMIN"],
     permissions: [
     "CREATE_LEAVE",
-    "MANAGE_EMPLOYEES",
+    "CREATE_EMPLOYEE",
+    "VIEW_EMPLOYEES",
+    "UPDATE_EMPLOYEE",
+    "DELETE_EMPLOYEE",
+    "IMPORT_ATTENDANCE",
     "VIEW_SYSTEM_SUMMARY",
     "VIEW_REPORTS",
-    "VIEW_OWN_LEAVE",
+    "VIEW_OWN_LEAVES",
     "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVE",
+    "VIEW_TEAM_LEAVES",
     "APPROVE_LEAVE",
     "REJECT_LEAVE",
     "CANCEL_LEAVE"
     ]
   },
   {
-    roleNames: ["PROJECT_MANAGER", "PROJECT MANAGER", "Project Manager"],
-    permissions: [
-    "CREATE_LEAVE",
-    "VIEW_TEAM_ATTENDANCE",
-    "VIEW_OWN_LEAVE",
-    "VIEW_TEAM_LEAVE",
-    "APPROVE_LEAVE",
-    "REJECT_LEAVE",
-    "CANCEL_LEAVE"
-    ]
-  },
-  {
-    roleNames: ["EMPLOYEE", "Employee"],
+    roleNames: ["Employee", "EMPLOYEE"],
     permissions: [
     "CREATE_LEAVE",
     "VIEW_OWN_ATTENDANCE",
-    "VIEW_OWN_LEAVE",
+    "VIEW_OWN_LEAVES",
     "CANCEL_LEAVE"
     ]
   }

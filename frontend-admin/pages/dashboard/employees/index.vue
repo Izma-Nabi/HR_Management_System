@@ -33,7 +33,8 @@ const employees = ref<EmployeeAccount[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
-const canManageEmployees = computed(() => hasPermission("MANAGE_EMPLOYEES"));
+const canViewEmployees = computed(() => hasPermission("VIEW_EMPLOYEES"));
+const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -92,7 +93,7 @@ const loadEmployees = async () => {
 };
 
 onMounted(async () => {
-  if (!canManageEmployees.value) {
+  if (!canViewEmployees.value) {
     await navigateTo("/dashboard", { replace: true });
     return;
   }
@@ -122,7 +123,7 @@ const filteredEmployees = computed(() => {
         <p>{{ employees.length }} Employee(s)</p>
       </div>
 
-      <NuxtLink to="/dashboard/users/add-employee" class="add-btn">
+      <NuxtLink v-if="canCreateEmployee" to="/dashboard/users/add-employee" class="add-btn">
         + Add Employee
       </NuxtLink>
     </div>

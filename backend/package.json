@@ -18,7 +18,6 @@
     "node",
     "express",
     "admin-auth",
-    "employee-auth",
     "hrms"
   ],
   "author": "",

@@ -9,7 +9,7 @@ const router = express.Router();
 router.post(
   "/import",
   authMiddleware,
-  requirePermission("MANAGE_EMPLOYEES"),
+  requirePermission("IMPORT_ATTENDANCE"),
   attendanceController.importAttendance
 );
 

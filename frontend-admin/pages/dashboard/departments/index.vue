@@ -27,7 +27,10 @@ const departments = ref<Department[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
-const canManageDepartments = computed(() => hasPermission("MANAGE_DEPARTMENTS"));
+const canViewDepartments = computed(() => hasPermission("VIEW_DEPARTMENTS"));
+const canCreateDepartment = computed(() => hasPermission("CREATE_DEPARTMENT"));
+const canUpdateDepartment = computed(() => hasPermission("UPDATE_DEPARTMENT"));
+const canDeleteDepartment = computed(() => hasPermission("DELETE_DEPARTMENT"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -66,7 +69,7 @@ const loadDepartments = async () => {
 };
 
 onMounted(async () => {
-  if (!canManageDepartments.value) {
+  if (!canViewDepartments.value) {
     await navigateTo("/dashboard", { replace: true });
     return;
   }
@@ -117,7 +120,7 @@ const deleteDepartment = async (id: number) => {
         <p>{{ departments.length }} Department(s)</p>
       </div>
 
-      <NuxtLink to="/dashboard/departments/add" class="add-btn">
+      <NuxtLink v-if="canCreateDepartment" to="/dashboard/departments/add" class="add-btn">
         + Add Department
       </NuxtLink>
     </div>
@@ -145,10 +148,10 @@ const deleteDepartment = async (id: number) => {
           </div>
 
           <div class="card-actions">
-            <NuxtLink class="edit" :to="`/dashboard/departments/edit/${department.id}`">
+            <NuxtLink v-if="canUpdateDepartment" class="edit" :to="`/dashboard/departments/edit/${department.id}`">
               Edit
             </NuxtLink>
-            <button class="delete" type="button" @click="deleteDepartment(department.id)">
+            <button v-if="canDeleteDepartment" class="delete" type="button" @click="deleteDepartment(department.id)">
               Delete
             </button>
           </div>

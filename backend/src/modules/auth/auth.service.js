@@ -14,6 +14,10 @@ const login = async ({ email, password }) => {
     throw new ApiError(403, "Your account is not active");
   }
 
+  if (!user.role) {
+    throw new ApiError(403, "Your account role is not supported");
+  }
+
   const passwordMatches = await comparePassword(password, user.passwordHash);
 
   if (!passwordMatches) {
@@ -38,6 +42,10 @@ const getCurrentUser = async (userId) => {
 
   if (!user) {
     throw new ApiError(404, "User account not found");
+  }
+
+  if (!user.role) {
+    throw new ApiError(403, "Your account role is not supported");
   }
 
   return {

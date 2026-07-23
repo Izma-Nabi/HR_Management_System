@@ -17,40 +17,52 @@ router.use(authMiddleware);
 
 router.get(
   "/",
-  requireAnyPermission("MANAGE_DEPARTMENTS", "MANAGE_ADMINS", "MANAGE_EMPLOYEES"),
+  requireAnyPermission(
+    "VIEW_DEPARTMENTS",
+    "CREATE_ADMIN",
+    "UPDATE_ADMIN",
+    "CREATE_EMPLOYEE",
+    "UPDATE_EMPLOYEE"
+  ),
   departmentsController.listDepartments
 );
 
 router.post(
   "/",
-  requirePermission("MANAGE_DEPARTMENTS"),
+  requirePermission("CREATE_DEPARTMENT"),
   validate(createDepartmentSchema),
   departmentsController.createDepartment
 );
 
 router.get(
   "/:id",
-  requireAnyPermission("MANAGE_DEPARTMENTS", "MANAGE_ADMINS", "MANAGE_EMPLOYEES"),
+  requireAnyPermission(
+    "VIEW_DEPARTMENTS",
+    "CREATE_ADMIN",
+    "UPDATE_ADMIN",
+    "CREATE_EMPLOYEE",
+    "UPDATE_EMPLOYEE"
+  ),
   departmentsController.getDepartment
 );
 
 router.put(
   "/:id",
-  requirePermission("MANAGE_DEPARTMENTS"),
+  requirePermission("UPDATE_DEPARTMENT"),
   validate(updateDepartmentSchema),
   departmentsController.updateDepartment
 );
 
 router.patch(
   "/:id",
-  requirePermission("MANAGE_DEPARTMENTS"),
+  requirePermission("UPDATE_DEPARTMENT"),
   validate(updateDepartmentSchema),
   departmentsController.updateDepartment
 );
 
 router.delete(
   "/:id",
-  requirePermission("MANAGE_DEPARTMENTS"),
+  requirePermission("DELETE_DEPARTMENT"),
   departmentsController.deleteDepartment
 );
 
