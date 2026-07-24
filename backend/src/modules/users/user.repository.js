@@ -1,7 +1,6 @@
 const { prisma } = require("../../../../database/prisma");
 const { roleNameCandidates, toRoleKey } = require("../../utils/roles");
 const { generateNextEmployeeCode } = require("../../utils/employee-code");
-const { generateNextAdminCode } = require("../../utils/admin-code");
 
 const userProfileSelect = {
   id: true,
@@ -12,7 +11,14 @@ const userProfileSelect = {
   phone: true,
   address: true,
   photo: true,
-  designation: true,
+  designationId:true,
+
+  designation:{
+    select:{
+      id:true,
+      designationName:true
+    }
+  },
   joiningDate: true,
   employmentStatus: true,
   createdAt: true,
@@ -33,18 +39,6 @@ department: {
   }
 },
 
-  adminDepartments: {
-    select: {
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true,
-          description: true
-        }
-      }
-    }
-  }
 };
 
 const fullNameFromUser = (user) => {
@@ -72,9 +66,6 @@ const mapAdmin = (user) => {
     return null;
   }
 
-  const managedDepartments = user.adminDepartments?.map(
-    (item) => item.department
-  ) || [];
 
   return {
     id: user.id,
@@ -95,11 +86,6 @@ const mapAdmin = (user) => {
     department: user.department || null,
 
     // admin_departments table departments
-    managedDepartments,
-
-    managedDepartmentIds: user.adminDepartments?.map(
-      (item)=>item.departmentId
-    ) || [],
 
     designation: user.designation,
     employmentStatus:user.employmentStatus,
@@ -152,15 +138,7 @@ const findUserByEmail = async (email) => {
   });
 };
 
-const findRoleByName = async (roleName) => {
-  return prisma.role.findFirst({
-    where: {
-      roleName: {
-        in: roleNameCandidates(roleName)
-      }
-    }
-  });
-};
+
 
 const findDepartmentById = async (id, dbClient = prisma) => {
   if (!id) {
@@ -177,271 +155,103 @@ const findDepartmentById = async (id, dbClient = prisma) => {
   });
 };
 
+// const createUser = async(data)=>{
 
-const replaceDepartmentAssignment = async (
-  dbClient,
-  userId,
-  departmentIds
-) => {
+// return prisma.user.create({
+// data:{
+// userCode: await generateNextEmployeeCode(),
+// firstName:data.firstName,
+// lastName:data.lastName,
+// email:data.email,
+// passwordHash:data.passwordHash,
+// phone:data.phone,
+// address:data.address,
+// photo:data.photo,
+// roleId:Number(data.roleId),
 
-  await dbClient.adminDepartment.deleteMany({
-    where:{
-      userId:Number(userId)
-    }
-  });
+// departmentId:
+// data.departmentId
+// ? Number(data.departmentId)
+// :null,
 
+// designationId:
+// data.designationId
+// ? Number(data.designationId)
+// :null,
 
-  if(
-    !Array.isArray(departmentIds) ||
-    departmentIds.length === 0
-  ){
-    return;
-  }
+// employmentStatus:
+// data.employmentStatus || "ACTIVE"
+// },
 
+// select:userProfileSelect
+// });
+// };
 
-  await dbClient.adminDepartment.createMany({
-    data: departmentIds.map(id=>({
-      userId:Number(userId),
-      departmentId:Number(id)
-    }))
-  });
-};
+const createUser = async(data)=>{
 
+  console.log("CREATE USER DATA:", data);
 
+  const user = await prisma.user.create({
+    data:{
+      userCode: await generateNextUserCode(),
 
-const findAdminById = async (id, dbClient = prisma) => {
+      firstName:data.firstName,
+      lastName:data.lastName,
 
-  const user = await dbClient.user.findFirst({
-    where:{
-      id:Number(id),
-      ...roleWhere("ADMIN")
-    },
-    select:userProfileSelect
-  });
+      email:data.email,
+      passwordHash:data.passwordHash,
 
-  return mapAdmin(user);
-};
+      phone:data.phone,
+      address:data.address,
+      photo:data.photo,
 
-const listAdmins = async () => {
-  const admins = await prisma.user.findMany({
-    where: roleWhere("ADMIN"),
-    orderBy: [
-      {
-        firstName: "asc"
-      },
-      {
-        lastName: "asc"
-      }
-    ],
-    select: userProfileSelect
-  });
+      roleId:Number(data.roleId),
 
-  return admins.map(mapAdmin);
-};
-
-const createAdmin = async (data) => {
-
-  return prisma.$transaction(async (tx)=>{
-
-    const adminCode = await generateNextAdminCode(tx);
-
-
-    const user = await tx.user.create({
-
-      data:{
-        userCode:adminCode,
-        firstName:data.firstName,
-        lastName:data.lastName,
-        email:data.email,
-        passwordHash:data.passwordHash,
-        phone:data.phone,
-        address:data.address,
-        photo:data.photo,
-        designation:data.designation,
-
-        joiningDate:data.joiningDate
-          ? new Date(data.joiningDate)
-          : null,
-
-        employmentStatus:data.employmentStatus || "ACTIVE",
-
-        departmentId:data.departmentId
-          ? Number(data.departmentId)
-          : null,
-
-        roleId:data.roleId
-      },
-
-      select:{
-        id:true
-      }
-
-    });
-
-
-    await replaceDepartmentAssignment(
-      tx,
-      user.id,
-      data.managedDepartmentIds
-    );
-
-
-    return findAdminById(user.id,tx);
-
-  });
-
-};
-
-const updateAdmin = async (id, data) => {
-  return prisma.$transaction(
-    async (tx) => {
-
-      const existingAdmin = await findAdminById(id, tx);
-
-      if (!existingAdmin) {
-        return null;
-      }
-
-      const userData = {};
-
-      if (data.firstName !== undefined) {
-        userData.firstName = data.firstName;
-      }
-
-      if (data.lastName !== undefined) {
-        userData.lastName = data.lastName;
-      }
-
-      if (data.email !== undefined) {
-        userData.email = data.email;
-      }
-
-      if (data.passwordHash !== undefined) {
-        userData.passwordHash = data.passwordHash;
-      }
-
-      if (data.phone !== undefined) {
-        userData.phone = data.phone;
-      }
-
-      if (data.address !== undefined) {
-        userData.address = data.address;
-      }
-
-      if (data.photo !== undefined) {
-        userData.photo = data.photo;
-      }
-
-      if (data.designation !== undefined) {
-        userData.designation = data.designation;
-      }
-
-      if (data.joiningDate !== undefined) {
-        userData.joiningDate = data.joiningDate
-          ? new Date(data.joiningDate)
-          : null;
-      }
-
-      if (data.employmentStatus !== undefined) {
-        userData.employmentStatus = data.employmentStatus;
-      }
-
-      if (Object.keys(userData).length > 0) {
-        await tx.user.update({
-          where:{
-            id: existingAdmin.userId
-          },
-          data:userData
-        });
-      }
-
-
-      if (data.managedDepartmentIds !== undefined) {
-        await replaceDepartmentAssignment(
-          tx,
-          existingAdmin.userId,
-          data.managedDepartmentIds
-        );
-      }
-
-
-      return findAdminById(
-        existingAdmin.userId,
-        tx
-      );
-
-    },
-    {
-      timeout:15000
-    }
-  );
-};
-
-const deleteAdmin = async (id) => {
-  return prisma.$transaction(async (tx) => {
-    const existingAdmin = await findAdminById(id, tx);
-
-    if (!existingAdmin) {
-      return null;
-    }
-
-    await tx.user.delete({
-      where: {
-        id: existingAdmin.userId
-      }
-    });
-
-    return existingAdmin;
-  });
-};
-
-const createEmployee = async (data) => {
-  return prisma.$transaction(async (tx) => {
-    const employeeCode = await generateNextEmployeeCode(tx);
-
-    const user = await tx.user.create({
-      data: {
-        userCode: employeeCode,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        passwordHash: data.passwordHash,
-        phone: data.phone,
-        address: data.address,
-        photo: data.photo,
-        designation: data.designation,
-        departmentId: data.departmentId
+      departmentId:
+        data.departmentId
         ? Number(data.departmentId)
         : null,
-        employmentStatus: data.employmentStatus || "ACTIVE",
-        roleId: data.roleId
-      },
-      select: {
-        id: true
-      }
-    });
 
-    await replaceDepartmentAssignment(tx, user.id, data.departmentId);
+      designationId:
+        data.designationId
+        ? Number(data.designationId)
+        : null,
 
-    return tx.user.findUnique({
-      where: {
-        id: user.id
-      },
-      select: userProfileSelect
-    });
+      employmentStatus:data.employmentStatus || "ACTIVE"
+    }
+  });
+
+
+  console.log("CREATED USER:", user);
+
+  return user;
+};
+
+
+const findDesignationById = async(id)=>{
+  if(!id){
+    return null;
+  }
+  return prisma.designation.findUnique({
+    where:{
+      id:Number(id)
+    }
   });
 };
 
-module.exports = {
-  findUserByEmail,
-  findRoleByName,
-  findDepartmentById,
-  findAdminById,
-  listAdmins,
-  createAdmin,
-  updateAdmin,
-  deleteAdmin,
-  createEmployee,
-  mapEmployeeUser,
-  toSafeUser
+const findRoleByNameById = async(id)=>{
+  return prisma.role.findUnique({
+    where:{
+      id:Number(id)
+    }
+  });
+};
+module.exports={
+findUserByEmail,
+findRoleByNameById,
+findDepartmentById,
+createUser,
+mapEmployeeUser,
+toSafeUser,
+findDesignationById
 };

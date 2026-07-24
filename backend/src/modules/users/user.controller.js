@@ -2,48 +2,41 @@ const { sendSuccess } = require("../../utils/apiResponse");
 const asyncHandler = require("../../utils/asyncHandler");
 const userService = require("./user.service");
 
-const createAdmin = asyncHandler(async (req,res)=>{
-
-  const result = await userService.createAdmin(req.body);
-
+const createUser = asyncHandler(async (req, res) => {
+  const result = await userService.createUser(req.body);
   return sendSuccess(
     res,
     201,
-    "Administrator created successfully",
+    "User created successfully",
     result
   );
-
 });
 
-const listAdmins = asyncHandler(async (req, res) => {
 
-  const result = await userService.listAdmins();
-
+const listUsers = asyncHandler(async (req,res)=>{
+  const result = await userService.listUsers();
   return sendSuccess(
     res,
     200,
-    "Administrators fetched successfully",
+    "Users fetched successfully",
     result
   );
-
 });
 
-const getAdmin = asyncHandler(async (req, res) => {
 
-  const result = await userService.getAdmin(req.params.id);
-
+const getUser = asyncHandler(async(req,res)=>{
+  const result = await userService.getUser(req.params.id);
   return sendSuccess(
     res,
     200,
-    "Administrator fetched successfully",
+    "User fetched successfully",
     result
   );
-
 });
 
-const updateAdmin = asyncHandler(async (req,res)=>{
 
-  const result = await userService.updateAdmin(
+const updateUser = asyncHandler(async(req,res)=>{
+  const result = await userService.updateUser(
     req.params.id,
     req.body
   );
@@ -51,43 +44,28 @@ const updateAdmin = asyncHandler(async (req,res)=>{
   return sendSuccess(
     res,
     200,
-    "Administrator updated successfully",
+    "User updated successfully",
     result
   );
-
 });
 
-const deleteAdmin = asyncHandler(async (req, res) => {
 
-  const result = await userService.deleteAdmin(req.params.id);
-
+const deleteUser = asyncHandler(async(req,res)=>{
+  const result = await userService.deleteUser(
+    req.params.id
+  );
   return sendSuccess(
     res,
     200,
-    "Administrator deleted successfully",
+    "User deleted successfully",
     result
   );
-
-});
-
-const createEmployee = asyncHandler(async (req, res) => {
-
-  const result = await userService.createEmployee(req.body);
-
-  return sendSuccess(
-    res,
-    201,
-    "Employee created successfully",
-    result
-  );
-
 });
 
 module.exports = {
-  createAdmin,
-  listAdmins,
-  getAdmin,
-  updateAdmin,
-  deleteAdmin,
-  createEmployee
+  createUser,
+  listUsers,
+  getUser,
+  updateUser,
+  deleteUser
 };

@@ -1,110 +1,28 @@
-const Joi = require("joi");
+const Joi=require("joi");
 
-const optionalText = (max) => Joi.string().trim().max(max).empty("").allow(null).default(null);
-const optionalUpdateText = (max) => Joi.string().trim().max(max).empty("").allow(null).optional();
-const employmentStatus = Joi.string().trim().uppercase().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED");
+const createUserSchema=Joi.object({
 
-const createAdminSchema = Joi.object({
-  email: Joi.string().trim().lowercase().email().max(255).required().messages({
-    "string.email": "Email must be a valid email address",
-    "string.empty": "Email is required"
-  }),
+ firstName:Joi.string().trim().max(100).required(),
 
-  password: Joi.string().min(8).max(128).required().messages({
-    "string.empty": "Password is required",
-    "string.min": "Password must be at least 8 characters"
-  }),
+ lastName:Joi.string().trim().max(100).required(),
 
-  firstName: Joi.string().trim().max(100).required().messages({
-    "string.empty": "First name is required"
-  }),
+ email:Joi.string().email().lowercase().required(),
 
-  lastName: optionalText(100),
-  phone: optionalText(30),
-  address: optionalText(255),
+ password:Joi.string().min(8).required(),
 
- departmentId: Joi.number().integer().positive().required().messages({
-  "number.base": "Department is required",
-  "any.required": "Department is required"
-}),
+ phone:Joi.string().allow("",null),
 
-  managedDepartmentIds: Joi.array()
-    .items(
-      Joi.number().integer().positive()
-    )
-    .min(1)
-    .required()
-    .messages({
-      "array.min": "At least one department is required",
-      "any.required": "Departments are required"
-    }),
+ address:Joi.string().allow("",null),
 
-  designation: optionalText(100),
-  employmentStatus: employmentStatus.empty("").default("ACTIVE"),
-  joiningDate: Joi.date().allow(null).optional(),
-  photo: optionalText(255)
+ roleId:Joi.number().integer().positive().required(),
+
+ departmentId:Joi.number().integer().positive().allow(null),
+
+ designationId: Joi.number().integer().positive().empty("").allow(null),
+
+ photo:Joi.string().allow("",null)
 });
 
-const updateAdminSchema = Joi.object({
-  email: Joi.string().trim().lowercase().email().max(255).optional().messages({
-    "string.email": "Email must be a valid email address"
-  }),
-
-  password: Joi.string().min(8).max(128).optional().messages({
-    "string.min": "Password must be at least 8 characters"
-  }),
-
-  firstName: Joi.string().trim().max(100).optional(),
-  lastName: optionalUpdateText(100),
-  phone: optionalUpdateText(30),
-  address: optionalUpdateText(255),
-  departmentId: Joi.number().integer().positive().allow(null).optional(),
-  managedDepartmentIds: Joi.array()
-  .items(
-    Joi.number().integer().positive()
-  )
-  .optional(),
-  designation: optionalUpdateText(100),
-  employmentStatus: employmentStatus.empty("").allow(null).optional(),
-  joiningDate: Joi.date().allow(null).optional(),
-  photo: optionalUpdateText(255)
-}).min(1).messages({
-  "object.min": "At least one field is required"
-});
-
-const createEmployeeSchema = Joi.object({
-  fullName: Joi.string().trim().min(2).max(100).optional(),
-
-  email: Joi.string().trim().lowercase().email().max(255).required().messages({
-    "string.email": "Email must be a valid email address",
-    "string.empty": "Email is required"
-  }),
-
-  password: Joi.string().min(8).max(128).required().messages({
-    "string.empty": "Password is required",
-    "string.min": "Password must be at least 8 characters"
-  }),
-
-  firstName: Joi.string().trim().max(100).required().messages({
-    "string.empty": "First name is required"
-  }),
-
-  lastName: Joi.string().trim().max(100).required().messages({
-    "string.empty": "Last name is required"
-  }),
-
-  phone: optionalText(30),
-  address: optionalText(255),
-  photo: optionalText(255),
-  departmentId: Joi.number().integer().positive().required().messages({
-    "number.base": "Department is required",
-    "any.required": "Department is required"
-  }),
-  designation: optionalText(100)
-});
-
-module.exports = {
-  createAdminSchema,
-  updateAdminSchema,
-  createEmployeeSchema
+module.exports={
+ createUserSchema
 };

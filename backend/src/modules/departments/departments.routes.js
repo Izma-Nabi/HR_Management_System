@@ -16,15 +16,38 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get(
+  "/:id/designations",
+    requireAnyPermission(
+      "VIEW_DEPARTMENTS",
+      "CREATE_ADMIN",
+      "UPDATE_ADMIN",
+      "CREATE_EMPLOYEE",
+      "UPDATE_EMPLOYEE"
+    ),
+  departmentsController.listDepartmentDesignations
+);
+
+
+router.get(
   "/",
+    requireAnyPermission(
+      "VIEW_DEPARTMENTS",
+      "CREATE_ADMIN",
+      "UPDATE_ADMIN",
+      "CREATE_EMPLOYEE",
+      "UPDATE_EMPLOYEE"
+    ),
+  departmentsController.listDepartments
+);
+
+router.get(
+  "/:id",
   requireAnyPermission(
     "VIEW_DEPARTMENTS",
-    "CREATE_ADMIN",
-    "UPDATE_ADMIN",
-    "CREATE_EMPLOYEE",
-    "UPDATE_EMPLOYEE"
+    "CREATE_USER",
+    "UPDATE_USER"
   ),
-  departmentsController.listDepartments
+  departmentsController.getDepartment
 );
 
 router.post(
@@ -32,18 +55,6 @@ router.post(
   requirePermission("CREATE_DEPARTMENT"),
   validate(createDepartmentSchema),
   departmentsController.createDepartment
-);
-
-router.get(
-  "/:id",
-  requireAnyPermission(
-    "VIEW_DEPARTMENTS",
-    "CREATE_ADMIN",
-    "UPDATE_ADMIN",
-    "CREATE_EMPLOYEE",
-    "UPDATE_EMPLOYEE"
-  ),
-  departmentsController.getDepartment
 );
 
 router.put(
@@ -65,5 +76,4 @@ router.delete(
   requirePermission("DELETE_DEPARTMENT"),
   departmentsController.deleteDepartment
 );
-
 module.exports = router;

@@ -59,7 +59,12 @@ const safeUserSelect = {
   phone: true,
   address: true,
   photo: true,
-  designation: true,
+  designation: {
+    select: {
+      id: true,
+      designationName: true
+    }
+  },
   joiningDate: true,
   employmentStatus: true,
   departmentId: true,
@@ -82,18 +87,6 @@ const safeUserSelect = {
               permissionName: true
             }
           }
-        }
-      }
-    }
-  },
-  adminDepartments: {
-    select: {
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true,
-          description: true
         }
       }
     }

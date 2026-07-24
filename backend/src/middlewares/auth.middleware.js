@@ -12,6 +12,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "Authorization header is missing or invalid");
   }
 
+  
   const token = authHeader.split(" ")[1];
   const decodedToken = verifyAccessToken(token);
 

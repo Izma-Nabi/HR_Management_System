@@ -2,6 +2,20 @@ const { sendSuccess } = require("../../utils/apiResponse");
 const asyncHandler = require("../../utils/asyncHandler");
 const departmentsService = require("./departments.service");
 
+const listDepartmentDesignations = asyncHandler(async (req, res) => {
+  const result = await departmentsService.listDepartmentDesignations(
+    req.params.id
+  );
+
+  return sendSuccess(
+    res,
+    200,
+    "Designations fetched successfully",
+    result
+  );
+});
+
+
 const listDepartments = asyncHandler(async (req, res) => {
   const result = await departmentsService.listDepartments();
 
@@ -37,5 +51,6 @@ module.exports = {
   getDepartment,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  listDepartmentDesignations
 };
