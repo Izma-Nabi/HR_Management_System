@@ -59,7 +59,7 @@ const safeUserSelect = {
   phone: true,
   address: true,
   photo: true,
-  designation: true,
+  designationId: true,
   joiningDate: true,
   employmentStatus: true,
   departmentId: true,
@@ -82,18 +82,6 @@ const safeUserSelect = {
               permissionName: true
             }
           }
-        }
-      }
-    }
-  },
-  adminDepartments: {
-    select: {
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true,
-          description: true
         }
       }
     }
@@ -152,12 +140,6 @@ const permissionsFromRole = (role) => {
   return Array.from(permissions).sort();
 };
 
-const mapManagedDepartments = (user) => {
-  return (user?.adminDepartments || [])
-    .map((assignment) => assignment.department)
-    .filter(Boolean);
-};
-
 const toSafeUser = (user) => {
   if (!user) {
     return null;
@@ -173,14 +155,14 @@ const toSafeUser = (user) => {
     phone: user.phone,
     address: user.address,
     photo: user.photo,
-    designation: user.designation,
+    designation: user.designationId ?? null,
     joiningDate: user.joiningDate,
     role: toRoleKey(user.role),
     roleName: user.role?.roleName || null,
     status: user.employmentStatus,
     departmentId: user.departmentId,
     department: user.department || null,
-    managedDepartments: mapManagedDepartments(user),
+    managedDepartments: [],
     permissions: permissionsFromRole(user.role),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt

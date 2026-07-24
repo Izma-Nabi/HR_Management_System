@@ -79,6 +79,10 @@ const listAdmins = async () => {
   return repository.listAdmins();
 };
 
+const listUsers = async () => {
+  return repository.listUsers();
+};
+
 const getAdmin = async (id) => {
   return ensureAdminExists(id);
 };
@@ -155,6 +159,7 @@ const createEmployee = async (payload) => {
 module.exports = {
   createAdmin,
   listAdmins,
+  listUsers,
   getAdmin,
   updateAdmin,
   deleteAdmin,

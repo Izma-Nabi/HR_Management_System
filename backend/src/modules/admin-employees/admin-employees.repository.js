@@ -15,7 +15,7 @@ const userProfileSelect = {
   address: true,
   photo: true,
 
-  designation: true,
+  designationId: true,
   joiningDate: true,
 
   employmentStatus: true,
@@ -80,7 +80,7 @@ const mapEmployeeAccount = (user) => {
       photo: user.photo,
       departmentId: user.departmentId,
       department: user.department,
-      designation: user.designation,
+      designation: user.designationId ?? null,
       joiningDate: user.joiningDate,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
@@ -172,7 +172,7 @@ const createEmployeeAccount = async ({ user, employee }) => {
         phone: employee.phone,
         address: employee.address,
         photo: employee.photo,
-        designation: employee.designation,
+        designationId: employee.designation,
         joiningDate: employee.joiningDate,
         employmentStatus: "ACTIVE",
 

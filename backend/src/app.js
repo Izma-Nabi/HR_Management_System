@@ -23,16 +23,13 @@ const app = express();
 app.use(helmet());
 
 // cors controls which frontend origins can call this API from a browser.
-const corsOptions = env.corsOrigin === "*"
-  ? { origin: "*" }
-  : {
-      origin: env.corsOrigin.split(",").map((origin) => origin.trim()),
-      credentials: true
-    };
+const corsOrigins = env.corsOrigin === "*"
+  ? "*"
+  : env.corsOrigin.split(",").map((origin) => origin.trim()).filter(Boolean);
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: corsOrigins,
     credentials: true
   })
 );

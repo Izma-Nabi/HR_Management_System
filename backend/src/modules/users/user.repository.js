@@ -12,7 +12,7 @@ const userProfileSelect = {
   phone: true,
   address: true,
   photo: true,
-  designation: true,
+  designationId: true,
   joiningDate: true,
   employmentStatus: true,
   createdAt: true,
@@ -23,26 +23,12 @@ const userProfileSelect = {
       roleName: true
     }
   },
- departmentId: true,
-
-department: {
-  select: {
-    id: true,
-    departmentName: true,
-    description: true
-  }
-},
-
-  adminDepartments: {
+  departmentId: true,
+  department: {
     select: {
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true,
-          description: true
-        }
-      }
+      id: true,
+      departmentName: true,
+      description: true
     }
   }
 };
@@ -72,9 +58,7 @@ const mapAdmin = (user) => {
     return null;
   }
 
-  const managedDepartments = user.adminDepartments?.map(
-    (item) => item.department
-  ) || [];
+  const managedDepartments = [];
 
   return {
     id: user.id,
@@ -97,11 +81,9 @@ const mapAdmin = (user) => {
     // admin_departments table departments
     managedDepartments,
 
-    managedDepartmentIds: user.adminDepartments?.map(
-      (item)=>item.departmentId
-    ) || [],
+    managedDepartmentIds: [],
 
-    designation: user.designation,
+    designation: user.designationId ?? null,
     employmentStatus:user.employmentStatus,
     joiningDate:user.joiningDate,
 
@@ -128,7 +110,7 @@ const mapEmployeeUser = (user) => {
     photo: user.photo,
     departmentId: user.departmentId,
     department: user.department,
-    designation: user.designation,
+    designation: user.designationId ?? null,
     joiningDate: user.joiningDate,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -239,6 +221,71 @@ const listAdmins = async () => {
   return admins.map(mapAdmin);
 };
 
+const listUsers = async () => {
+  const users = await prisma.user.findMany({
+    where: {
+      role: {
+        roleName: {
+          in: ["Admin", "ADMIN", "Employee", "EMPLOYEE", "Super Admin", "SUPER_ADMIN", "SUPER ADMIN"]
+        }
+      }
+    },
+    orderBy: [
+      {
+        firstName: "asc"
+      },
+      {
+        lastName: "asc"
+      }
+    ],
+    select: userProfileSelect
+  });
+
+  return users.map((user) => {
+    const roleKey = toRoleKey(user.role);
+
+    if (roleKey === "ADMIN" || roleKey === "SUPER_ADMIN") {
+      return {
+        id: user.id,
+        userId: user.id,
+        type: roleKey === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN",
+        name: fullNameFromUser(user),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        department: user.department,
+        designation: user.designationId ?? null,
+        role: roleKey,
+        roleName: user.role?.roleName || null,
+        status: user.employmentStatus,
+        departmentId: user.departmentId,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      };
+    }
+
+    return {
+      id: user.id,
+      userId: user.id,
+      type: "EMPLOYEE",
+      name: fullNameFromUser(user),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      department: user.department,
+      designation: user.designationId ?? null,
+      role: roleKey,
+      roleName: user.role?.roleName || null,
+      status: user.employmentStatus,
+      departmentId: user.departmentId,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+  });
+};
+
 const createAdmin = async (data) => {
 
   return prisma.$transaction(async (tx)=>{
@@ -257,7 +304,7 @@ const createAdmin = async (data) => {
         phone:data.phone,
         address:data.address,
         photo:data.photo,
-        designation:data.designation,
+        designationId: data.designation,
 
         joiningDate:data.joiningDate
           ? new Date(data.joiningDate)
@@ -333,7 +380,7 @@ const updateAdmin = async (id, data) => {
       }
 
       if (data.designation !== undefined) {
-        userData.designation = data.designation;
+        userData.designationId = data.designation;
       }
 
       if (data.joiningDate !== undefined) {
@@ -409,7 +456,7 @@ const createEmployee = async (data) => {
         phone: data.phone,
         address: data.address,
         photo: data.photo,
-        designation: data.designation,
+        designationId: data.designation,
         departmentId: data.departmentId
         ? Number(data.departmentId)
         : null,
@@ -438,6 +485,7 @@ module.exports = {
   findDepartmentById,
   findAdminById,
   listAdmins,
+  listUsers,
   createAdmin,
   updateAdmin,
   deleteAdmin,

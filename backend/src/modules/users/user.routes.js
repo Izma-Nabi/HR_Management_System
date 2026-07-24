@@ -43,6 +43,12 @@ router.get(
 );
 
 router.get(
+  "/users",
+  requirePermission("VIEW_ADMINS"),
+  userController.listUsers
+);
+
+router.get(
   "/admin/:id",
   requirePermission("VIEW_ADMINS"),
   userController.getAdmin

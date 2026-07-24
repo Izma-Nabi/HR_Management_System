@@ -98,7 +98,7 @@ model User {
   phone       String? @db.VarChar(20)
   address     String? @db.VarChar(255)
   photo       String? @db.VarChar(255)
-  designation String? @db.VarChar(100)
+  designationId Int? @map("designation_id") @db.UnsignedInt
 
   joiningDate DateTime? @map("joiningDate") @db.Date
 

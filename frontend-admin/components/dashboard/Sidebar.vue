@@ -4,11 +4,17 @@ const { hasPermission, hasAnyPermission } = useAuthUser();
 const canAddUser = computed(() =>
   hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
 );
-const canManageAdmins = computed(() =>
-  hasAnyPermission("VIEW_ADMINS", "CREATE_ADMIN", "UPDATE_ADMIN", "DELETE_ADMIN")
-);
-const canManageEmployees = computed(() =>
-  hasAnyPermission("VIEW_EMPLOYEES", "CREATE_EMPLOYEE", "UPDATE_EMPLOYEE", "DELETE_EMPLOYEE")
+const canManageUsers = computed(() =>
+  hasAnyPermission(
+    "VIEW_ADMINS",
+    "VIEW_EMPLOYEES",
+    "CREATE_ADMIN",
+    "CREATE_EMPLOYEE",
+    "UPDATE_ADMIN",
+    "UPDATE_EMPLOYEE",
+    "DELETE_ADMIN",
+    "DELETE_EMPLOYEE"
+  )
 );
 const canManageDepartments = computed(() =>
   hasAnyPermission(
@@ -49,19 +55,11 @@ const canViewLeaves = computed(() =>
       </NuxtLink>
 
       <NuxtLink
-        v-if="canManageAdmins"
-        to="/dashboard/admins"
+        v-if="canManageUsers"
+        to="/dashboard/users"
         class="nav-item"
       >
-        Administrators
-      </NuxtLink>
-
-      <NuxtLink
-        v-if="canManageEmployees"
-        to="/dashboard/employees"
-        class="nav-item"
-      >
-        Employees
+        Users
       </NuxtLink>
 
       <NuxtLink

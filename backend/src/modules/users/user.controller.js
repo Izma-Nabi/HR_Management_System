@@ -28,6 +28,17 @@ const listAdmins = asyncHandler(async (req, res) => {
 
 });
 
+const listUsers = asyncHandler(async (req, res) => {
+  const result = await userService.listUsers();
+
+  return sendSuccess(
+    res,
+    200,
+    "Users fetched successfully",
+    result
+  );
+});
+
 const getAdmin = asyncHandler(async (req, res) => {
 
   const result = await userService.getAdmin(req.params.id);
@@ -86,6 +97,7 @@ const createEmployee = asyncHandler(async (req, res) => {
 module.exports = {
   createAdmin,
   listAdmins,
+  listUsers,
   getAdmin,
   updateAdmin,
   deleteAdmin,

@@ -2,29 +2,28 @@ const { prisma } = require("../../../../database/prisma");
 const { ROLE_KEYS, toRoleKey } = require("../../utils/roles");
 
 const departmentInclude = {
-  adminDepartments: {
+  users: {
     select: {
-      user: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      employmentStatus: true,
+      role: {
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          employmentStatus: true,
-          role: {
-            select: {
-              id: true,
-              roleName: true
-            }
-          }
+          roleName: true
         }
       }
     },
-    orderBy: {
-      user: {
+    orderBy: [
+      {
         firstName: "asc"
+      },
+      {
+        lastName: "asc"
       }
-    }
+    ]
   }
 };
 
@@ -41,9 +40,9 @@ const mapPerson = (user) => ({
 });
 
 const mapDepartment = (department) => {
-  const people = department.adminDepartments.map((assignment) => assignment.user);
   const admins = [];
   const employees = [];
+  const people = Array.isArray(department.users) ? department.users : [];
 
   people.forEach((user) => {
     const role = toRoleKey(user.role);
@@ -58,7 +57,7 @@ const mapDepartment = (department) => {
     }
   });
 
-  const { adminDepartments, ...departmentData } = department;
+  const { users, ...departmentData } = department;
 
   return {
     ...departmentData,
