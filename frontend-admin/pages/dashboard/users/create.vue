@@ -3,9 +3,11 @@ definePageMeta({
   layout: "dashboard"
 });
 
-await navigateTo("/dashboard/users/add", { replace: true });
+await navigateTo("/dashboard/users/add", {
+  replace: true
+});
 </script>
 
 <template>
-  <div />
+  <p>Opening Create User...</p>
 </template>

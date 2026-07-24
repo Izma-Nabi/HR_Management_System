@@ -6,6 +6,11 @@ type Department = {
   departmentName: string;
 };
 
+type Designation = {
+  id: number;
+  designationName: string;
+};
+
 type UserProfile = {
   id: number;
   firstName: string;
@@ -14,7 +19,7 @@ type UserProfile = {
   phone: string | null;
   address: string | null;
   photo: string | null;
-  designation: string | null;
+  designationId: number | null;
   joiningDate: string | null;
   role: RoleKey;
   employmentStatus: string;
@@ -31,11 +36,13 @@ const { hasPermission } = useAuthUser();
 const userId = route.params.id;
 
 const departments = ref<Department[]>([]);
+const designations = ref<Designation[]>([]);
 const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
 const photoInputKey = ref(0);
 const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
+const isSuperAdmin = computed(() => form.role === "SUPER_ADMIN");
 
 const roles: Array<{ value: RoleKey; label: string }> = [
   { value: "SUPER_ADMIN", label: "Super Admin" },
@@ -58,7 +65,7 @@ const form = reactive({
   address: "",
   role: "EMPLOYEE" as RoleKey,
   departmentId: null as number | null,
-  designation: "",
+  designationId: null as number | null,
   employmentStatus: "ACTIVE",
   joiningDate: "",
   photo: null as File | null
@@ -94,6 +101,18 @@ const loadDepartments = async (headers: Record<string, string>) => {
   departments.value = response.data;
 };
 
+const loadDesignations = async (
+  departmentId: number,
+  headers: Record<string, string>
+) => {
+  const response = await $fetch<{ data: Designation[] }>(
+    `${config.public.apiBase}/departments/${departmentId}/designations`,
+    { headers }
+  );
+
+  designations.value = response.data;
+};
+
 const loadUser = async (headers: Record<string, string>) => {
   const response = await $fetch<{ data: UserProfile }>(
     `${config.public.apiBase}/users/${userId}`,
@@ -109,7 +128,7 @@ const loadUser = async (headers: Record<string, string>) => {
   form.address = user.address || "";
   form.role = user.role;
   form.departmentId = user.departmentId || null;
-  form.designation = user.designation || "";
+  form.designationId = user.designationId || null;
   form.employmentStatus = user.employmentStatus || "ACTIVE";
   form.joiningDate = formatDate(user.joiningDate);
   form.photo = null;
@@ -134,12 +153,50 @@ onMounted(async () => {
       loadDepartments(headers),
       loadUser(headers)
     ]);
+
+    if (form.departmentId && !isSuperAdmin.value) {
+      await loadDesignations(form.departmentId, headers);
+    }
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load user";
   } finally {
     pageLoading.value = false;
   }
 });
+
+const changeDepartment = async () => {
+  form.designationId = null;
+  designations.value = [];
+
+  if (!form.departmentId) {
+    return;
+  }
+
+  const headers = authHeaders();
+
+  if (!headers) {
+    await navigateTo("/login", { replace: true });
+    return;
+  }
+
+  try {
+    await loadDesignations(form.departmentId, headers);
+  } catch (error: any) {
+    errorMessage.value =
+      error?.data?.message || "Unable to load designations";
+  }
+};
+
+watch(
+  () => form.role,
+  (role) => {
+    if (role === "SUPER_ADMIN") {
+      form.departmentId = null;
+      form.designationId = null;
+      designations.value = [];
+    }
+  }
+);
 
 const saveUser = async () => {
   const headers = authHeaders();
@@ -161,8 +218,18 @@ const saveUser = async () => {
     body.append("phone", form.phone);
     body.append("address", form.address);
     body.append("role", form.role);
-    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
-    body.append("designation", form.designation);
+    body.append(
+      "departmentId",
+      !isSuperAdmin.value && form.departmentId
+        ? String(form.departmentId)
+        : ""
+    );
+    body.append(
+      "designationId",
+      !isSuperAdmin.value && form.designationId
+        ? String(form.designationId)
+        : ""
+    );
     body.append("employmentStatus", form.employmentStatus);
     body.append("joiningDate", form.joiningDate);
 
@@ -210,7 +277,7 @@ const saveUser = async () => {
 
         <label class="form-group">
           <span>Last Name</span>
-          <input v-model="form.lastName" type="text" placeholder="Last name">
+          <input v-model="form.lastName" type="text" placeholder="Last name" required>
         </label>
 
         <label class="form-group">
@@ -249,10 +316,14 @@ const saveUser = async () => {
           </select>
         </label>
 
-        <label class="form-group">
+        <label v-if="!isSuperAdmin" class="form-group">
           <span>Primary Department</span>
-          <select v-model.number="form.departmentId">
-            <option :value="null">No Department</option>
+          <select
+            v-model.number="form.departmentId"
+            required
+            @change="changeDepartment"
+          >
+            <option :value="null">Select Department</option>
             <option
               v-for="department in departments"
               :key="department.id"
@@ -263,9 +334,22 @@ const saveUser = async () => {
           </select>
         </label>
 
-        <label class="form-group">
+        <label v-if="!isSuperAdmin" class="form-group">
           <span>Designation</span>
-          <input v-model="form.designation" type="text" placeholder="Designation">
+          <select
+            v-model.number="form.designationId"
+            :disabled="!form.departmentId"
+            required
+          >
+            <option :value="null">Select Designation</option>
+            <option
+              v-for="designation in designations"
+              :key="designation.id"
+              :value="designation.id"
+            >
+              {{ designation.designationName }}
+            </option>
+          </select>
         </label>
 
         <label class="form-group">

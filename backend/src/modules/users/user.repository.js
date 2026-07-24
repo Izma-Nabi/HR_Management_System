@@ -13,6 +13,12 @@ const userProfileSelect = {
   address: true,
   photo: true,
   designationId: true,
+  designation: {
+    select: {
+      id: true,
+      designationName: true
+    }
+  },
   joiningDate: true,
   employmentStatus: true,
   createdAt: true,
@@ -73,7 +79,9 @@ const mapUser = (user) => {
     phone: user.phone,
     address: user.address,
     photo: user.photo,
-    designation: user.designationId ?? null,
+    designationId: user.designationId ?? null,
+    designation: user.designation?.designationName || null,
+    designationDetails: user.designation || null,
     joiningDate: user.joiningDate,
     role,
     roleName: user.role?.roleName || null,
@@ -118,7 +126,8 @@ const mapAdmin = (user) => {
 
     managedDepartmentIds: mappedUser.managedDepartmentIds,
 
-    designation: user.designationId ?? null,
+    designationId: user.designationId ?? null,
+    designation: user.designation?.designationName || null,
     employmentStatus:user.employmentStatus,
     joiningDate:user.joiningDate,
 
@@ -145,7 +154,8 @@ const mapEmployeeUser = (user) => {
     photo: user.photo,
     departmentId: user.departmentId,
     department: user.department,
-    designation: user.designationId ?? null,
+    designationId: user.designationId ?? null,
+    designation: user.designation?.designationName || null,
     joiningDate: user.joiningDate,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -175,6 +185,39 @@ const findRoleByName = async (roleName) => {
       roleName: {
         in: roleNameCandidates(roleName)
       }
+    }
+  });
+};
+
+const findRoleById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  return prisma.role.findUnique({
+    where: {
+      id: Number(id)
+    },
+    select: {
+      id: true,
+      roleName: true
+    }
+  });
+};
+
+const findDesignationById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  return prisma.designation.findUnique({
+    where: {
+      id: Number(id)
+    },
+    select: {
+      id: true,
+      designationName: true,
+      departmentId: true
     }
   });
 };
@@ -251,6 +294,40 @@ const listUsers = async () => {
   return users.map(mapUser);
 };
 
+const createUser = async (data) => {
+  return prisma.$transaction(async (tx) => {
+    const userCode = data.roleKey === "EMPLOYEE"
+      ? await generateNextEmployeeCode(tx)
+      : await generateNextAdminCode(tx);
+
+    const user = await tx.user.create({
+      data: {
+        userCode,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        passwordHash: data.passwordHash,
+        phone: data.phone,
+        address: data.address,
+        photo: data.photo,
+        roleId: Number(data.roleId),
+        departmentId: data.departmentId
+          ? Number(data.departmentId)
+          : null,
+        designationId: data.designationId
+          ? Number(data.designationId)
+          : null,
+        employmentStatus: data.employmentStatus || "ACTIVE"
+      },
+      select: {
+        id: true
+      }
+    });
+
+    return findUserById(user.id, tx);
+  });
+};
+
 const createAdmin = async (data) => {
 
   return prisma.$transaction(async (tx)=>{
@@ -269,7 +346,7 @@ const createAdmin = async (data) => {
         phone:data.phone,
         address:data.address,
         photo:data.photo,
-        designationId: data.designation,
+        designationId: data.designationId ?? data.designation,
 
         joiningDate:data.joiningDate
           ? new Date(data.joiningDate)
@@ -341,6 +418,10 @@ const updateAdmin = async (id, data) => {
         userData.designationId = data.designation;
       }
 
+      if (data.designationId !== undefined) {
+        userData.designationId = data.designationId;
+      }
+
       if (data.joiningDate !== undefined) {
         userData.joiningDate = data.joiningDate
           ? new Date(data.joiningDate)
@@ -349,6 +430,12 @@ const updateAdmin = async (id, data) => {
 
       if (data.employmentStatus !== undefined) {
         userData.employmentStatus = data.employmentStatus;
+      }
+
+      if (data.departmentId !== undefined) {
+        userData.departmentId = data.departmentId
+          ? Number(data.departmentId)
+          : null;
       }
 
       if (Object.keys(userData).length > 0) {
@@ -415,6 +502,10 @@ const updateUser = async (id, data) => {
         userData.designationId = data.designation;
       }
 
+      if (data.designationId !== undefined) {
+        userData.designationId = data.designationId;
+      }
+
       if (data.joiningDate !== undefined) {
         userData.joiningDate = data.joiningDate
           ? new Date(data.joiningDate)
@@ -470,6 +561,22 @@ const deleteAdmin = async (id) => {
   });
 };
 
+const deleteUser = async (id) => {
+  const existingUser = await findUserById(id);
+
+  if (!existingUser) {
+    return null;
+  }
+
+  await prisma.user.delete({
+    where: {
+      id: Number(id)
+    }
+  });
+
+  return existingUser;
+};
+
 const createEmployee = async (data) => {
   return prisma.$transaction(async (tx) => {
     const employeeCode = await generateNextEmployeeCode(tx);
@@ -484,7 +591,7 @@ const createEmployee = async (data) => {
         phone: data.phone,
         address: data.address,
         photo: data.photo,
-        designationId: data.designation,
+        designationId: data.designationId ?? data.designation,
         departmentId: data.departmentId
         ? Number(data.departmentId)
         : null,
@@ -508,15 +615,19 @@ const createEmployee = async (data) => {
 module.exports = {
   findUserByEmail,
   findRoleByName,
+  findRoleById,
+  findDesignationById,
   findDepartmentById,
   findAdminById,
   findUserById,
   listAdmins,
   listUsers,
+  createUser,
   createAdmin,
   updateAdmin,
   updateUser,
   deleteAdmin,
+  deleteUser,
   createEmployee,
   mapUser,
   mapEmployeeUser,

@@ -84,6 +84,19 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+model Designation {
+  id              Int    @id @default(autoincrement()) @db.UnsignedInt
+  designationName String @map("designation_name") @db.VarChar(100)
+  departmentId    Int    @map("department_id") @db.UnsignedInt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  users      User[]
+
+  @@unique([departmentId, designationName])
+  @@index([departmentId])
+  @@map("designations")
+}
+
 model User {
   id Int @id @default(autoincrement()) @db.UnsignedInt
 
@@ -95,10 +108,11 @@ model User {
   email        String @unique @db.VarChar(255)
   passwordHash String @map("password_hash") @db.VarChar(255)
 
-  phone       String? @db.VarChar(20)
-  address     String? @db.VarChar(255)
-  photo       String? @db.VarChar(255)
-  designationId Int? @map("designation_id") @db.UnsignedInt
+  phone         String?      @db.VarChar(20)
+  address       String?      @db.VarChar(255)
+  photo         String?      @db.VarChar(255)
+  designationId Int?         @map("designation_id") @db.UnsignedInt
+  designation   Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
 
   joiningDate DateTime? @map("joiningDate") @db.Date
 
@@ -126,6 +140,7 @@ model User {
 
   @@index([roleId])
   @@index([departmentId])
+  @@index([designationId])
   @@map("users")
 }
 
@@ -136,7 +151,8 @@ model Department {
   description    String? @db.VarChar(255)
 
   // Users belonging to this department
-  users User[]
+  users        User[]
+  designations Designation[]
 
   @@map("departments")
 }

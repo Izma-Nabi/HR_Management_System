@@ -1,7 +1,10 @@
 const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
-const { requirePermission } = require("../../middlewares/permission.middleware");
+const {
+  requirePermission,
+  requireAnyPermission
+} = require("../../middlewares/permission.middleware");
 const {
   uploadAdminPhoto,
   uploadUserPhoto
@@ -9,6 +12,7 @@ const {
 const userController = require("./user.controller");
 const parseAdminDepartments = require("../../middlewares/parse-admin-departments.middleware");
 const {
+  createUserSchema,
   createAdminSchema,
   updateAdminSchema,
   createEmployeeSchema,
@@ -18,6 +22,14 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware);
+
+router.post(
+  "/",
+  requireAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE"),
+  uploadUserPhoto,
+  validate(createUserSchema),
+  userController.createUser
+);
 
 router.get(
   "/",
@@ -107,6 +119,12 @@ router.patch(
   parseAdminDepartments,
   validate(updateUserSchema),
   userController.updateUser
+);
+
+router.delete(
+  "/:id",
+  requireAnyPermission("DELETE_ADMIN", "DELETE_EMPLOYEE"),
+  userController.deleteUser
 );
 
 router.delete(

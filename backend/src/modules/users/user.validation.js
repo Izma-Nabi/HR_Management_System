@@ -2,11 +2,33 @@ const Joi = require("joi");
 
 const optionalText = (max) => Joi.string().trim().max(max).empty("").allow(null).default(null);
 const optionalUpdateText = (max) => Joi.string().trim().max(max).empty("").allow(null).optional();
+const optionalId = Joi.number().integer().positive().empty("").allow(null).default(null);
+const optionalUpdateId = Joi.number().integer().positive().empty("").allow(null).optional();
 const employmentStatus = Joi.string().trim().uppercase().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED");
 const editableRole = Joi.string()
   .trim()
   .uppercase()
   .valid("SUPER_ADMIN", "ADMIN", "EMPLOYEE");
+
+const createUserSchema = Joi.object({
+  email: Joi.string().trim().lowercase().email().max(255).required().messages({
+    "string.email": "Email must be a valid email address",
+    "string.empty": "Email is required"
+  }),
+  password: Joi.string().min(8).max(128).required().messages({
+    "string.empty": "Password is required",
+    "string.min": "Password must be at least 8 characters"
+  }),
+  firstName: Joi.string().trim().max(100).required(),
+  lastName: Joi.string().trim().max(100).required(),
+  phone: optionalText(30),
+  address: optionalText(255),
+  roleId: Joi.number().integer().positive().required(),
+  departmentId: optionalId,
+  designationId: optionalId,
+  employmentStatus: employmentStatus.empty("").default("ACTIVE"),
+  photo: optionalText(255)
+});
 
 const createAdminSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
@@ -32,7 +54,8 @@ const createAdminSchema = Joi.object({
   "any.required": "Department is required"
 }),
 
-  designation: optionalText(100),
+  designation: optionalId,
+  designationId: optionalId,
   employmentStatus: employmentStatus.empty("").default("ACTIVE"),
   joiningDate: Joi.date().allow(null).optional(),
   photo: optionalText(255)
@@ -52,7 +75,8 @@ const updateAdminSchema = Joi.object({
   phone: optionalUpdateText(30),
   address: optionalUpdateText(255),
   departmentId: Joi.number().integer().positive().allow(null).optional(),
-  designation: optionalUpdateText(100),
+  designation: optionalUpdateId,
+  designationId: optionalUpdateId,
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().allow(null).optional(),
   photo: optionalUpdateText(255)
@@ -88,7 +112,8 @@ const createEmployeeSchema = Joi.object({
     "number.base": "Department is required",
     "any.required": "Department is required"
   }),
-  designation: optionalText(100)
+  designation: optionalId,
+  designationId: optionalId
 });
 
 const updateUserSchema = Joi.object({
@@ -103,7 +128,8 @@ const updateUserSchema = Joi.object({
   phone: optionalUpdateText(30),
   address: optionalUpdateText(255),
   departmentId: Joi.number().integer().positive().allow(null).optional(),
-  designation: optionalUpdateText(100),
+  designation: optionalUpdateId,
+  designationId: optionalUpdateId,
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().empty("").allow(null).optional(),
   photo: optionalUpdateText(255),
@@ -113,6 +139,7 @@ const updateUserSchema = Joi.object({
 });
 
 module.exports = {
+  createUserSchema,
   createAdminSchema,
   updateAdminSchema,
   createEmployeeSchema,

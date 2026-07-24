@@ -62,6 +62,12 @@ const safeUserSelect = {
   address: true,
   photo: true,
   designationId: true,
+  designation: {
+    select: {
+      id: true,
+      designationName: true
+    }
+  },
   joiningDate: true,
   employmentStatus: true,
   departmentId: true,
@@ -157,7 +163,9 @@ const toSafeUser = (user) => {
     phone: user.phone,
     address: user.address,
     photo: user.photo,
-    designation: user.designationId ?? null,
+    designationId: user.designationId ?? null,
+    designation: user.designation?.designationName || null,
+    designationDetails: user.designation || null,
     joiningDate: user.joiningDate,
     role: toRoleKey(user.role),
     roleName: user.role?.roleName || null,

@@ -52,18 +52,32 @@ const updateDepartment = async (id, payload) => {
 
 const deleteDepartment = async (id) => {
   const department = await getDepartment(id);
+  const userCount = await departmentsRepository.countUsersByDepartment(
+  department.id
+    );
 
-  if (department.employees.length > 0 || department.admins.length > 0) {
-    throw new ApiError(409, "Cannot delete department because it has assigned employees or administrators");
-  }
+    if (userCount > 0) {
+      throw new ApiError(
+        409,
+        "Cannot delete department because users are assigned to it"
+      );
+    }
 
   return departmentsRepository.deleteDepartment(department.id);
 };
+
+const listDepartmentDesignations = async (id) => {
+  parseDepartmentId(id);
+
+  return departmentsRepository.listDepartmentDesignations(id);
+};
+
 
 module.exports = {
   listDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  listDepartmentDesignations
 };

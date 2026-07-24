@@ -11,6 +11,7 @@ const departmentRoutes = require("./modules/departments/departments.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const attendanceRoutes = require("./modules/attendance/attendance.routes");
 const leaveRoutes = require("./modules/leaves/leave.routes");
+const roleRoutes = require("./modules/roles/role.routes");
 
 const {
   notFoundHandler,
@@ -48,7 +49,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", authRoutes);
 
 app.use("/api/leaves", leaveRoutes);
-
 
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {
@@ -88,6 +88,7 @@ app.get("/health", (req, res) => {
 // stay mounted to the same router so existing clients do not break.
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/roles", roleRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/departments", departmentRoutes);

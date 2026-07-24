@@ -1,6 +1,7 @@
 const Joi = require("joi");
 
 const optionalText = (max) => Joi.string().trim().max(max).empty("").allow(null).default(null);
+const optionalId = Joi.number().integer().positive().empty("").allow(null).default(null);
 
 const createEmployeeSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
@@ -29,7 +30,8 @@ const createEmployeeSchema = Joi.object({
     "number.base": "Department is required",
     "any.required": "Department is required"
   }),
-  designation: optionalText(100)
+  designation: optionalId,
+  designationId: optionalId
 });
 
 module.exports = {

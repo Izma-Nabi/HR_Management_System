@@ -2,6 +2,17 @@ const { sendSuccess } = require("../../utils/apiResponse");
 const asyncHandler = require("../../utils/asyncHandler");
 const userService = require("./user.service");
 
+const createUser = asyncHandler(async (req, res) => {
+  const result = await userService.createUser(req.body, req.user);
+
+  return sendSuccess(
+    res,
+    201,
+    "User created successfully",
+    result
+  );
+});
+
 const createAdmin = asyncHandler(async (req,res)=>{
 
   const result = await userService.createAdmin(req.body);
@@ -93,6 +104,17 @@ const updateUser = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteUser = asyncHandler(async (req, res) => {
+  const result = await userService.deleteUser(req.params.id, req.user);
+
+  return sendSuccess(
+    res,
+    200,
+    "User deleted successfully",
+    result
+  );
+});
+
 const deleteAdmin = asyncHandler(async (req, res) => {
 
   const result = await userService.deleteAdmin(req.params.id);
@@ -120,6 +142,7 @@ const createEmployee = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  createUser,
   createAdmin,
   listAdmins,
   listUsers,
@@ -127,6 +150,7 @@ module.exports = {
   getAdmin,
   updateAdmin,
   updateUser,
+  deleteUser,
   deleteAdmin,
   createEmployee
 };

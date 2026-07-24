@@ -121,7 +121,7 @@ const deleteAdmin = async (id: number) => {
         <p>{{ admins.length }} Administrator(s)</p>
       </div>
 
-      <NuxtLink v-if="canCreateAdmin" to="/dashboard/users/add-admin" class="add-btn">
+      <NuxtLink v-if="canCreateAdmin" to="/dashboard/users/add" class="add-btn">
         + Add Administrator
       </NuxtLink>
     </div>

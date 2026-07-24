@@ -19,6 +19,25 @@ const createEmployee = async (payload) => {
     throw new ApiError(400, "Department not found");
   }
 
+  const designationId = payload.designationId ?? payload.designation;
+
+  if (designationId) {
+    const designation = await adminEmployeesRepository.findDesignationById(
+      designationId
+    );
+
+    if (!designation) {
+      throw new ApiError(400, "Designation not found");
+    }
+
+    if (designation.departmentId !== Number(payload.departmentId)) {
+      throw new ApiError(
+        400,
+        "Designation does not belong to the selected department"
+      );
+    }
+  }
+
   const passwordHash = await hashPassword(payload.password);
   const fullName = `${payload.firstName} ${payload.lastName}`.trim();
 
@@ -37,7 +56,7 @@ const createEmployee = async (payload) => {
           address: payload.address,
           photo: payload.photo,
           departmentId: payload.departmentId,
-          designation: payload.designation
+          designationId
         }
       });
     } catch (error) {

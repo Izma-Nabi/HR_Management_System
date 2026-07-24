@@ -23,7 +23,7 @@ type UserRow = {
 definePageMeta({ layout: "dashboard" });
 
 const config = useRuntimeConfig();
-const { hasPermission } = useAuthUser();
+const { hasPermission, hasAnyPermission } = useAuthUser();
 
 const users = ref<UserRow[]>([]);
 const loading = ref(true);
@@ -31,7 +31,14 @@ const search = ref("");
 const errorMessage = ref("");
 const canViewUsers = computed(() => hasPermission("UPDATE_USER"));
 const canEditUser = computed(() => hasPermission("UPDATE_USER"));
-const canDeleteUser = computed(() => hasPermission("DELETE_ADMIN") || hasPermission("DELETE_EMPLOYEE"));
+const canCreateUser = computed(() =>
+  hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
+);
+const canDeleteUser = (user: UserRow) => {
+  return user.type === "EMPLOYEE"
+    ? hasPermission("DELETE_EMPLOYEE")
+    : hasPermission("DELETE_ADMIN");
+};
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -79,7 +86,7 @@ const deleteUser = async (id: number) => {
   }
 
   try {
-    await $fetch(`${config.public.apiBase}/users/admin/${id}`, {
+    await $fetch(`${config.public.apiBase}/users/${id}`, {
       method: "DELETE",
       headers
     });
@@ -119,6 +126,14 @@ const filteredUsers = computed(() => {
         <h1>Users</h1>
         <p>{{ users.length }} user(s)</p>
       </div>
+
+      <NuxtLink
+        v-if="canCreateUser"
+        to="/dashboard/users/add"
+        class="create"
+      >
+        Create User
+      </NuxtLink>
     </div>
 
     <div class="toolbar">
@@ -159,7 +174,7 @@ const filteredUsers = computed(() => {
             <NuxtLink v-if="canEditUser" class="edit" :to="`/dashboard/users/edit/${user.id}`">
               Edit User
             </NuxtLink>
-            <button v-if="canDeleteUser" class="delete" type="button" @click="deleteUser(user.id)">
+            <button v-if="canDeleteUser(user)" class="delete" type="button" @click="deleteUser(user.id)">
               Delete
             </button>
           </td>
@@ -176,6 +191,7 @@ const filteredUsers = computed(() => {
 .page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
 .page-header h1 { margin:0 0 6px; color:#1f2937; font-size:30px; }
 .page-header p { margin:0; color:#6b7280; }
+.create { padding:10px 16px; color:#fff; background:#4f46e5; border-radius:8px; text-decoration:none; font-weight:700; }
 .toolbar { margin-bottom:20px; }
 .toolbar input { width:100%; min-height:44px; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; outline:none; }
 .table { width:100%; background:#fff; border:1px solid #e5e7eb; border-collapse:collapse; border-radius:8px; overflow:hidden; }

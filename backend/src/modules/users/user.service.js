@@ -1,5 +1,6 @@
 const { ApiError } = require("../../utils/apiResponse");
 const { hashPassword } = require("../../utils/password");
+const { ROLE_KEYS, toRoleKey } = require("../../utils/roles");
 const repository = require("./user.repository");
 
 const parseAdminId = (id) => {
@@ -48,6 +49,46 @@ const ensureDepartmentExists = async (departmentId) => {
   return department;
 };
 
+const ensureDesignationMatchesDepartment = async (designationId, departmentId) => {
+  if (!designationId) {
+    throw new ApiError(400, "Designation is required");
+  }
+
+  const designation = await repository.findDesignationById(designationId);
+
+  if (!designation) {
+    throw new ApiError(400, "Designation not found");
+  }
+
+  if (designation.departmentId !== Number(departmentId)) {
+    throw new ApiError(
+      400,
+      "Designation does not belong to the selected department"
+    );
+  }
+
+  return designation;
+};
+
+const permissionSetFromUser = (user) => {
+  return new Set(
+    (user?.permissions || []).map((permission) =>
+      String(permission || "").trim().toUpperCase().replace(/[\s-]+/g, "_")
+    )
+  );
+};
+
+const ensureCanManageRole = (actor, roleKey, action) => {
+  const permissions = permissionSetFromUser(actor);
+  const permission = roleKey === ROLE_KEYS.EMPLOYEE
+    ? `${action}_EMPLOYEE`
+    : `${action}_ADMIN`;
+
+  if (!permissions.has(permission)) {
+    throw new ApiError(403, `You do not have permission to ${action.toLowerCase()} this user`);
+  }
+};
+
 const ensureAdminExists = async (id) => {
   const adminId = parseAdminId(id);
   const admin = await repository.findAdminById(adminId);
@@ -85,6 +126,15 @@ const createAdmin = async (payload) => {
 
   await ensureDepartmentExists(payload.departmentId);
 
+  const designationId = payload.designationId ?? payload.designation;
+
+  if (designationId) {
+    await ensureDesignationMatchesDepartment(
+      designationId,
+      payload.departmentId
+    );
+  }
+
   const passwordHash = await hashPassword(payload.password);
 
   return repository.createAdmin({
@@ -92,6 +142,49 @@ const createAdmin = async (payload) => {
     employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
     passwordHash,
     roleId: role.id
+  });
+};
+
+const createUser = async (payload, actor) => {
+  const existingUser = await repository.findUserByEmail(payload.email);
+
+  if (existingUser) {
+    throw new ApiError(409, "Email already exists");
+  }
+
+  const role = await repository.findRoleById(payload.roleId);
+  const roleKey = toRoleKey(role);
+
+  if (!role || !roleKey) {
+    throw new ApiError(400, "Invalid role");
+  }
+
+  ensureCanManageRole(actor, roleKey, "CREATE");
+
+  let departmentId = payload.departmentId;
+  let designationId = payload.designationId;
+
+  if (roleKey === ROLE_KEYS.SUPER_ADMIN) {
+    departmentId = null;
+    designationId = null;
+  } else {
+    if (!departmentId) {
+      throw new ApiError(400, "Department is required");
+    }
+
+    await ensureDepartmentExists(departmentId);
+    await ensureDesignationMatchesDepartment(designationId, departmentId);
+  }
+
+  const passwordHash = await hashPassword(payload.password);
+
+  return repository.createUser({
+    ...payload,
+    roleKey,
+    departmentId,
+    designationId,
+    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
+    passwordHash
   });
 };
 
@@ -125,6 +218,28 @@ const updateAdmin = async (id, payload) => {
 
   if (payload.departmentId !== undefined && payload.departmentId !== null) {
     await ensureDepartmentExists(payload.departmentId);
+  }
+
+  const departmentId =
+    payload.departmentId !== undefined
+      ? payload.departmentId
+      : admin.departmentId;
+  const designationId =
+    payload.designationId !== undefined
+      ? payload.designationId
+      : payload.designation !== undefined
+        ? payload.designation
+        : admin.designationId;
+
+  if (
+    designationId
+    && (
+      payload.departmentId !== undefined
+      || payload.designationId !== undefined
+      || payload.designation !== undefined
+    )
+  ) {
+    await ensureDesignationMatchesDepartment(designationId, departmentId);
   }
 
   const data = { ...payload };
@@ -170,6 +285,22 @@ const updateUser = async (id, payload) => {
     throw new ApiError(400, "Role not found");
   }
 
+  const designationId =
+    payload.designationId !== undefined
+      ? payload.designationId
+      : payload.designation !== undefined
+        ? payload.designation
+        : user.designationId;
+  const departmentId =
+    payload.departmentId !== undefined
+      ? payload.departmentId
+      : user.departmentId;
+  const profileAssignmentChanged =
+    payload.role !== undefined
+    || payload.departmentId !== undefined
+    || payload.designationId !== undefined
+    || payload.designation !== undefined;
+
   const data = {
     ...payload,
     roleId: role.id
@@ -178,6 +309,20 @@ const updateUser = async (id, payload) => {
   delete data.password;
   delete data.role;
   delete data.managedDepartmentIds;
+  delete data.designation;
+
+  if (roleKey === ROLE_KEYS.SUPER_ADMIN) {
+    data.departmentId = null;
+    data.designationId = null;
+  } else if (profileAssignmentChanged) {
+    if (!departmentId) {
+      throw new ApiError(400, "Department is required");
+    }
+
+    await ensureDepartmentExists(departmentId);
+    await ensureDesignationMatchesDepartment(designationId, departmentId);
+    data.designationId = Number(designationId);
+  }
 
   if (data.employmentStatus !== undefined) {
     data.employmentStatus = normalizeEmploymentStatus(data.employmentStatus);
@@ -188,6 +333,14 @@ const updateUser = async (id, payload) => {
   }
 
   return repository.updateUser(user.id, data);
+};
+
+const deleteUser = async (id, actor) => {
+  const user = await ensureUserExists(id);
+
+  ensureCanManageRole(actor, user.role, "DELETE");
+
+  return repository.deleteUser(user.id);
 };
 
 const deleteAdmin = async (id) => {
@@ -211,6 +364,15 @@ const createEmployee = async (payload) => {
 
   await ensureDepartmentExists(payload.departmentId);
 
+  const designationId = payload.designationId ?? payload.designation;
+
+  if (designationId) {
+    await ensureDesignationMatchesDepartment(
+      designationId,
+      payload.departmentId
+    );
+  }
+
   const passwordHash = await hashPassword(payload.password);
   const fullName = payload.fullName || buildFullName(payload);
 
@@ -224,6 +386,7 @@ const createEmployee = async (payload) => {
 };
 
 module.exports = {
+  createUser,
   createAdmin,
   listAdmins,
   listUsers,
@@ -231,6 +394,7 @@ module.exports = {
   getAdmin,
   updateAdmin,
   updateUser,
+  deleteUser,
   deleteAdmin,
   createEmployee
 };

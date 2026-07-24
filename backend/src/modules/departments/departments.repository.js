@@ -135,11 +135,36 @@ const deleteDepartment = async (id) => {
   });
 };
 
+const countUsersByDepartment = async (departmentId) => {
+  return prisma.user.count({
+    where: {
+      departmentId: Number(departmentId)
+    }
+  });
+};
+
+const listDepartmentDesignations = async (departmentId) => {
+  return prisma.designation.findMany({
+    where: {
+      departmentId: Number(departmentId)
+    },
+    select: {
+      id: true,
+      designationName: true
+    },
+    orderBy: {
+      designationName: "asc"
+    }
+  });
+};
+
 module.exports = {
   listDepartments,
   findDepartmentById,
   findDepartmentByName,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  countUsersByDepartment,
+  listDepartmentDesignations
 };

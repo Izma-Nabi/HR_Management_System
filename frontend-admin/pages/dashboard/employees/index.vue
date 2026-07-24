@@ -124,7 +124,7 @@ const filteredEmployees = computed(() => {
         <p>{{ employees.length }} Employee(s)</p>
       </div>
 
-      <NuxtLink v-if="canCreateEmployee" to="/dashboard/users/add-employee" class="add-btn">
+      <NuxtLink v-if="canCreateEmployee" to="/dashboard/users/add" class="add-btn">
         + Add Employee
       </NuxtLink>
     </div>
