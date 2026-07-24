@@ -16,6 +16,7 @@ const permissions = [
   { permissionName: "VIEW_EMPLOYEES" },
   { permissionName: "UPDATE_EMPLOYEE" },
   { permissionName: "DELETE_EMPLOYEE" },
+  { permissionName: "UPDATE_USER" },
   { permissionName: "IMPORT_ATTENDANCE" },
   { permissionName: "VIEW_SYSTEM_SUMMARY" },
   { permissionName: "VIEW_TEAM_ATTENDANCE" },

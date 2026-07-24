@@ -112,9 +112,6 @@ model User {
   departmentId Int?        @map("department_id") @db.UnsignedInt
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  // Admin manages many departments
-  adminDepartments AdminDepartment[]
-
   // leaves 
   leaveRequests LeaveRequest[] @relation("LeaveRequester")
 
@@ -141,25 +138,7 @@ model Department {
   // Users belonging to this department
   users User[]
 
-  // Admins managing this department
-  adminDepartments AdminDepartment[]
-
   @@map("departments")
-}
-
-model AdminDepartment {
-  id Int @id @default(autoincrement()) @db.UnsignedInt
-
-  userId       Int @map("user_id") @db.UnsignedInt
-  departmentId Int @map("department_id") @db.UnsignedInt
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, departmentId])
-  @@index([userId])
-  @@index([departmentId])
-  @@map("admin_departments")
 }
 
 model Attendance {

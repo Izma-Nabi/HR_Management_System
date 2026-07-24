@@ -6,6 +6,14 @@ const parseAdminDepartments = (req, res, next) => {
       );
     }
 
+    if (req.body.departmentId === "") {
+      req.body.departmentId = null;
+    }
+
+    if (req.body.joiningDate === "") {
+      req.body.joiningDate = null;
+    }
+
     next();
   } catch (error) {
     return res.status(400).json({

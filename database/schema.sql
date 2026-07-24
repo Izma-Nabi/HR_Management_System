@@ -69,24 +69,6 @@ CREATE TABLE IF NOT EXISTS departments (
   UNIQUE KEY departments_department_name_key (department_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS admin_departments (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id INT UNSIGNED NOT NULL,
-  department_id INT UNSIGNED NOT NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY admin_departments_user_id_department_id_key (user_id, department_id),
-  KEY admin_departments_user_id_idx (user_id),
-  KEY admin_departments_department_id_idx (department_id),
-  CONSTRAINT admin_departments_user_id_fkey
-    FOREIGN KEY (user_id)
-    REFERENCES users(id)
-    ON DELETE CASCADE,
-  CONSTRAINT admin_departments_department_id_fkey
-    FOREIGN KEY (department_id)
-    REFERENCES departments(id)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS leave_requests (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   requester_id INT UNSIGNED NOT NULL,

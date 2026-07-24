@@ -3,6 +3,10 @@ const Joi = require("joi");
 const optionalText = (max) => Joi.string().trim().max(max).empty("").allow(null).default(null);
 const optionalUpdateText = (max) => Joi.string().trim().max(max).empty("").allow(null).optional();
 const employmentStatus = Joi.string().trim().uppercase().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED");
+const editableRole = Joi.string()
+  .trim()
+  .uppercase()
+  .valid("SUPER_ADMIN", "ADMIN", "EMPLOYEE");
 
 const createAdminSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
@@ -28,17 +32,6 @@ const createAdminSchema = Joi.object({
   "any.required": "Department is required"
 }),
 
-  managedDepartmentIds: Joi.array()
-    .items(
-      Joi.number().integer().positive()
-    )
-    .min(1)
-    .required()
-    .messages({
-      "array.min": "At least one department is required",
-      "any.required": "Departments are required"
-    }),
-
   designation: optionalText(100),
   employmentStatus: employmentStatus.empty("").default("ACTIVE"),
   joiningDate: Joi.date().allow(null).optional(),
@@ -59,11 +52,6 @@ const updateAdminSchema = Joi.object({
   phone: optionalUpdateText(30),
   address: optionalUpdateText(255),
   departmentId: Joi.number().integer().positive().allow(null).optional(),
-  managedDepartmentIds: Joi.array()
-  .items(
-    Joi.number().integer().positive()
-  )
-  .optional(),
   designation: optionalUpdateText(100),
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().allow(null).optional(),
@@ -103,8 +91,30 @@ const createEmployeeSchema = Joi.object({
   designation: optionalText(100)
 });
 
+const updateUserSchema = Joi.object({
+  email: Joi.string().trim().lowercase().email().max(255).optional().messages({
+    "string.email": "Email must be a valid email address"
+  }),
+  password: Joi.string().min(8).max(128).optional().messages({
+    "string.min": "Password must be at least 8 characters"
+  }),
+  firstName: Joi.string().trim().max(100).optional(),
+  lastName: optionalUpdateText(100),
+  phone: optionalUpdateText(30),
+  address: optionalUpdateText(255),
+  departmentId: Joi.number().integer().positive().allow(null).optional(),
+  designation: optionalUpdateText(100),
+  employmentStatus: employmentStatus.empty("").allow(null).optional(),
+  joiningDate: Joi.date().empty("").allow(null).optional(),
+  photo: optionalUpdateText(255),
+  role: editableRole.optional()
+}).min(1).messages({
+  "object.min": "At least one field is required"
+});
+
 module.exports = {
   createAdminSchema,
   updateAdminSchema,
-  createEmployeeSchema
+  createEmployeeSchema,
+  updateUserSchema
 };

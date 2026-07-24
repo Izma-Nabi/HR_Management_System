@@ -6,8 +6,10 @@ const { ApiError } = require("../utils/apiResponse");
 const uploadsRoot = path.join(__dirname, "../../uploads");
 const employeePhotosDirectory = path.join(uploadsRoot, "employees");
 const adminPhotosDirectory = path.join(uploadsRoot, "admins");
+const userPhotosDirectory = path.join(uploadsRoot, "users");
 const employeePhotosPublicPath = "/uploads/employees";
 const adminPhotosPublicPath = "/uploads/admins";
+const userPhotosPublicPath = "/uploads/users";
 const attendanceDirectory = path.join(uploadsRoot, "attendance");
 const attendancePublicPath = "/uploads/attendance";
 
@@ -15,6 +17,7 @@ fs.mkdirSync(attendanceDirectory, { recursive: true });
 
 fs.mkdirSync(employeePhotosDirectory, { recursive: true });
 fs.mkdirSync(adminPhotosDirectory, { recursive: true });
+fs.mkdirSync(userPhotosDirectory, { recursive: true });
 
 const allowedImageTypes = new Set([
   "image/jpeg",
@@ -148,6 +151,11 @@ const adminPhotoUpload = createPhotoUpload(createStorage({
   filenamePrefix: "admin"
 }));
 
+const userPhotoUpload = createPhotoUpload(createStorage({
+  directory: userPhotosDirectory,
+  filenamePrefix: "user"
+}));
+
 const uploadEmployeePhoto = createSinglePhotoMiddleware({
   upload: employeePhotoUpload,
   publicPath: employeePhotosPublicPath
@@ -156,6 +164,11 @@ const uploadEmployeePhoto = createSinglePhotoMiddleware({
 const uploadAdminPhoto = createSinglePhotoMiddleware({
   upload: adminPhotoUpload,
   publicPath: adminPhotosPublicPath
+});
+
+const uploadUserPhoto = createSinglePhotoMiddleware({
+  upload: userPhotoUpload,
+  publicPath: userPhotosPublicPath
 });
 
 const attendanceUpload = createExcelUpload(
@@ -175,5 +188,6 @@ module.exports = {
   uploadsRoot,
   uploadEmployeePhoto,
   uploadAdminPhoto,
+  uploadUserPhoto,
   uploadAttendanceExcel
 };

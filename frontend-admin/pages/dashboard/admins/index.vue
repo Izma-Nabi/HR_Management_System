@@ -26,7 +26,7 @@ const admins = ref<AdminProfile[]>([]);
 const errorMessage = ref("");
 const canViewAdmins = computed(() => hasPermission("VIEW_ADMINS"));
 const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
-const canUpdateAdmin = computed(() => hasPermission("UPDATE_ADMIN"));
+const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
 const canDeleteAdmin = computed(() => hasPermission("DELETE_ADMIN"));
 
 const authHeaders = () => {
@@ -164,8 +164,8 @@ const deleteAdmin = async (id: number) => {
             </span>
           </td>
           <td class="actions">
-            <NuxtLink v-if="canUpdateAdmin" class="edit" :to="`/dashboard/admins/edit/${admin.id}`">
-              Edit Profile
+            <NuxtLink v-if="canUpdateUser" class="edit" :to="`/dashboard/users/edit/${admin.id}`">
+              Edit User
             </NuxtLink>
             <button v-if="canDeleteAdmin" class="delete" type="button" @click="deleteAdmin(admin.id)">
               Delete

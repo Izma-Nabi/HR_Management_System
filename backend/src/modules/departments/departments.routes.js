@@ -22,7 +22,8 @@ router.get(
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
     "CREATE_EMPLOYEE",
-    "UPDATE_EMPLOYEE"
+    "UPDATE_EMPLOYEE",
+    "UPDATE_USER"
   ),
   departmentsController.listDepartments
 );
@@ -41,7 +42,8 @@ router.get(
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
     "CREATE_EMPLOYEE",
-    "UPDATE_EMPLOYEE"
+    "UPDATE_EMPLOYEE",
+    "UPDATE_USER"
   ),
   departmentsController.getDepartment
 );

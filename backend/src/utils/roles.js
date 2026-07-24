@@ -1,5 +1,5 @@
 const ROLE_KEYS = {
-  SUPER_ADMIN: "SUPER_ADMIN",      // CEO
+  SUPER_ADMIN: "SUPER_ADMIN",      
   ADMIN: "ADMIN",
   EMPLOYEE: "EMPLOYEE"
 };

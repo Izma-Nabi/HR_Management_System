@@ -29,8 +29,8 @@ const users = ref<UserRow[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
-const canViewUsers = computed(() => hasPermission("VIEW_ADMINS"));
-const canEditUser = computed(() => hasPermission("UPDATE_ADMIN") || hasPermission("UPDATE_EMPLOYEE"));
+const canViewUsers = computed(() => hasPermission("UPDATE_USER"));
+const canEditUser = computed(() => hasPermission("UPDATE_USER"));
 const canDeleteUser = computed(() => hasPermission("DELETE_ADMIN") || hasPermission("DELETE_EMPLOYEE"));
 
 const authHeaders = () => {
@@ -55,7 +55,7 @@ const loadUsers = async () => {
   errorMessage.value = "";
 
   try {
-    const response = await $fetch<{ data: UserRow[] }>(`${config.public.apiBase}/users/users`, { headers });
+    const response = await $fetch<{ data: UserRow[] }>(`${config.public.apiBase}/users`, { headers });
     users.value = response.data;
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load users";
@@ -156,8 +156,8 @@ const filteredUsers = computed(() => {
             </span>
           </td>
           <td class="actions">
-            <NuxtLink v-if="canEditUser" class="edit" :to="user.type === 'EMPLOYEE' ? `/dashboard/employees/edit/${user.id}` : `/dashboard/admins/edit/${user.id}`">
-              Edit
+            <NuxtLink v-if="canEditUser" class="edit" :to="`/dashboard/users/edit/${user.id}`">
+              Edit User
             </NuxtLink>
             <button v-if="canDeleteUser" class="delete" type="button" @click="deleteUser(user.id)">
               Delete

@@ -33,9 +33,7 @@ const form = reactive({
   lastName: "",
   phone: "",
   address: "",
-  primaryDepartmentId: null as number | null,
-  selectedDepartmentId: null as number | null,
-  managedDepartmentIds: [] as number[],
+  departmentId: null as number | null,
   designation: "",
   joiningDate: "",
   photo: null as File |null
@@ -88,42 +86,6 @@ onMounted(async () => {
   }
 });
 
-const addDepartment = () => {
-  if (!form.selectedDepartmentId) {
-    return;
-  }
-
-  if (!form.managedDepartmentIds.includes(form.selectedDepartmentId)) {
-    form.managedDepartmentIds.push(form.selectedDepartmentId);
-
-    if (!form.primaryDepartmentId) {
-      form.primaryDepartmentId = form.selectedDepartmentId;
-    }
-  }
-
-  form.selectedDepartmentId = null;
-};
-
-const removeDepartment = (departmentId:number) => {
-  form.managedDepartmentIds =
-    form.managedDepartmentIds.filter(id => id !== departmentId);
-
-  if (form.primaryDepartmentId === departmentId) {
-    form.primaryDepartmentId =
-      form.managedDepartmentIds.length
-        ? form.managedDepartmentIds[0]
-        : null;
-  }
-};
-
-const getDepartmentName = (id:number) => {
-  return (
-    departments.value.find(d => d.id === id)?.departmentName ||
-    ""
-  );
-};
-
-
 const selectPhoto = (event: Event) => {
   const input = event.target as HTMLInputElement;
   form.photo = input.files?.[0] || null;
@@ -136,9 +98,7 @@ const resetForm = () => {
   form.lastName = "";
   form.phone = "";
   form.address = "";
-  form.primaryDepartmentId = null;
-  form.selectedDepartmentId = null;
-  form.managedDepartmentIds = [];
+  form.departmentId = null;
   form.designation = "";
   form.joiningDate = "";
   form.photo = null;
@@ -171,12 +131,12 @@ const validateForm = () => {
     });
   }
 
-if (form.managedDepartmentIds.length === 0) {
-  fieldErrors.value.push({
-    field: "managedDepartmentIds",
-    message: "Please select at least one department."
-  });
-}
+  if (!form.departmentId) {
+    fieldErrors.value.push({
+      field: "departmentId",
+      message: "Please select a department."
+    });
+  }
 
   if (form.password && form.password.length < 8) {
     fieldErrors.value.push({
@@ -232,10 +192,6 @@ const saveAdmin = async () => {
   }
 
   try {
-  console.log("Selected Department:", form.selectedDepartmentId);
-console.log("Managed Departments:", form.managedDepartmentIds);
-console.log(form);
-console.log(form.managedDepartmentIds);
     const body = new FormData();
 
     body.append("email", form.email);
@@ -247,27 +203,15 @@ console.log(form.managedDepartmentIds);
     body.append("designation", form.designation);
     body.append("joiningDate", form.joiningDate);
 
-    // Primary department (users.department_id)
     body.append(
       "departmentId",
-      form.managedDepartmentIds.length
-        ? String(form.managedDepartmentIds[0])
-        : ""
+      form.departmentId ? String(form.departmentId) : ""
     );
 
-    // Managed departments (admin_departments)
-    body.append(
-      "managedDepartmentIds",
-      JSON.stringify(form.managedDepartmentIds)
-    );
-console.log(body.get("managedDepartmentIds"));
     if (form.photo) {
       body.append("photo", form.photo);
     }
 
-console.log("Selected Department:", form.selectedDepartmentId);
-console.log("Managed Departments:", form.managedDepartmentIds);
-console.log("FORM DATA MANAGED:", body.get("managedDepartmentIds"));
     const response = await $fetch<{ message: string }>(
       `${config.public.apiBase}/users/admin`,
       {
@@ -343,58 +287,20 @@ console.log("FORM DATA MANAGED:", body.get("managedDepartmentIds"));
           <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
         </label>
 
-       <label class="form-group full">
+        <label class="form-group full">
           <span>Department</span>
-
-          <div class="department-picker">
-            <select v-model.number="form.selectedDepartmentId">
-              <option :value="null" disabled>
-                Select Department
-              </option>
-
-              <option
-                v-for="department in departments"
-                :key="department.id"
-                :value="department.id"
-              >
-                {{ department.departmentName }}
-              </option>
-            </select>
-
-            <button
-              type="button"
-              class="add-btn"
-              @click="addDepartment"
+          <select v-model.number="form.departmentId">
+            <option :value="null" disabled>Select Department</option>
+            <option
+              v-for="department in departments"
+              :key="department.id"
+              :value="department.id"
             >
-              +
-            </button>
-          </div>
-
-          <div
-            v-if="form.managedDepartmentIds.length"
-            class="department-list"
-          >
-            <div
-              v-for="departmentId in form.managedDepartmentIds"
-              :key="departmentId"
-              class="department-chip"
-            >
-              <span>
-                {{ getDepartmentName(departmentId) }}
-              </span>
-
-              <button
-                type="button"
-                class="remove-btn"
-                @click="removeDepartment(departmentId)"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          <small v-if="fieldErrorMap.managedDepartmentIds">
-            {{ fieldErrorMap.managedDepartmentIds }}
+              {{ department.departmentName }}
+            </option>
+          </select>
+          <small v-if="fieldErrorMap.departmentId">
+            {{ fieldErrorMap.departmentId }}
           </small>
         </label>
 
@@ -595,52 +501,6 @@ button:disabled {
 
   .buttons {
     flex-direction: column-reverse;
-  }
-  .department-picker{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  }
-
-  .department-picker select{
-  flex:1;
-  }
-
-  .add-btn{
-  width:42px;
-  height:42px;
-  border:none;
-  border-radius:8px;
-  background:#2563eb;
-  color:#fff;
-  font-size:22px;
-  cursor:pointer;
-  }
-
-  .department-list{
-  margin-top:12px;
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  }
-
-  .department-chip{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:8px 14px;
-  background:#eef2ff;
-  border-radius:999px;
-  font-size:14px;
-  }
-
-  .remove-btn{
-  border:none;
-  background:none;
-  cursor:pointer;
-  font-size:18px;
-  color:#ef4444;
-  font-weight:bold;
   }
 }
 </style>

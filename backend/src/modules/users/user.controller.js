@@ -39,6 +39,17 @@ const listUsers = asyncHandler(async (req, res) => {
   );
 });
 
+const getUser = asyncHandler(async (req, res) => {
+  const result = await userService.getUser(req.params.id);
+
+  return sendSuccess(
+    res,
+    200,
+    "User fetched successfully",
+    result
+  );
+});
+
 const getAdmin = asyncHandler(async (req, res) => {
 
   const result = await userService.getAdmin(req.params.id);
@@ -66,6 +77,20 @@ const updateAdmin = asyncHandler(async (req,res)=>{
     result
   );
 
+});
+
+const updateUser = asyncHandler(async (req, res) => {
+  const result = await userService.updateUser(
+    req.params.id,
+    req.body
+  );
+
+  return sendSuccess(
+    res,
+    200,
+    "User updated successfully",
+    result
+  );
 });
 
 const deleteAdmin = asyncHandler(async (req, res) => {
@@ -98,8 +123,10 @@ module.exports = {
   createAdmin,
   listAdmins,
   listUsers,
+  getUser,
   getAdmin,
   updateAdmin,
+  updateUser,
   deleteAdmin,
   createEmployee
 };

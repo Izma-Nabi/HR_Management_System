@@ -53,12 +53,47 @@ const toSafeUser = (user) => {
   };
 };
 
+const mapUser = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  const role = toRoleKey(user.role);
+
+  return {
+    id: user.id,
+    userId: user.id,
+    userCode: user.userCode,
+    type: role,
+    name: fullNameFromUser(user),
+    fullName: fullNameFromUser(user),
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    photo: user.photo,
+    designation: user.designationId ?? null,
+    joiningDate: user.joiningDate,
+    role,
+    roleName: user.role?.roleName || null,
+    status: user.employmentStatus,
+    employmentStatus: user.employmentStatus,
+    departmentId: user.departmentId,
+    department: user.department || null,
+    managedDepartments: user.department ? [user.department] : [],
+    managedDepartmentIds: user.departmentId ? [user.departmentId] : [],
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
+};
+
 const mapAdmin = (user) => {
   if (!user) {
     return null;
   }
 
-  const managedDepartments = [];
+  const mappedUser = mapUser(user);
 
   return {
     id: user.id,
@@ -78,10 +113,10 @@ const mapAdmin = (user) => {
     // users table department object
     department: user.department || null,
 
-    // admin_departments table departments
-    managedDepartments,
+    // Compatibility fields derived from the user's single department.
+    managedDepartments: mappedUser.managedDepartments,
 
-    managedDepartmentIds: [],
+    managedDepartmentIds: mappedUser.managedDepartmentIds,
 
     designation: user.designationId ?? null,
     employmentStatus:user.employmentStatus,
@@ -159,38 +194,6 @@ const findDepartmentById = async (id, dbClient = prisma) => {
   });
 };
 
-
-const replaceDepartmentAssignment = async (
-  dbClient,
-  userId,
-  departmentIds
-) => {
-
-  await dbClient.adminDepartment.deleteMany({
-    where:{
-      userId:Number(userId)
-    }
-  });
-
-
-  if(
-    !Array.isArray(departmentIds) ||
-    departmentIds.length === 0
-  ){
-    return;
-  }
-
-
-  await dbClient.adminDepartment.createMany({
-    data: departmentIds.map(id=>({
-      userId:Number(userId),
-      departmentId:Number(id)
-    }))
-  });
-};
-
-
-
 const findAdminById = async (id, dbClient = prisma) => {
 
   const user = await dbClient.user.findFirst({
@@ -202,6 +205,17 @@ const findAdminById = async (id, dbClient = prisma) => {
   });
 
   return mapAdmin(user);
+};
+
+const findUserById = async (id, dbClient = prisma) => {
+  const user = await dbClient.user.findUnique({
+    where: {
+      id: Number(id)
+    },
+    select: userProfileSelect
+  });
+
+  return mapUser(user);
 };
 
 const listAdmins = async () => {
@@ -223,13 +237,6 @@ const listAdmins = async () => {
 
 const listUsers = async () => {
   const users = await prisma.user.findMany({
-    where: {
-      role: {
-        roleName: {
-          in: ["Admin", "ADMIN", "Employee", "EMPLOYEE", "Super Admin", "SUPER_ADMIN", "SUPER ADMIN"]
-        }
-      }
-    },
     orderBy: [
       {
         firstName: "asc"
@@ -241,49 +248,7 @@ const listUsers = async () => {
     select: userProfileSelect
   });
 
-  return users.map((user) => {
-    const roleKey = toRoleKey(user.role);
-
-    if (roleKey === "ADMIN" || roleKey === "SUPER_ADMIN") {
-      return {
-        id: user.id,
-        userId: user.id,
-        type: roleKey === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN",
-        name: fullNameFromUser(user),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        department: user.department,
-        designation: user.designationId ?? null,
-        role: roleKey,
-        roleName: user.role?.roleName || null,
-        status: user.employmentStatus,
-        departmentId: user.departmentId,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      };
-    }
-
-    return {
-      id: user.id,
-      userId: user.id,
-      type: "EMPLOYEE",
-      name: fullNameFromUser(user),
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      department: user.department,
-      designation: user.designationId ?? null,
-      role: roleKey,
-      roleName: user.role?.roleName || null,
-      status: user.employmentStatus,
-      departmentId: user.departmentId,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
-    };
-  });
+  return users.map(mapUser);
 };
 
 const createAdmin = async (data) => {
@@ -324,13 +289,6 @@ const createAdmin = async (data) => {
       }
 
     });
-
-
-    await replaceDepartmentAssignment(
-      tx,
-      user.id,
-      data.managedDepartmentIds
-    );
 
 
     return findAdminById(user.id,tx);
@@ -402,16 +360,6 @@ const updateAdmin = async (id, data) => {
         });
       }
 
-
-      if (data.managedDepartmentIds !== undefined) {
-        await replaceDepartmentAssignment(
-          tx,
-          existingAdmin.userId,
-          data.managedDepartmentIds
-        );
-      }
-
-
       return findAdminById(
         existingAdmin.userId,
         tx
@@ -420,6 +368,86 @@ const updateAdmin = async (id, data) => {
     },
     {
       timeout:15000
+    }
+  );
+};
+
+const updateUser = async (id, data) => {
+  return prisma.$transaction(
+    async (tx) => {
+      const existingUser = await findUserById(id, tx);
+
+      if (!existingUser) {
+        return null;
+      }
+
+      const userData = {};
+
+      if (data.firstName !== undefined) {
+        userData.firstName = data.firstName;
+      }
+
+      if (data.lastName !== undefined) {
+        userData.lastName = data.lastName;
+      }
+
+      if (data.email !== undefined) {
+        userData.email = data.email;
+      }
+
+      if (data.passwordHash !== undefined) {
+        userData.passwordHash = data.passwordHash;
+      }
+
+      if (data.phone !== undefined) {
+        userData.phone = data.phone;
+      }
+
+      if (data.address !== undefined) {
+        userData.address = data.address;
+      }
+
+      if (data.photo !== undefined) {
+        userData.photo = data.photo;
+      }
+
+      if (data.designation !== undefined) {
+        userData.designationId = data.designation;
+      }
+
+      if (data.joiningDate !== undefined) {
+        userData.joiningDate = data.joiningDate
+          ? new Date(data.joiningDate)
+          : null;
+      }
+
+      if (data.employmentStatus !== undefined) {
+        userData.employmentStatus = data.employmentStatus;
+      }
+
+      if (data.departmentId !== undefined) {
+        userData.departmentId = data.departmentId
+          ? Number(data.departmentId)
+          : null;
+      }
+
+      if (data.roleId !== undefined) {
+        userData.roleId = Number(data.roleId);
+      }
+
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({
+          where: {
+            id: existingUser.id
+          },
+          data: userData
+        });
+      }
+
+      return findUserById(existingUser.id, tx);
+    },
+    {
+      timeout: 15000
     }
   );
 };
@@ -468,8 +496,6 @@ const createEmployee = async (data) => {
       }
     });
 
-    await replaceDepartmentAssignment(tx, user.id, data.departmentId);
-
     return tx.user.findUnique({
       where: {
         id: user.id
@@ -484,12 +510,15 @@ module.exports = {
   findRoleByName,
   findDepartmentById,
   findAdminById,
+  findUserById,
   listAdmins,
   listUsers,
   createAdmin,
   updateAdmin,
+  updateUser,
   deleteAdmin,
   createEmployee,
+  mapUser,
   mapEmployeeUser,
   toSafeUser
 };

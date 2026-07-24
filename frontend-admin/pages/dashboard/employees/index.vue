@@ -35,6 +35,7 @@ const search = ref("");
 const errorMessage = ref("");
 const canViewEmployees = computed(() => hasPermission("VIEW_EMPLOYEES"));
 const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
+const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -152,6 +153,7 @@ const filteredEmployees = computed(() => {
           <th>Designation</th>
           <th>Phone</th>
           <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
 
@@ -180,6 +182,15 @@ const filteredEmployees = computed(() => {
             <span class="status" :class="employee.user.status.toLowerCase()">
               {{ employee.user.status }}
             </span>
+          </td>
+          <td>
+            <NuxtLink
+              v-if="canUpdateUser"
+              class="edit"
+              :to="`/dashboard/users/edit/${employee.user.id}`"
+            >
+              Edit User
+            </NuxtLink>
           </td>
         </tr>
       </tbody>
@@ -306,6 +317,18 @@ th {
   color: #9f1d1d;
   background: #fff0f0;
   border-color: #f4c7c7;
+}
+
+.edit {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 8px 12px;
+  color: #ffffff;
+  background: #4f46e5;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 800;
 }
 
 .loading,

@@ -12,6 +12,7 @@ const canManageUsers = computed(() =>
     "CREATE_EMPLOYEE",
     "UPDATE_ADMIN",
     "UPDATE_EMPLOYEE",
+    "UPDATE_USER",
     "DELETE_ADMIN",
     "DELETE_EMPLOYEE"
   )
