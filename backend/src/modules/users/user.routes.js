@@ -1,7 +1,10 @@
 const express = require("express");
 const validate = require("../../middlewares/validate.middleware");
 const authMiddleware = require("../../middlewares/auth.middleware");
-const { requirePermission } = require("../../middlewares/permission.middleware");
+const {
+  requirePermission,
+  requireAnyPermission
+} = require("../../middlewares/permission.middleware");
 const {
   uploadAdminPhoto,
   uploadUserPhoto
@@ -11,6 +14,7 @@ const parseAdminDepartments = require("../../middlewares/parse-admin-departments
 const {
   createAdminSchema,
   updateAdminSchema,
+  createUserSchema,
   createEmployeeSchema,
   updateUserSchema
 } = require("./user.validation");
@@ -18,6 +22,14 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware);
+
+router.post(
+  "/",
+  requireAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE"),
+  uploadUserPhoto,
+  validate(createUserSchema),
+  userController.createUser
+);
 
 router.get(
   "/",

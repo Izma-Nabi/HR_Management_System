@@ -32,6 +32,7 @@ const errorMessage = ref("");
 const canViewUsers = computed(() => hasPermission("UPDATE_USER"));
 const canEditUser = computed(() => hasPermission("UPDATE_USER"));
 const canDeleteUser = computed(() => hasPermission("DELETE_ADMIN") || hasPermission("DELETE_EMPLOYEE"));
+const canCreateUser = computed(() => hasPermission("CREATE_ADMIN") || hasPermission("CREATE_EMPLOYEE"));
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -119,6 +120,10 @@ const filteredUsers = computed(() => {
         <h1>Users</h1>
         <p>{{ users.length }} user(s)</p>
       </div>
+
+      <NuxtLink v-if="canCreateUser" to="/dashboard/users/add" class="add-btn">
+        Create User
+      </NuxtLink>
     </div>
 
     <div class="toolbar">
@@ -176,6 +181,7 @@ const filteredUsers = computed(() => {
 .page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
 .page-header h1 { margin:0 0 6px; color:#1f2937; font-size:30px; }
 .page-header p { margin:0; color:#6b7280; }
+.add-btn { display:inline-flex; min-height:42px; align-items:center; padding:9px 16px; color:#fff; background:#4f46e5; border-radius:8px; text-decoration:none; font-weight:800; }
 .toolbar { margin-bottom:20px; }
 .toolbar input { width:100%; min-height:44px; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; outline:none; }
 .table { width:100%; background:#fff; border:1px solid #e5e7eb; border-collapse:collapse; border-radius:8px; overflow:hidden; }

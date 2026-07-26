@@ -13,6 +13,12 @@ const userProfileSelect = {
   address: true,
   photo: true,
   designationId: true,
+  designation: {
+    select: {
+      id: true,
+      designationName: true
+    }
+  },
   joiningDate: true,
   employmentStatus: true,
   createdAt: true,
@@ -73,7 +79,8 @@ const mapUser = (user) => {
     phone: user.phone,
     address: user.address,
     photo: user.photo,
-    designation: user.designationId ?? null,
+    designationId: user.designationId,
+    designation: user.designation?.designationName || null,
     joiningDate: user.joiningDate,
     role,
     roleName: user.role?.roleName || null,
@@ -118,7 +125,8 @@ const mapAdmin = (user) => {
 
     managedDepartmentIds: mappedUser.managedDepartmentIds,
 
-    designation: user.designationId ?? null,
+    designationId: user.designationId,
+    designation: user.designation?.designationName || null,
     employmentStatus:user.employmentStatus,
     joiningDate:user.joiningDate,
 
@@ -145,7 +153,8 @@ const mapEmployeeUser = (user) => {
     photo: user.photo,
     departmentId: user.departmentId,
     department: user.department,
-    designation: user.designationId ?? null,
+    designationId: user.designationId,
+    designation: user.designation?.designationName || null,
     joiningDate: user.joiningDate,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -175,6 +184,59 @@ const findRoleByName = async (roleName) => {
       roleName: {
         in: roleNameCandidates(roleName)
       }
+    }
+  });
+};
+
+const findRoleById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  return prisma.role.findUnique({
+    where: {
+      id: Number(id)
+    }
+  });
+};
+
+const findDesignationById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  return prisma.designation.findUnique({
+    where: {
+      id: Number(id)
+    }
+  });
+};
+
+const findDesignationByName = async (designationName) => {
+  if (!designationName) {
+    return null;
+  }
+
+  return prisma.designation.findFirst({
+    where: {
+      designationName: {
+        equals: String(designationName).trim()
+      }
+    }
+  });
+};
+
+const findDesignationByNameAndDepartment = async (designationName, departmentId) => {
+  if (!designationName || !departmentId) {
+    return null;
+  }
+
+  return prisma.designation.findFirst({
+    where: {
+      designationName: {
+        equals: String(designationName).trim()
+      },
+      departmentId: Number(departmentId)
     }
   });
 };
@@ -269,7 +331,7 @@ const createAdmin = async (data) => {
         phone:data.phone,
         address:data.address,
         photo:data.photo,
-        designationId: data.designation,
+        designationId: data.designationId ?? data.designation,
 
         joiningDate:data.joiningDate
           ? new Date(data.joiningDate)
@@ -337,8 +399,8 @@ const updateAdmin = async (id, data) => {
         userData.photo = data.photo;
       }
 
-      if (data.designation !== undefined) {
-        userData.designationId = data.designation;
+      if (data.designationId !== undefined || data.designation !== undefined) {
+        userData.designationId = data.designationId ?? data.designation;
       }
 
       if (data.joiningDate !== undefined) {
@@ -411,8 +473,8 @@ const updateUser = async (id, data) => {
         userData.photo = data.photo;
       }
 
-      if (data.designation !== undefined) {
-        userData.designationId = data.designation;
+      if (data.designationId !== undefined || data.designation !== undefined) {
+        userData.designationId = data.designationId ?? data.designation;
       }
 
       if (data.joiningDate !== undefined) {
@@ -484,7 +546,7 @@ const createEmployee = async (data) => {
         phone: data.phone,
         address: data.address,
         photo: data.photo,
-        designationId: data.designation,
+        designationId: data.designationId ?? data.designation,
         departmentId: data.departmentId
         ? Number(data.departmentId)
         : null,
@@ -508,6 +570,10 @@ const createEmployee = async (data) => {
 module.exports = {
   findUserByEmail,
   findRoleByName,
+  findRoleById,
+  findDesignationById,
+  findDesignationByName,
+  findDesignationByNameAndDepartment,
   findDepartmentById,
   findAdminById,
   findUserById,

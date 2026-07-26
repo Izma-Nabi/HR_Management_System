@@ -1,9 +1,6 @@
 <script setup>
-const { hasPermission, hasAnyPermission } = useAuthUser();
+const { hasAnyPermission } = useAuthUser();
 
-const canAddUser = computed(() =>
-  hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
-);
 const canManageUsers = computed(() =>
   hasAnyPermission(
     "VIEW_ADMINS",
@@ -45,14 +42,6 @@ const canViewLeaves = computed(() =>
     <nav>
       <NuxtLink to="/dashboard" class="nav-item">
         Dashboard
-      </NuxtLink>
-
-      <NuxtLink
-        v-if="canAddUser"
-        to="/dashboard/users/add"
-        class="nav-item"
-      >
-        Add User
       </NuxtLink>
 
       <NuxtLink

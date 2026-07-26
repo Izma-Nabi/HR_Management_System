@@ -13,12 +13,17 @@ type EmployeeForm = {
   address: string;
   photo: File | null;
   departmentId: number | null;
-  designation: string;
+  designationId: number | null;
 };
 
 type Department = {
   id: number;
   departmentName: string;
+};
+
+type Designation = {
+  id: number;
+  designationName: string;
 };
 
 definePageMeta({
@@ -38,12 +43,13 @@ const defaultForm = (): EmployeeForm => ({
   address: "",
   photo: null,
   departmentId: null,
-  designation: ""
+  designationId: null
 });
 
 const form = reactive(defaultForm());
 const photoInputKey = ref(0);
 const departments = ref<Department[]>([]);
+const designations = ref<Designation[]>([]);
 const loading = ref(false);
 const successMessage = ref("");
 const errorMessage = ref("");
@@ -66,6 +72,43 @@ const loadDepartments = async (token: string) => {
   departments.value = response.data;
 };
 
+const loadDesignations = async (departmentId: number, token: string) => {
+  const response = await $fetch<{ data: Designation[] }>(
+    `${config.public.apiBase}/departments/${departmentId}/designations`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  designations.value = response.data;
+};
+
+watch(
+  () => form.departmentId,
+  async (departmentId) => {
+    form.designationId = null;
+    designations.value = [];
+
+    if (!departmentId) {
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      return;
+    }
+
+    try {
+      await loadDesignations(departmentId, token);
+    } catch {
+      designations.value = [];
+    }
+  }
+);
+
 onMounted(async () => {
   if (!canCreateEmployee.value) {
     await navigateTo("/dashboard", { replace: true });
@@ -83,11 +126,13 @@ onMounted(async () => {
     await loadDepartments(token);
   } catch {
     departments.value = [];
+    designations.value = [];
   }
 });
 
 const resetForm = () => {
   Object.assign(form, defaultForm());
+  designations.value = [];
   fieldErrors.value = [];
   errorMessage.value = "";
   photoInputKey.value += 1;
@@ -121,7 +166,7 @@ const saveEmployee = async () => {
     body.append("phone", form.phone);
     body.append("address", form.address);
     body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
-    body.append("designation", form.designation);
+    body.append("designationId", form.designationId ? String(form.designationId) : "");
 
     if (form.photo) {
       body.append("photo", form.photo);
@@ -254,12 +299,17 @@ const saveEmployee = async () => {
 
         <label class="form-group">
           <span>Designation</span>
-          <input
-            v-model="form.designation"
-            type="text"
-            placeholder="Designation"
-          >
-          <small v-if="fieldErrorMap.designation">{{ fieldErrorMap.designation }}</small>
+          <select v-model.number="form.designationId" :disabled="!form.departmentId" required>
+            <option :value="null" disabled>Select Designation</option>
+            <option
+              v-for="designation in designations"
+              :key="designation.id"
+              :value="designation.id"
+            >
+              {{ designation.designationName }}
+            </option>
+          </select>
+          <small v-if="fieldErrorMap.designationId">{{ fieldErrorMap.designationId }}</small>
         </label>
 
         <label class="form-group full">

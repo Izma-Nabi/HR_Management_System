@@ -6,6 +6,11 @@ type Department = {
   departmentName: string;
 };
 
+type Designation = {
+  id: number;
+  designationName: string;
+};
+
 type UserProfile = {
   id: number;
   firstName: string;
@@ -14,6 +19,7 @@ type UserProfile = {
   phone: string | null;
   address: string | null;
   photo: string | null;
+  designationId: number | null;
   designation: string | null;
   joiningDate: string | null;
   role: RoleKey;
@@ -31,6 +37,7 @@ const { hasPermission } = useAuthUser();
 const userId = route.params.id;
 
 const departments = ref<Department[]>([]);
+const designations = ref<Designation[]>([]);
 const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
@@ -58,7 +65,7 @@ const form = reactive({
   address: "",
   role: "EMPLOYEE" as RoleKey,
   departmentId: null as number | null,
-  designation: "",
+  designationId: null as number | null,
   employmentStatus: "ACTIVE",
   joiningDate: "",
   photo: null as File | null
@@ -94,6 +101,15 @@ const loadDepartments = async (headers: Record<string, string>) => {
   departments.value = response.data;
 };
 
+const loadDesignations = async (departmentId: number, headers: Record<string, string>) => {
+  const response = await $fetch<{ data: Designation[] }>(
+    `${config.public.apiBase}/departments/${departmentId}/designations`,
+    { headers }
+  );
+
+  designations.value = response.data;
+};
+
 const loadUser = async (headers: Record<string, string>) => {
   const response = await $fetch<{ data: UserProfile }>(
     `${config.public.apiBase}/users/${userId}`,
@@ -109,12 +125,40 @@ const loadUser = async (headers: Record<string, string>) => {
   form.address = user.address || "";
   form.role = user.role;
   form.departmentId = user.departmentId || null;
-  form.designation = user.designation || "";
+  form.designationId = user.designationId || null;
   form.employmentStatus = user.employmentStatus || "ACTIVE";
   form.joiningDate = formatDate(user.joiningDate);
   form.photo = null;
   photoInputKey.value += 1;
 };
+
+watch(
+  () => form.departmentId,
+  async (departmentId) => {
+    if (pageLoading.value) {
+      return;
+    }
+
+    form.designationId = null;
+    designations.value = [];
+
+    if (!departmentId) {
+      return;
+    }
+
+    const headers = authHeaders();
+
+    if (!headers) {
+      return;
+    }
+
+    try {
+      await loadDesignations(departmentId, headers);
+    } catch (error: any) {
+      errorMessage.value = error?.data?.message || "Unable to load designations";
+    }
+  }
+);
 
 onMounted(async () => {
   if (!canUpdateUser.value) {
@@ -130,10 +174,12 @@ onMounted(async () => {
   }
 
   try {
-    await Promise.all([
-      loadDepartments(headers),
-      loadUser(headers)
-    ]);
+    await loadDepartments(headers);
+    await loadUser(headers);
+
+    if (form.departmentId) {
+      await loadDesignations(form.departmentId, headers);
+    }
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load user";
   } finally {
@@ -162,7 +208,7 @@ const saveUser = async () => {
     body.append("address", form.address);
     body.append("role", form.role);
     body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
-    body.append("designation", form.designation);
+    body.append("designationId", form.designationId ? String(form.designationId) : "");
     body.append("employmentStatus", form.employmentStatus);
     body.append("joiningDate", form.joiningDate);
 
@@ -265,7 +311,16 @@ const saveUser = async () => {
 
         <label class="form-group">
           <span>Designation</span>
-          <input v-model="form.designation" type="text" placeholder="Designation">
+          <select v-model.number="form.designationId" :disabled="!form.departmentId">
+            <option :value="null">Select Designation</option>
+            <option
+              v-for="designation in designations"
+              :key="designation.id"
+              :value="designation.id"
+            >
+              {{ designation.designationName }}
+            </option>
+          </select>
         </label>
 
         <label class="form-group">

@@ -11,6 +11,8 @@ const departmentRoutes = require("./modules/departments/departments.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const attendanceRoutes = require("./modules/attendance/attendance.routes");
 const leaveRoutes = require("./modules/leaves/leave.routes");
+const roleRoutes = require("./modules/roles/role.routes");
+const designationRoutes = require("./modules/designations/designation.routes");
 
 const {
   notFoundHandler,
@@ -48,6 +50,8 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", authRoutes);
 
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/designations", designationRoutes);
 
 
 // Log HTTP requests during development.

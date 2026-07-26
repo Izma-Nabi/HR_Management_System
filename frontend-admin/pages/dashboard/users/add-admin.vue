@@ -9,6 +9,11 @@ type FieldError = {
   message: string;
 };
 
+type Designation = {
+  id: number;
+  designationName: string;
+};
+
 definePageMeta({
   layout: "dashboard"
 });
@@ -18,6 +23,7 @@ const { hasPermission } = useAuthUser();
 const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
 
 const departments = ref<Department[]>([]);
+const designations = ref<Designation[]>([]);
 const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
@@ -34,7 +40,7 @@ const form = reactive({
   phone: "",
   address: "",
   departmentId: null as number | null,
-  designation: "",
+  designationId: null as number | null,
   joiningDate: "",
   photo: null as File |null
 });
@@ -73,6 +79,40 @@ const loadDepartments = async () => {
   departments.value = response.data;
 };
 
+const loadDesignations = async (departmentId: number) => {
+  const headers = authHeaders();
+
+  if (!headers) {
+    await navigateTo("/login", { replace: true });
+    return;
+  }
+
+  const response = await $fetch<{ data: Designation[] }>(
+    `${config.public.apiBase}/departments/${departmentId}/designations`,
+    { headers }
+  );
+
+  designations.value = response.data;
+};
+
+watch(
+  () => form.departmentId,
+  async (departmentId) => {
+    form.designationId = null;
+    designations.value = [];
+
+    if (!departmentId) {
+      return;
+    }
+
+    try {
+      await loadDesignations(departmentId);
+    } catch (error: any) {
+      errorMessage.value = error?.data?.message || "Unable to load designations";
+    }
+  }
+);
+
 onMounted(async () => {
   if (!canCreateAdmin.value) {
     await navigateTo("/dashboard", { replace: true });
@@ -82,7 +122,7 @@ onMounted(async () => {
   try {
     await loadDepartments();
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to load departments";
+    errorMessage.value = error?.data?.message || "Unable to load form data";
   }
 });
 
@@ -99,9 +139,10 @@ const resetForm = () => {
   form.phone = "";
   form.address = "";
   form.departmentId = null;
-  form.designation = "";
+  form.designationId = null;
   form.joiningDate = "";
   form.photo = null;
+  designations.value = [];
   fieldErrors.value = [];
   errorMessage.value = "";
   photoInputKey.value += 1;
@@ -135,6 +176,13 @@ const validateForm = () => {
     fieldErrors.value.push({
       field: "departmentId",
       message: "Please select a department."
+    });
+  }
+
+  if (!form.designationId) {
+    fieldErrors.value.push({
+      field: "designationId",
+      message: "Please select a designation."
     });
   }
 
@@ -200,7 +248,7 @@ const saveAdmin = async () => {
     body.append("lastName", form.lastName);
     body.append("phone", form.phone);
     body.append("address", form.address);
-    body.append("designation", form.designation);
+    body.append("designationId", form.designationId ? String(form.designationId) : "");
     body.append("joiningDate", form.joiningDate);
 
     body.append(
@@ -282,12 +330,6 @@ const saveAdmin = async () => {
         </label>
 
         <label class="form-group">
-          <span>Phone</span>
-          <input v-model="form.phone" type="tel" placeholder="03xxxxxxxxx">
-          <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
-        </label>
-
-        <label class="form-group full">
           <span>Department</span>
           <select v-model.number="form.departmentId">
             <option :value="null" disabled>Select Department</option>
@@ -306,8 +348,23 @@ const saveAdmin = async () => {
 
         <label class="form-group">
           <span>Designation</span>
-          <input v-model="form.designation" type="text" placeholder="Designation">
-          <small v-if="fieldErrorMap.designation">{{ fieldErrorMap.designation }}</small>
+          <select v-model.number="form.designationId" :disabled="!form.departmentId" required>
+            <option :value="null" disabled>Select Designation</option>
+            <option
+              v-for="designation in designations"
+              :key="designation.id"
+              :value="designation.id"
+            >
+              {{ designation.designationName }}
+            </option>
+          </select>
+          <small v-if="fieldErrorMap.designationId">{{ fieldErrorMap.designationId }}</small>
+        </label>
+
+        <label class="form-group">
+          <span>Phone</span>
+          <input v-model="form.phone" type="tel" placeholder="03xxxxxxxxx">
+          <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
         </label>
 
         <label class="form-group">

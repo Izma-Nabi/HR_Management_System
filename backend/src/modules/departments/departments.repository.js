@@ -135,11 +135,28 @@ const deleteDepartment = async (id) => {
   });
 };
 
+const listDepartmentDesignations = async (departmentId) => {
+  return prisma.designation.findMany({
+    where: {
+      departmentId: Number(departmentId)
+    },
+    select: {
+      id: true,
+      designationName: true,
+      departmentId: true
+    },
+    orderBy: {
+      designationName: "asc"
+    }
+  });
+};
+
 module.exports = {
   listDepartments,
   findDepartmentById,
   findDepartmentByName,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  listDepartmentDesignations
 };

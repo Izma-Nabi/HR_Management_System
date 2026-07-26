@@ -1,5 +1,6 @@
 const { ApiError } = require("../../utils/apiResponse");
 const { hashPassword } = require("../../utils/password");
+const { ROLE_KEYS, toRoleKey } = require("../../utils/roles");
 const repository = require("./user.repository");
 
 const parseAdminId = (id) => {
@@ -34,6 +35,31 @@ const normalizeEmploymentStatus = (value) => {
   return String(value).trim().toUpperCase().replace(/\s+/g, "_");
 };
 
+const normalizeKey = (value) => {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "_");
+};
+
+const hasPermission = (actor, permission) => {
+  const permissions = Array.isArray(actor?.permissions) ? actor.permissions : [];
+
+  return permissions
+    .map(normalizeKey)
+    .includes(normalizeKey(permission));
+};
+
+const requireCreatePermission = (actor, roleKey) => {
+  const permissionByRole = {
+    [ROLE_KEYS.ADMIN]: "CREATE_ADMIN",
+    [ROLE_KEYS.EMPLOYEE]: "CREATE_EMPLOYEE"
+  };
+
+  const requiredPermission = permissionByRole[roleKey];
+
+  if (!requiredPermission || !hasPermission(actor, requiredPermission)) {
+    throw new ApiError(403, "You do not have permission to create this user type");
+  }
+};
+
 const ensureDepartmentExists = async (departmentId) => {
   if (!departmentId) {
     return null;
@@ -46,6 +72,54 @@ const ensureDepartmentExists = async (departmentId) => {
   }
 
   return department;
+};
+
+const findDesignationFromPayload = async (payload, departmentId) => {
+  const designationId = payload.designationId ?? null;
+
+  if (designationId) {
+    return repository.findDesignationById(designationId);
+  }
+
+  const designation = payload.designation ?? null;
+
+  if (!designation) {
+    return null;
+  }
+
+  const numericDesignation = Number(designation);
+
+  if (Number.isInteger(numericDesignation) && numericDesignation > 0) {
+    return repository.findDesignationById(numericDesignation);
+  }
+
+  if (departmentId) {
+    return repository.findDesignationByNameAndDepartment(designation, departmentId);
+  }
+
+  return repository.findDesignationByName(designation);
+};
+
+const ensureDesignationBelongsToDepartment = async (
+  payload,
+  departmentId,
+  { required = true } = {}
+) => {
+  const designation = await findDesignationFromPayload(payload, departmentId);
+
+  if (!designation) {
+    if (required) {
+      throw new ApiError(400, "Designation is required");
+    }
+
+    return null;
+  }
+
+  if (Number(designation.departmentId) !== Number(departmentId)) {
+    throw new ApiError(400, "Designation does not belong to the selected department");
+  }
+
+  return designation;
 };
 
 const ensureAdminExists = async (id) => {
@@ -84,12 +158,14 @@ const createAdmin = async (payload) => {
   }
 
   await ensureDepartmentExists(payload.departmentId);
+  const designation = await ensureDesignationBelongsToDepartment(payload, payload.departmentId);
 
   const passwordHash = await hashPassword(payload.password);
 
   return repository.createAdmin({
     ...payload,
     employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
+    designationId: designation.id,
     passwordHash,
     roleId: role.id
   });
@@ -129,6 +205,22 @@ const updateAdmin = async (id, payload) => {
 
   const data = { ...payload };
   delete data.password;
+  delete data.designation;
+
+  if (payload.designationId !== undefined || payload.designation !== undefined) {
+    const departmentId = payload.departmentId !== undefined
+      ? payload.departmentId
+      : admin.departmentId;
+    const designation = await ensureDesignationBelongsToDepartment(
+      payload,
+      departmentId,
+      { required: payload.designationId !== null && payload.designation !== null }
+    );
+
+    data.designationId = designation?.id || null;
+  } else if (payload.departmentId !== undefined) {
+    data.designationId = null;
+  }
 
   if (data.employmentStatus !== undefined) {
     data.employmentStatus = normalizeEmploymentStatus(data.employmentStatus);
@@ -174,9 +266,26 @@ const updateUser = async (id, payload) => {
     ...payload,
     roleId: role.id
   };
+  const hasDesignationInput = payload.designationId !== undefined || payload.designation !== undefined;
+
+  if (hasDesignationInput) {
+    const departmentId = payload.departmentId !== undefined
+      ? payload.departmentId
+      : user.departmentId;
+    const designation = await ensureDesignationBelongsToDepartment(
+      payload,
+      departmentId,
+      { required: payload.designationId !== null && payload.designation !== null }
+    );
+
+    data.designationId = designation?.id || null;
+  } else if (payload.departmentId !== undefined) {
+    data.designationId = null;
+  }
 
   delete data.password;
   delete data.role;
+  delete data.designation;
   delete data.managedDepartmentIds;
 
   if (data.employmentStatus !== undefined) {
@@ -210,6 +319,7 @@ const createEmployee = async (payload) => {
   }
 
   await ensureDepartmentExists(payload.departmentId);
+  const designation = await ensureDesignationBelongsToDepartment(payload, payload.departmentId);
 
   const passwordHash = await hashPassword(payload.password);
   const fullName = payload.fullName || buildFullName(payload);
@@ -217,14 +327,33 @@ const createEmployee = async (payload) => {
   return repository.createEmployee({
     ...payload,
     employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
+    designationId: designation.id,
     fullName,
     passwordHash,
     roleId: role.id
   });
 };
 
+const createUser = async (actor, payload) => {
+  const role = await repository.findRoleById(payload.roleId);
+  const roleKey = toRoleKey(role);
+
+  if (![ROLE_KEYS.ADMIN, ROLE_KEYS.EMPLOYEE].includes(roleKey)) {
+    throw new ApiError(400, "Only Admin and Employee users can be created here");
+  }
+
+  requireCreatePermission(actor, roleKey);
+
+  if (roleKey === ROLE_KEYS.ADMIN) {
+    return createAdmin(payload);
+  }
+
+  return createEmployee(payload);
+};
+
 module.exports = {
   createAdmin,
+  createUser,
   listAdmins,
   listUsers,
   getUser,

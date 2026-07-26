@@ -60,10 +60,22 @@ const deleteDepartment = async (id) => {
   return departmentsRepository.deleteDepartment(department.id);
 };
 
+const listDepartmentDesignations = async (id) => {
+  const departmentId = parseDepartmentId(id);
+  const department = await departmentsRepository.findDepartmentById(departmentId);
+
+  if (!department) {
+    throw new ApiError(404, "Department not found");
+  }
+
+  return departmentsRepository.listDepartmentDesignations(departmentId);
+};
+
 module.exports = {
   listDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  listDepartmentDesignations
 };

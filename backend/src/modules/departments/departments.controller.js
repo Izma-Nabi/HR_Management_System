@@ -32,10 +32,17 @@ const deleteDepartment = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Department deleted successfully", result);
 });
 
+const listDepartmentDesignations = asyncHandler(async (req, res) => {
+  const result = await departmentsService.listDepartmentDesignations(req.params.id);
+
+  return sendSuccess(res, 200, "Designations fetched successfully", result);
+});
+
 module.exports = {
   listDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  listDepartmentDesignations
 };

@@ -16,6 +16,12 @@ const userProfileSelect = {
   photo: true,
 
   designationId: true,
+  designation: {
+    select: {
+      id: true,
+      designationName: true
+    }
+  },
   joiningDate: true,
 
   employmentStatus: true,
@@ -80,7 +86,8 @@ const mapEmployeeAccount = (user) => {
       photo: user.photo,
       departmentId: user.departmentId,
       department: user.department,
-      designation: user.designationId ?? null,
+      designationId: user.designationId,
+      designation: user.designation?.designationName || null,
       joiningDate: user.joiningDate,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
@@ -110,6 +117,43 @@ const findDepartmentById = async (id, dbClient = prisma) => {
     },
     select: {
       id: true
+    }
+  });
+};
+
+const findDesignationById = async (id, dbClient = prisma) => {
+  if (!id) {
+    return null;
+  }
+
+  return dbClient.designation.findUnique({
+    where: {
+      id: Number(id)
+    }
+  });
+};
+
+const findDesignationByName = async (designationName, dbClient = prisma) => {
+  if (!designationName) {
+    return null;
+  }
+
+  return dbClient.designation.findFirst({
+    where: {
+      designationName: String(designationName).trim()
+    }
+  });
+};
+
+const findDesignationByNameAndDepartment = async (designationName, departmentId, dbClient = prisma) => {
+  if (!designationName || !departmentId) {
+    return null;
+  }
+
+  return dbClient.designation.findFirst({
+    where: {
+      designationName: String(designationName).trim(),
+      departmentId: Number(departmentId)
     }
   });
 };
@@ -172,7 +216,7 @@ const createEmployeeAccount = async ({ user, employee }) => {
         phone: employee.phone,
         address: employee.address,
         photo: employee.photo,
-        designationId: employee.designation,
+        designationId: employee.designationId ?? employee.designation,
         joiningDate: employee.joiningDate,
         employmentStatus: "ACTIVE",
 
@@ -206,6 +250,9 @@ const createEmployeeAccount = async ({ user, employee }) => {
 module.exports = {
   findUserByEmail,
   findDepartmentById,
+  findDesignationById,
+  findDesignationByName,
+  findDesignationByNameAndDepartment,
   listEmployeeAccounts,
   createEmployeeAccount
 };
