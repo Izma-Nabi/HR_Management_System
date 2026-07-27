@@ -24,6 +24,17 @@ const createDesignation = asyncHandler(async (req, res) => {
   );
 });
 
+const updateDesignation = asyncHandler(async (req, res) => {
+  const designation = await service.updateDesignation(req.params.id, req.body);
+
+  return sendSuccess(
+    res,
+    200,
+    "Designation updated successfully",
+    designation
+  );
+});
+
 const deleteDesignation = asyncHandler(async (req, res) => {
   const designation = await service.deleteDesignation(req.params.id);
 
@@ -38,5 +49,6 @@ const deleteDesignation = asyncHandler(async (req, res) => {
 module.exports = {
   listDesignations,
   createDesignation,
+  updateDesignation,
   deleteDesignation
 };

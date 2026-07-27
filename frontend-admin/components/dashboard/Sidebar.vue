@@ -37,6 +37,7 @@ const canManageDesignations = computed(() =>
   hasAnyPermission(
     "VIEW_DESIGNATIONS",
     "CREATE_DESIGNATION",
+    "UPDATE_DESIGNATION",
     "DELETE_DESIGNATION"
   )
 );

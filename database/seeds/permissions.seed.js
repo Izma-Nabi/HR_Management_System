@@ -23,6 +23,7 @@ const permissions = [
   { permissionName: "DELETE_ROLE" },
   { permissionName: "VIEW_DESIGNATIONS" },
   { permissionName: "CREATE_DESIGNATION" },
+  { permissionName: "UPDATE_DESIGNATION" },
   { permissionName: "DELETE_DESIGNATION" },
   { permissionName: "IMPORT_ATTENDANCE" },
   { permissionName: "VIEW_SYSTEM_SUMMARY" },

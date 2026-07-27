@@ -25,6 +25,16 @@ const createDesignation = async (data) => {
   return response.data;
 };
 
+const updateDesignation = async (id, data) => {
+  const response = await $fetch(designationUrl(`/${id}`), {
+    method: "PUT",
+    headers: authService.getAuthHeaders(),
+    body: data
+  });
+
+  return response.data;
+};
+
 const deleteDesignation = async (id) => {
   const response = await $fetch(designationUrl(`/${id}`), {
     method: "DELETE",
@@ -37,5 +47,6 @@ const deleteDesignation = async (id) => {
 export default {
   getDesignations,
   createDesignation,
+  updateDesignation,
   deleteDesignation
 };

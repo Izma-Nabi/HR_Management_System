@@ -1,23 +1,43 @@
 const { prisma } = require("../../../../database/prisma");
 
-const listDesignations = async () => {
-  return prisma.designation.findMany({
+const designationSelect = {
+  id: true,
+  designationName: true,
+  departmentId: true,
+  department: {
     select: {
       id: true,
-      designationName: true,
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true
-        }
-      },
-      _count: {
-        select: {
-          users: true
-        }
-      }
+      departmentName: true
+    }
+  },
+  users: {
+    select: {
+      id: true,
+      userCode: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      employmentStatus: true
     },
+    orderBy: [
+      {
+        firstName: "asc"
+      },
+      {
+        lastName: "asc"
+      }
+    ]
+  },
+  _count: {
+    select: {
+      users: true
+    }
+  }
+};
+
+const listDesignations = async () => {
+  return prisma.designation.findMany({
+    select: designationSelect,
     orderBy: [
       {
         department: {
@@ -79,17 +99,19 @@ const createDesignation = async ({ departmentId, designationName }) => {
       departmentId: Number(departmentId),
       designationName
     },
-    select: {
-      id: true,
-      designationName: true,
-      departmentId: true,
-      department: {
-        select: {
-          id: true,
-          departmentName: true
-        }
-      }
-    }
+    select: designationSelect
+  });
+};
+
+const updateDesignation = async (id, { designationName }) => {
+  return prisma.designation.update({
+    where: {
+      id: Number(id)
+    },
+    data: {
+      designationName
+    },
+    select: designationSelect
   });
 };
 
@@ -107,5 +129,6 @@ module.exports = {
   findDesignationById,
   findDesignationByNameAndDepartment,
   createDesignation,
+  updateDesignation,
   deleteDesignation
 };

@@ -11,6 +11,14 @@ const createDesignationSchema = Joi.object({
   })
 });
 
+const updateDesignationSchema = Joi.object({
+  designationName: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Designation name is required",
+    "string.min": "Designation name must be at least 2 characters"
+  })
+});
+
 module.exports = {
-  createDesignationSchema
+  createDesignationSchema,
+  updateDesignationSchema
 };

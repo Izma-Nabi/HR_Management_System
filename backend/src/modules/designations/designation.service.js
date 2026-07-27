@@ -43,6 +43,29 @@ const createDesignation = async (payload) => {
   });
 };
 
+const updateDesignation = async (id, payload) => {
+  const designationId = parseId(id, "designation id");
+  const designationName = normalizeDesignationName(payload.designationName);
+  const designation = await repository.findDesignationById(designationId);
+
+  if (!designation) {
+    throw new ApiError(404, "Designation not found");
+  }
+
+  const existingDesignation = await repository.findDesignationByNameAndDepartment(
+    designationName,
+    designation.departmentId
+  );
+
+  if (existingDesignation && Number(existingDesignation.id) !== designationId) {
+    throw new ApiError(409, "Designation already exists in this department");
+  }
+
+  return repository.updateDesignation(designationId, {
+    designationName
+  });
+};
+
 const deleteDesignation = async (id) => {
   const designationId = parseId(id, "designation id");
   const designation = await repository.findDesignationById(designationId);
@@ -61,5 +84,6 @@ const deleteDesignation = async (id) => {
 module.exports = {
   listDesignations,
   createDesignation,
+  updateDesignation,
   deleteDesignation
 };

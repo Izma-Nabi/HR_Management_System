@@ -7,7 +7,8 @@ const {
 } = require("../../middlewares/permission.middleware");
 const controller = require("./designation.controller");
 const {
-  createDesignationSchema
+  createDesignationSchema,
+  updateDesignationSchema
 } = require("./designation.validation");
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get(
   requireAnyPermission(
     "VIEW_DESIGNATIONS",
     "CREATE_DESIGNATION",
+    "UPDATE_DESIGNATION",
     "DELETE_DESIGNATION",
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
@@ -34,6 +36,20 @@ router.post(
   requirePermission("CREATE_DESIGNATION"),
   validate(createDesignationSchema),
   controller.createDesignation
+);
+
+router.put(
+  "/:id",
+  requirePermission("UPDATE_DESIGNATION"),
+  validate(updateDesignationSchema),
+  controller.updateDesignation
+);
+
+router.patch(
+  "/:id",
+  requirePermission("UPDATE_DESIGNATION"),
+  validate(updateDesignationSchema),
+  controller.updateDesignation
 );
 
 router.delete(
