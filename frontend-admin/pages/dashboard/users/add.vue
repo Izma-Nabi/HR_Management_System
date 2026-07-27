@@ -40,8 +40,6 @@ definePageMeta({
 const config = useRuntimeConfig();
 const { hasPermission, hasAnyPermission } = useAuthUser();
 
-const canCreateAdmin = computed(() => hasPermission("CREATE_ADMIN"));
-const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
 const canCreateUser = computed(() =>
   hasAnyPermission("CREATE_ADMIN", "CREATE_EMPLOYEE")
 );
@@ -71,22 +69,7 @@ const errorMessage = ref("");
 const fieldErrors = ref<FieldError[]>([]);
 const photoInputKey = ref(0);
 
-const normalizeKey = (value: string) => {
-  return value.trim().toUpperCase().replace(/\s+/g, "_");
-};
-
-const roleKey = (role: Role | undefined) => {
-  return role ? normalizeKey(role.roleName) : "";
-};
-
-const visibleRoles = computed(() => {
-  return roles.value.filter((role) => {
-    const key = roleKey(role);
-
-    return (key === "ADMIN" && canCreateAdmin.value)
-      || (key === "EMPLOYEE" && canCreateEmployee.value);
-  });
-});
+const visibleRoles = computed(() => roles.value);
 
 const fieldErrorMap = computed(() => {
   return fieldErrors.value.reduce<Record<string, string>>((errors, error) => {
@@ -270,7 +253,7 @@ const saveUser = async () => {
     <div class="page-header">
       <div>
         <h1>Create User</h1>
-        <p>Create an Admin or Employee account.</p>
+        <p>Create a user account.</p>
       </div>
 
       <NuxtLink to="/dashboard/users" class="back-link">

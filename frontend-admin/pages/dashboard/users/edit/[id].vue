@@ -1,9 +1,12 @@
 <script setup lang="ts">
-type RoleKey = "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE";
-
 type Department = {
   id: number;
   departmentName: string;
+};
+
+type Role = {
+  id: number;
+  roleName: string;
 };
 
 type Designation = {
@@ -22,7 +25,9 @@ type UserProfile = {
   designationId: number | null;
   designation: string | null;
   joiningDate: string | null;
-  role: RoleKey;
+  roleId: number | null;
+  role: string | null;
+  roleName: string | null;
   employmentStatus: string;
   departmentId: number | null;
 };
@@ -36,6 +41,7 @@ const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
 const userId = route.params.id;
 
+const roles = ref<Role[]>([]);
 const departments = ref<Department[]>([]);
 const designations = ref<Designation[]>([]);
 const loading = ref(false);
@@ -43,12 +49,6 @@ const pageLoading = ref(true);
 const errorMessage = ref("");
 const photoInputKey = ref(0);
 const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
-
-const roles: Array<{ value: RoleKey; label: string }> = [
-  { value: "SUPER_ADMIN", label: "Super Admin" },
-  { value: "ADMIN", label: "Admin" },
-  { value: "EMPLOYEE", label: "Employee" }
-];
 
 const employmentStatuses = [
   "ACTIVE",
@@ -63,7 +63,7 @@ const form = reactive({
   lastName: "",
   phone: "",
   address: "",
-  role: "EMPLOYEE" as RoleKey,
+  roleId: null as number | null,
   departmentId: null as number | null,
   designationId: null as number | null,
   employmentStatus: "ACTIVE",
@@ -101,6 +101,15 @@ const loadDepartments = async (headers: Record<string, string>) => {
   departments.value = response.data;
 };
 
+const loadRoles = async (headers: Record<string, string>) => {
+  const response = await $fetch<{ data: Role[] }>(
+    `${config.public.apiBase}/roles`,
+    { headers }
+  );
+
+  roles.value = response.data;
+};
+
 const loadDesignations = async (departmentId: number, headers: Record<string, string>) => {
   const response = await $fetch<{ data: Designation[] }>(
     `${config.public.apiBase}/departments/${departmentId}/designations`,
@@ -123,7 +132,7 @@ const loadUser = async (headers: Record<string, string>) => {
   form.lastName = user.lastName || "";
   form.phone = user.phone || "";
   form.address = user.address || "";
-  form.role = user.role;
+  form.roleId = user.roleId || null;
   form.departmentId = user.departmentId || null;
   form.designationId = user.designationId || null;
   form.employmentStatus = user.employmentStatus || "ACTIVE";
@@ -174,7 +183,10 @@ onMounted(async () => {
   }
 
   try {
-    await loadDepartments(headers);
+    await Promise.all([
+      loadDepartments(headers),
+      loadRoles(headers)
+    ]);
     await loadUser(headers);
 
     if (form.departmentId) {
@@ -206,7 +218,7 @@ const saveUser = async () => {
     body.append("lastName", form.lastName);
     body.append("phone", form.phone);
     body.append("address", form.address);
-    body.append("role", form.role);
+    body.append("roleId", form.roleId ? String(form.roleId) : "");
     body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
     body.append("designationId", form.designationId ? String(form.designationId) : "");
     body.append("employmentStatus", form.employmentStatus);
@@ -266,13 +278,14 @@ const saveUser = async () => {
 
         <label class="form-group">
           <span>Role</span>
-          <select v-model="form.role" required>
+          <select v-model.number="form.roleId" required>
+            <option :value="null" disabled>Select Role</option>
             <option
               v-for="role in roles"
-              :key="role.value"
-              :value="role.value"
+              :key="role.id"
+              :value="role.id"
             >
-              {{ role.label }}
+              {{ role.roleName }}
             </option>
           </select>
         </label>

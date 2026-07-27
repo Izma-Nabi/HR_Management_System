@@ -48,14 +48,16 @@ const hasPermission = (actor, permission) => {
 };
 
 const requireCreatePermission = (actor, roleKey) => {
-  const permissionByRole = {
-    [ROLE_KEYS.ADMIN]: "CREATE_ADMIN",
-    [ROLE_KEYS.EMPLOYEE]: "CREATE_EMPLOYEE"
-  };
+  const adminRoles = new Set([
+    ROLE_KEYS.SUPER_ADMIN,
+    ROLE_KEYS.ADMIN
+  ]);
 
-  const requiredPermission = permissionByRole[roleKey];
+  const requiredPermission = adminRoles.has(roleKey)
+    ? "CREATE_ADMIN"
+    : "CREATE_EMPLOYEE";
 
-  if (!requiredPermission || !hasPermission(actor, requiredPermission)) {
+  if (!hasPermission(actor, requiredPermission)) {
     throw new ApiError(403, "You do not have permission to create this user type");
   }
 };
@@ -255,17 +257,26 @@ const updateUser = async (id, payload) => {
     await ensureDepartmentExists(payload.departmentId);
   }
 
-  const roleKey = payload.role || user.role;
-  const role = await repository.findRoleByName(roleKey);
+  const data = { ...payload };
 
-  if (!role) {
-    throw new ApiError(400, "Role not found");
+  if (payload.roleId !== undefined) {
+    const role = await repository.findRoleById(payload.roleId);
+
+    if (!role) {
+      throw new ApiError(400, "Role not found");
+    }
+
+    data.roleId = role.id;
+  } else if (payload.role !== undefined) {
+    const role = await repository.findRoleByName(payload.role);
+
+    if (!role) {
+      throw new ApiError(400, "Role not found");
+    }
+
+    data.roleId = role.id;
   }
 
-  const data = {
-    ...payload,
-    roleId: role.id
-  };
   const hasDesignationInput = payload.designationId !== undefined || payload.designation !== undefined;
 
   if (hasDesignationInput) {
@@ -336,19 +347,36 @@ const createEmployee = async (payload) => {
 
 const createUser = async (actor, payload) => {
   const role = await repository.findRoleById(payload.roleId);
-  const roleKey = toRoleKey(role);
 
-  if (![ROLE_KEYS.ADMIN, ROLE_KEYS.EMPLOYEE].includes(roleKey)) {
-    throw new ApiError(400, "Only Admin and Employee users can be created here");
+  if (!role) {
+    throw new ApiError(400, "Role not found");
   }
+
+  const roleKey = toRoleKey(role);
 
   requireCreatePermission(actor, roleKey);
 
-  if (roleKey === ROLE_KEYS.ADMIN) {
-    return createAdmin(payload);
+  const existingUser = await repository.findUserByEmail(payload.email);
+
+  if (existingUser) {
+    throw new ApiError(409, "Email already exists");
   }
 
-  return createEmployee(payload);
+  await ensureDepartmentExists(payload.departmentId);
+  const designation = await ensureDesignationBelongsToDepartment(payload, payload.departmentId);
+  const passwordHash = await hashPassword(payload.password);
+  const codeType = [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.ADMIN].includes(roleKey)
+    ? "ADMIN"
+    : "EMPLOYEE";
+
+  return repository.createUser({
+    ...payload,
+    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
+    designationId: designation.id,
+    passwordHash,
+    roleId: role.id,
+    codeType
+  });
 };
 
 module.exports = {

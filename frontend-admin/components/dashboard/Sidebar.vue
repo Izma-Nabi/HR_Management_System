@@ -14,6 +14,16 @@ const canManageUsers = computed(() =>
     "DELETE_EMPLOYEE"
   )
 );
+
+const canManageRoles = computed(() =>
+  hasAnyPermission(
+    "VIEW_ROLES",
+    "CREATE_ROLE",
+    "UPDATE_ROLE",
+    "DELETE_ROLE"
+  )
+);
+
 const canManageDepartments = computed(() =>
   hasAnyPermission(
     "VIEW_DEPARTMENTS",
@@ -50,6 +60,14 @@ const canViewLeaves = computed(() =>
         class="nav-item"
       >
         Users
+      </NuxtLink>
+
+      <NuxtLink
+        v-if="canManageRoles"
+        to="/dashboard/roles"
+        class="nav-item"
+      >
+        Roles & Permissions
       </NuxtLink>
 
       <NuxtLink

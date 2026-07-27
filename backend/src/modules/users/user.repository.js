@@ -1,5 +1,5 @@
 const { prisma } = require("../../../../database/prisma");
-const { roleNameCandidates, toRoleKey } = require("../../utils/roles");
+const { normalizeRoleName, roleNameCandidates, toRoleKey } = require("../../utils/roles");
 const { generateNextEmployeeCode } = require("../../utils/employee-code");
 const { generateNextAdminCode } = require("../../utils/admin-code");
 
@@ -52,6 +52,7 @@ const toSafeUser = (user) => {
     id: user.id,
     fullName: fullNameFromUser(user),
     email: user.email,
+    roleId: user.role?.id || null,
     role: toRoleKey(user.role),
     status: user.employmentStatus,
     createdAt: user.createdAt,
@@ -82,6 +83,7 @@ const mapUser = (user) => {
     designationId: user.designationId,
     designation: user.designation?.designationName || null,
     joiningDate: user.joiningDate,
+    roleId: user.role?.id || null,
     role,
     roleName: user.role?.roleName || null,
     status: user.employmentStatus,
@@ -179,11 +181,33 @@ const findUserByEmail = async (email) => {
 };
 
 const findRoleByName = async (roleName) => {
-  return prisma.role.findFirst({
+  const role = await prisma.role.findFirst({
     where: {
       roleName: {
         in: roleNameCandidates(roleName)
       }
+    }
+  });
+
+  if (role || !roleName) {
+    return role;
+  }
+
+  const normalizedRoleName = normalizeRoleName(roleName);
+
+  return prisma.role.findFirst({
+    where: {
+      OR: [
+        {
+          roleName: String(roleName).trim()
+        },
+        {
+          roleName: normalizedRoleName
+        },
+        {
+          roleName: normalizedRoleName.replace(/_/g, " ")
+        }
+      ]
     }
   });
 };
@@ -311,6 +335,41 @@ const listUsers = async () => {
   });
 
   return users.map(mapUser);
+};
+
+const createUser = async (data) => {
+  return prisma.$transaction(async (tx) => {
+    const userCode = data.codeType === "ADMIN"
+      ? await generateNextAdminCode(tx)
+      : await generateNextEmployeeCode(tx);
+
+    const user = await tx.user.create({
+      data: {
+        userCode,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        passwordHash: data.passwordHash,
+        phone: data.phone,
+        address: data.address,
+        photo: data.photo,
+        designationId: data.designationId ?? data.designation,
+        joiningDate: data.joiningDate
+          ? new Date(data.joiningDate)
+          : null,
+        employmentStatus: data.employmentStatus || "ACTIVE",
+        departmentId: data.departmentId
+          ? Number(data.departmentId)
+          : null,
+        roleId: data.roleId
+      },
+      select: {
+        id: true
+      }
+    });
+
+    return findUserById(user.id, tx);
+  });
 };
 
 const createAdmin = async (data) => {
@@ -579,6 +638,7 @@ module.exports = {
   findUserById,
   listAdmins,
   listUsers,
+  createUser,
   createAdmin,
   updateAdmin,
   updateUser,

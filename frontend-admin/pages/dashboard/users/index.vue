@@ -2,7 +2,7 @@
 type UserRow = {
   id: number;
   userId: number;
-  type: "ADMIN" | "SUPER_ADMIN" | "EMPLOYEE";
+  type: string | null;
   name: string;
   firstName: string;
   lastName: string | null;
@@ -14,6 +14,7 @@ type UserRow = {
     description?: string | null;
   } | null;
   designation: string | null;
+  roleId: number | null;
   role: string;
   roleName: string | null;
   status: string;

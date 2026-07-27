@@ -29,34 +29,27 @@ import authService from "~/services/auth.service";
 
 const { authUser, role } = useAuthUser();
 
+const humanizeRole = (value) => {
+  return String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
 const displayName = computed(() => {
   return authUser.value?.fullName || authUser.value?.name || authUser.value?.email || "User";
 });
 
 const roleLabel = computed(() => {
-  switch ((role.value || "").toUpperCase()) {
-    case "SUPER_ADMIN":
-      return "Super Admin";
-    case "ADMIN":
-      return "Admin";
-    case "EMPLOYEE":
-      return "Employee";
-    default:
-      return "User";
-  }
+  return authUser.value?.roleName || humanizeRole(role.value) || "User";
 });
 
 const dashboardTitle = computed(() => {
-  switch ((role.value || "").toUpperCase()) {
-    case "SUPER_ADMIN":
-      return "Super Admin Dashboard";
-    case "ADMIN":
-      return "Admin Dashboard";
-    case "EMPLOYEE":
-      return "Employee Dashboard";
-    default:
-      return "Dashboard";
-  }
+  return roleLabel.value === "User"
+    ? "Dashboard"
+    : `${roleLabel.value} Dashboard`;
 });
 
 const avatarUrl = computed(() => {

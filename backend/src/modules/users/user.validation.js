@@ -5,10 +5,7 @@ const optionalUpdateText = (max) => Joi.string().trim().max(max).empty("").allow
 const optionalId = Joi.number().integer().positive().empty("").allow(null).default(null);
 const optionalUpdateId = Joi.number().integer().positive().empty("").allow(null).optional();
 const employmentStatus = Joi.string().trim().uppercase().valid("ACTIVE", "INACTIVE", "RESIGNED", "TERMINATED");
-const editableRole = Joi.string()
-  .trim()
-  .uppercase()
-  .valid("SUPER_ADMIN", "ADMIN", "EMPLOYEE");
+const editableRole = Joi.string().trim().max(50).empty("").optional();
 
 const createAdminSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().max(255).required().messages({
@@ -151,6 +148,7 @@ const updateUserSchema = Joi.object({
   employmentStatus: employmentStatus.empty("").allow(null).optional(),
   joiningDate: Joi.date().empty("").allow(null).optional(),
   photo: optionalUpdateText(255),
+  roleId: Joi.number().integer().positive().empty("").optional(),
   role: editableRole.optional()
 }).min(1).messages({
   "object.min": "At least one field is required"

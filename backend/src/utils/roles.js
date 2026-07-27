@@ -26,6 +26,12 @@ const normalizeRoleName = (roleName) => {
   return String(roleName || "").trim().toUpperCase().replace(/\s+/g, "_");
 };
 
+const roleNameValue = (role) => {
+  return typeof role === "string"
+    ? role
+    : role?.roleName;
+};
+
 const ROLE_KEY_BY_ALIAS = Object.entries(ROLE_NAME_ALIASES).reduce(
   (aliases, [roleKey, roleNames]) => {
     for (const roleName of roleNames) {
@@ -53,26 +59,36 @@ const toRoleKey = (role) => {
     return null;
   }
 
-  const roleName =
-    typeof role === "string"
-      ? role
-      : role.roleName;
+  const roleName = roleNameValue(role);
 
   if (!roleName) {
     return null;
   }
 
-  return ROLE_KEY_BY_ALIAS[normalizeRoleName(roleName)] || null;
+  const normalizedRoleName = normalizeRoleName(roleName);
+
+  return ROLE_KEY_BY_ALIAS[normalizedRoleName] || normalizedRoleName;
 };
 
 const roleNameCandidates = (role) => {
+  const roleName = roleNameValue(role);
   const roleKey = toRoleKey(role);
 
   if (!roleKey) {
     return [];
   }
 
-  return ROLE_NAME_ALIASES[roleKey] || [];
+  if (ROLE_NAME_ALIASES[roleKey]) {
+    return ROLE_NAME_ALIASES[roleKey];
+  }
+
+  return Array.from(
+    new Set([
+      roleName,
+      roleKey,
+      roleKey.replace(/_/g, " ")
+    ].filter(Boolean))
+  );
 };
 
 const getDashboardByRole = (role) => {
