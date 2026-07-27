@@ -1,6 +1,6 @@
 <script setup>
 definePageMeta({
-  layout: "dashboard"
+  layout: "dashboard",
 });
 
 import { ref, onMounted } from "vue";
@@ -17,7 +17,7 @@ const permissions = ref([]);
 
 const role = ref({
   roleName: "",
-  permissions: []
+  permissions: [],
 });
 
 const goBack = () => {
@@ -30,7 +30,7 @@ const loadData = async () => {
   try {
     const [roleResponse, permissionResponse] = await Promise.all([
       roleService.getRole(route.params.id),
-      roleService.getPermissions()
+      roleService.getPermissions(),
     ]);
 
     permissions.value = permissionResponse;
@@ -39,7 +39,7 @@ const loadData = async () => {
       roleName: roleResponse.roleName,
       permissions: roleResponse.rolePermissions.map(
         (item) => item.permissionId
-      )
+      ),
     };
   } catch (error) {
     console.error(error);
@@ -53,7 +53,6 @@ const submit = async (form) => {
 
   try {
     await roleService.updateRole(route.params.id, form);
-
     router.push("/dashboard/roles");
   } catch (error) {
     console.error(error);
@@ -117,7 +116,7 @@ onMounted(loadData);
 
 .back-btn {
   padding: 10px 18px;
-  color: #ffffff;
+  color: #fff;
   background: #4f46e5;
   border: none;
   border-radius: 8px;
