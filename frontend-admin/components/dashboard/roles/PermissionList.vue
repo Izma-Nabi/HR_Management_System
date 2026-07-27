@@ -24,6 +24,7 @@ const GROUP_ORDER = [
   "User Management",
   "Role Management",
   "Department Management",
+  "Designation Management",
   "Leave Management",
   "Attendance Management",
   "Other",
@@ -33,6 +34,7 @@ const GROUP_ICONS: Record<string, string> = {
   "User Management": "user",
   "Role Management": "shield",
   "Department Management": "building",
+  "Designation Management": "badge",
   "Leave Management": "calendar",
   "Attendance Management": "clock",
   Other: "dots",
@@ -47,6 +49,9 @@ function resolveGroup(name: string) {
   }
   if (name.includes("DEPARTMENT")) {
     return "Department Management";
+  }
+  if (name.includes("DESIGNATION")) {
+    return "Designation Management";
   }
   if (name.includes("LEAVE")) {
     return "Leave Management";
@@ -208,6 +213,10 @@ const totalPermissions = computed(() => props.permissions.length);
             <svg v-else-if="GROUP_ICONS[title] === 'building'" viewBox="0 0 20 20" fill="none">
               <rect x="4" y="3" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5" />
               <path d="M7 7h1M12 7h1M7 10h1M12 10h1M7 13h1M12 13h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <svg v-else-if="GROUP_ICONS[title] === 'badge'" viewBox="0 0 20 20" fill="none">
+              <rect x="5" y="4" width="10" height="12" rx="2" stroke="currentColor" stroke-width="1.5" />
+              <path d="M8 8h4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
             <svg v-else-if="GROUP_ICONS[title] === 'calendar'" viewBox="0 0 20 20" fill="none">
               <rect x="3.5" y="4.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" />

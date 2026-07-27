@@ -13,6 +13,30 @@ const listDesignations = asyncHandler(async (req, res) => {
   );
 });
 
+const createDesignation = asyncHandler(async (req, res) => {
+  const designation = await service.createDesignation(req.body);
+
+  return sendSuccess(
+    res,
+    201,
+    "Designation created successfully",
+    designation
+  );
+});
+
+const deleteDesignation = asyncHandler(async (req, res) => {
+  const designation = await service.deleteDesignation(req.params.id);
+
+  return sendSuccess(
+    res,
+    200,
+    "Designation deleted successfully",
+    designation
+  );
+});
+
 module.exports = {
-  listDesignations
+  listDesignations,
+  createDesignation,
+  deleteDesignation
 };

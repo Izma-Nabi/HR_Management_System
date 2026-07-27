@@ -22,14 +22,23 @@ const timeFromParts = (hours, minutes = 0, seconds = 0) => {
   return `${padTwo(hours)}:${padTwo(minutes)}:${padTwo(seconds)}`;
 };
 
+const normalizeUserCode = (value) => {
+  return String(value || "").trim();
+};
+
+const userCodeKey = (value) => {
+  return normalizeUserCode(value).toUpperCase();
+};
+
+const fullNameFromUser = (user) => {
+  return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+};
+
 const sourceHashFromRecord = (record) => {
   return crypto
     .createHash("sha256")
     .update(JSON.stringify([
-      record.userCode,
-      record.fullName,
-      record.role,
-      record.department,
+      record.userId,
       record.attendanceDate,
       record.checkIn,
       record.checkOut,
@@ -153,31 +162,10 @@ const VALID_STATUSES = [
 
 const validateRow = (row, rowNumber) => {
 
-  if (isMissing(row["User Code"])) {
+  if (!normalizeUserCode(row["User Code"])) {
     throw new ApiError(
       400,
       `Row ${rowNumber}: User Code is required.`
-    );
-  }
-
-  if (isMissing(row["Full Name"])) {
-    throw new ApiError(
-      400,
-      `Row ${rowNumber}: Full Name is required.`
-    );
-  }
-
-  if (isMissing(row["Role"])) {
-    throw new ApiError(
-      400,
-      `Row ${rowNumber}: Role is required.`
-    );
-  }
-
-  if (isMissing(row["Department"])) {
-    throw new ApiError(
-      400,
-      `Row ${rowNumber}: Department is required.`
     );
   }
 
@@ -188,10 +176,12 @@ const validateRow = (row, rowNumber) => {
     );
   }
 
-  if (!VALID_STATUSES.includes(row["Status"])) {
+  const status = String(row["Status"] || "").trim();
+
+  if (!VALID_STATUSES.includes(status)) {
     throw new ApiError(
       400,
-      `Row ${rowNumber}: Invalid Status '${row["Status"]}'.`
+      `Row ${rowNumber}: Invalid Status '${status}'.`
     );
   }
 
@@ -222,7 +212,7 @@ const importAttendance = async () => {
     };
   }
 
-  const attendanceRecords = [];
+  const parsedRows = [];
   const sourceHashCounts = new Map();
 
   for (let index = 0; index < rows.length; index++) {
@@ -239,12 +229,40 @@ const importAttendance = async () => {
       );
     }
 
+    parsedRows.push({
+      row,
+      rowNumber: index + 2,
+      userCode: normalizeUserCode(row["User Code"]),
+      attendanceDate
+    });
+  }
+
+  const users = await attendanceRepository.findUsersByCodes(
+    parsedRows.map((row) => row.userCode)
+  );
+  const usersByCode = new Map(
+    users.map((user) => [userCodeKey(user.userCode), user])
+  );
+  const attendanceRecords = [];
+
+  for (const parsedRow of parsedRows) {
+    const row = parsedRow.row;
+    const user = usersByCode.get(userCodeKey(parsedRow.userCode));
+
+    if (!user) {
+      throw new ApiError(
+        400,
+        `Row ${parsedRow.rowNumber}: User Code '${parsedRow.userCode}' does not match any user.`
+      );
+    }
+
     const attendanceRecord = {
-      userCode: row["User Code"].toString().trim(),
-      fullName: row["Full Name"].toString().trim(),
-      role: row["Role"].toString().trim(),
-      department: row["Department"].toString().trim(),
-      attendanceDate,
+      userId: user.id,
+      userCode: user.userCode,
+      fullName: fullNameFromUser(user),
+      role: user.role?.roleName || "Unassigned",
+      department: user.department?.departmentName || "Unassigned",
+      attendanceDate: parsedRow.attendanceDate,
       checkIn: parseExcelTime(row["Check-In"]),
       checkOut: parseExcelTime(row["Check-Out"]),
       status: row["Status"].toString().trim(),

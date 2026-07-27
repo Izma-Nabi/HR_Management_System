@@ -47,20 +47,20 @@ const getAttendanceBundle = async (scopeWhere = {}) => {
 };
 
 const teamScopeFromUser = (user) => {
-  const departmentNames = (user?.managedDepartments || [])
-    .map((department) => department.departmentName)
-    .filter(Boolean);
+  const departmentIds = (user?.managedDepartments || [])
+    .map((department) => Number(department.id))
+    .filter((departmentId) => Number.isInteger(departmentId) && departmentId > 0);
 
   return {
-    department: {
-      in: departmentNames
+    departmentId: {
+      in: departmentIds
     }
   };
 };
 
 const ownScopeFromUser = (user) => {
   return {
-    userCode: user?.userCode || "__NO_USER_CODE__"
+    userId: Number(user?.id) || -1
   };
 };
 

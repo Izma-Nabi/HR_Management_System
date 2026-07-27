@@ -9,6 +9,38 @@ const createManyAttendance = async (records) => {
   });
 };
 
+const findUsersByCodes = async (userCodes) => {
+  const codes = Array.from(new Set(userCodes.filter(Boolean)));
+
+  if (!codes.length) {
+    return [];
+  }
+
+  return prisma.user.findMany({
+    where: {
+      userCode: {
+        in: codes
+      }
+    },
+    select: {
+      id: true,
+      userCode: true,
+      firstName: true,
+      lastName: true,
+      role: {
+        select: {
+          roleName: true
+        }
+      },
+      department: {
+        select: {
+          departmentName: true
+        }
+      }
+    }
+  });
+};
+
 const deleteAttendanceByDates = async (dates) => {
   return prisma.attendance.deleteMany({
     where: {
@@ -28,14 +60,12 @@ const equalsOrNull = (column, value) => {
 
 const exactRecordCondition = (record) => {
   return Prisma.sql`(
-    user_code = ${record.userCode}
-    AND full_name = ${record.fullName}
-    AND role = ${record.role}
-    AND department = ${record.department}
+    user_id = ${record.userId}
     AND attendance_date = ${record.attendanceDate}
     AND ${equalsOrNull("check_in", record.checkIn)}
     AND ${equalsOrNull("check_out", record.checkOut)}
     AND status = ${record.status}
+    AND ${equalsOrNull("remarks", record.remarks)}
   )`;
 };
 
@@ -56,6 +86,7 @@ const attachSourceKeyToExistingRecord = async (tx, record) => {
 const insertAttendanceRecordIfMissing = async (tx, record) => {
   const result = await tx.$executeRaw`
     INSERT INTO attendance (
+      user_id,
       user_code,
       full_name,
       role,
@@ -70,6 +101,7 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
       updated_at
     )
     SELECT
+      ${record.userId},
       ${record.userCode},
       ${record.fullName},
       ${record.role},
@@ -86,6 +118,7 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
       SELECT 1
       FROM attendance
       WHERE source_key = ${record.sourceKey}
+        OR ${exactRecordCondition(record)}
     )
   `;
 
@@ -129,6 +162,7 @@ const getAttendanceCount = async () => {
 module.exports = {
   createManyAttendance,
   deleteAttendanceByDates,
+  findUsersByCodes,
   getAttendanceCount,
   syncNewAttendance
 };

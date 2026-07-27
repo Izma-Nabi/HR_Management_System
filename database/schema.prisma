@@ -136,6 +136,8 @@ model User {
 
   leaveApprovalHistory LeaveApprovalHistory[] @relation("LeaveHistoryRefersTo")
 
+  attendanceRecords Attendance[]
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -160,6 +162,8 @@ model Department {
 
 model Attendance {
   id             Int              @id @default(autoincrement())
+  userId         Int?             @map("user_id") @db.UnsignedInt
+  user           User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userCode       String           @map("user_code") @db.VarChar(50)
   fullName       String           @map("full_name") @db.VarChar(100)
   role           String           @db.VarChar(50)
@@ -173,6 +177,7 @@ model Attendance {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
+  @@index([userId, attendanceDate])
   @@map("attendance")
 }
 

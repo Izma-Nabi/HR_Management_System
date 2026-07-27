@@ -64,23 +64,23 @@ const currentWeekRange = () => {
 };
 
 const scopeSql = (scopeWhere = {}) => {
-  const conditions = [];
+  const conditions = [
+    Prisma.sql`a.user_id IS NOT NULL`
+  ];
 
-  if (scopeWhere.department?.in) {
-    if (!scopeWhere.department.in.length) {
+  if (scopeWhere.departmentId?.in) {
+    if (!scopeWhere.departmentId.in.length) {
       conditions.push(Prisma.sql`1 = 0`);
     } else {
-      conditions.push(Prisma.sql`department IN (${Prisma.join(scopeWhere.department.in)})`);
+      conditions.push(Prisma.sql`u.department_id IN (${Prisma.join(scopeWhere.departmentId.in)})`);
     }
   }
 
-  if (scopeWhere.userCode) {
-    conditions.push(Prisma.sql`user_code = ${scopeWhere.userCode}`);
+  if (scopeWhere.userId) {
+    conditions.push(Prisma.sql`a.user_id = ${scopeWhere.userId}`);
   }
 
-  return conditions.length
-    ? Prisma.sql`AND ${Prisma.join(conditions, " AND ")}`
-    : Prisma.empty;
+  return Prisma.sql`AND ${Prisma.join(conditions, " AND ")}`;
 };
 
 const countFromSummary = (value) => {
@@ -92,12 +92,14 @@ const getSummary = async (scopeWhere = {}) => {
   const [summary] = await prisma.$queryRaw`
     SELECT
       COUNT(*) AS total,
-      SUM(status = 'Present') AS present,
-      SUM(status = 'Absent') AS absent,
-      SUM(status = 'Late') AS late,
-      SUM(status = 'Leave') AS leaveCount
-    FROM attendance
-    WHERE attendance_date = ${targetDate}
+      SUM(a.status = 'Present') AS present,
+      SUM(a.status = 'Absent') AS absent,
+      SUM(a.status = 'Late') AS late,
+      SUM(a.status = 'Leave') AS leaveCount
+    FROM attendance AS a
+    JOIN users AS u
+      ON u.id = a.user_id
+    WHERE a.attendance_date = ${targetDate}
     ${scopeSql(scopeWhere)}
   `;
 
@@ -114,13 +116,15 @@ const getAttendanceTrend = async (scopeWhere = {}) => {
   const { monday, saturday } = currentWeekRange();
   const rows = await prisma.$queryRaw`
     SELECT
-      DATE_FORMAT(attendance_date, '%a') AS day,
+      DATE_FORMAT(a.attendance_date, '%a') AS day,
       COUNT(*) AS count
-    FROM attendance
-    WHERE attendance_date BETWEEN ${monday} AND ${saturday}
+    FROM attendance AS a
+    JOIN users AS u
+      ON u.id = a.user_id
+    WHERE a.attendance_date BETWEEN ${monday} AND ${saturday}
     ${scopeSql(scopeWhere)}
-    GROUP BY attendance_date
-    ORDER BY attendance_date ASC
+    GROUP BY a.attendance_date
+    ORDER BY a.attendance_date ASC
   `;
 
   const week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -142,65 +146,72 @@ const getAttendanceTrend = async (scopeWhere = {}) => {
 };
 
 const getDepartmentAttendance = async (scopeWhere = {}) => {
-  const result = await prisma.attendance.groupBy({
-    by: [
-      "department"
-    ],
-    where: {
-      ...scopeWhere,
-      status: "Present"
-    },
-    _count: {
-      id: true
-    }
-  });
-  return result.map(item => ({
+  const rows = await prisma.$queryRaw`
+    SELECT
+      COALESCE(d.department_name, 'Unassigned') AS department,
+      COUNT(*) AS present
+    FROM attendance AS a
+    JOIN users AS u
+      ON u.id = a.user_id
+    LEFT JOIN departments AS d
+      ON d.id = u.department_id
+    WHERE a.status = 'Present'
+    ${scopeSql(scopeWhere)}
+    GROUP BY d.id, d.department_name
+    ORDER BY present DESC
+  `;
+
+  return rows.map(item => ({
     department: item.department,
-    present: item._count.id
+    present: Number(item.present || 0)
   }));
 };
 
 const getTopLateEmployees = async (scopeWhere = {}) => {
-  const rows = await prisma.attendance.groupBy({
-    by: ["userCode", "fullName"],
-    where: {
-      ...scopeWhere,
-      status: "Late"
-    },
-    _count: {
-      id: true
-    },
-    orderBy: {
-      _count: {
-        id: "desc"
-      }
-    },
-    take: 5
-  });
+  const rows = await prisma.$queryRaw`
+    SELECT
+      a.user_id AS userId,
+      COALESCE(NULLIF(TRIM(CONCAT(u.firstName, ' ', u.lastName)), ''), u.userCode) AS name,
+      COUNT(*) AS value
+    FROM attendance AS a
+    JOIN users AS u
+      ON u.id = a.user_id
+    WHERE a.status = 'Late'
+    ${scopeSql(scopeWhere)}
+    GROUP BY a.user_id, u.firstName, u.lastName, u.userCode
+    ORDER BY value DESC
+    LIMIT 5
+  `;
 
   return rows.map(row => ({
-    name: row.fullName,
-    value: row._count.id
+    name: row.name,
+    value: Number(row.value || 0)
   }));
 };
 
 const getRecentAttendance = async (scopeWhere = {}, take = 10) => {
   return prisma.$queryRaw`
     SELECT
-      id,
-      user_code AS userCode,
-      full_name AS fullName,
-      role,
-      department,
-      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
-      TIME_FORMAT(check_in, '%H:%i:%s') AS checkIn,
-      TIME_FORMAT(check_out, '%H:%i:%s') AS checkOut,
-      status,
-      remarks
-    FROM attendance
+      a.id,
+      u.userCode AS userCode,
+      COALESCE(NULLIF(TRIM(CONCAT(u.firstName, ' ', u.lastName)), ''), u.userCode) AS fullName,
+      r.role_name AS role,
+      COALESCE(d.department_name, 'Unassigned') AS department,
+      DATE_FORMAT(a.attendance_date, '%Y-%m-%d') AS attendanceDate,
+      TIME_FORMAT(a.check_in, '%H:%i:%s') AS checkIn,
+      TIME_FORMAT(a.check_out, '%H:%i:%s') AS checkOut,
+      a.status,
+      a.remarks
+    FROM attendance AS a
+    JOIN users AS u
+      ON u.id = a.user_id
+    JOIN roles AS r
+      ON r.id = u.role_id
+    LEFT JOIN departments AS d
+      ON d.id = u.department_id
     WHERE 1 = 1
     ${scopeSql(scopeWhere)}
-    ORDER BY attendance_date DESC, id DESC
+    ORDER BY a.attendance_date DESC, a.id DESC
     LIMIT ${take}
   `;
 };

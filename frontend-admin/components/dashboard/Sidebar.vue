@@ -32,6 +32,15 @@ const canManageDepartments = computed(() =>
     "DELETE_DEPARTMENT"
   )
 );
+
+const canManageDesignations = computed(() =>
+  hasAnyPermission(
+    "VIEW_DESIGNATIONS",
+    "CREATE_DESIGNATION",
+    "DELETE_DESIGNATION"
+  )
+);
+
 const canViewLeaves = computed(() =>
   hasAnyPermission(
     "CREATE_LEAVE",
@@ -76,6 +85,14 @@ const canViewLeaves = computed(() =>
         class="nav-item"
       >
         Departments
+      </NuxtLink>
+
+      <NuxtLink
+        v-if="canManageDesignations"
+        to="/dashboard/designations"
+        class="nav-item"
+      >
+        Designations
       </NuxtLink>
 
       <NuxtLink

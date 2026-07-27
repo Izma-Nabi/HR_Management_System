@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS attendance (
   id INT NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NULL,
   user_code VARCHAR(50) NOT NULL,
   full_name VARCHAR(100) NOT NULL,
   role VARCHAR(50) NOT NULL,
@@ -156,7 +157,12 @@ CREATE TABLE IF NOT EXISTS attendance (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY attendance_source_key_key (source_key)
+  UNIQUE KEY attendance_source_key_key (source_key),
+  KEY attendance_user_id_attendance_date_idx (user_id, attendance_date),
+  CONSTRAINT attendance_user_id_fkey
+    FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS leave_requests (

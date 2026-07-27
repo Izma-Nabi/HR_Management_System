@@ -19,6 +19,9 @@ router.get(
   "/",
   requireAnyPermission(
     "VIEW_DEPARTMENTS",
+    "VIEW_DESIGNATIONS",
+    "CREATE_DESIGNATION",
+    "DELETE_DESIGNATION",
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
     "CREATE_EMPLOYEE",
@@ -39,6 +42,9 @@ router.get(
   "/:id/designations",
   requireAnyPermission(
     "VIEW_DEPARTMENTS",
+    "VIEW_DESIGNATIONS",
+    "CREATE_DESIGNATION",
+    "DELETE_DESIGNATION",
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
     "CREATE_EMPLOYEE",
@@ -52,6 +58,9 @@ router.get(
   "/:id",
   requireAnyPermission(
     "VIEW_DEPARTMENTS",
+    "VIEW_DESIGNATIONS",
+    "CREATE_DESIGNATION",
+    "DELETE_DESIGNATION",
     "CREATE_ADMIN",
     "UPDATE_ADMIN",
     "CREATE_EMPLOYEE",
