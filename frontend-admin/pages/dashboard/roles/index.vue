@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import roleService from "~/services/role.service";
 
 definePageMeta({
   layout: "dashboard"
@@ -21,25 +22,9 @@ const goBack = ()=>{
 router.push("/dashboard");
 
 };
-const config = useRuntimeConfig();
-
 const roles = ref<any[]>([]);
 const loading = ref(true);
 const errorMessage = ref("");
-
-
-
-const authHeaders = () => {
-
-  const token = localStorage.getItem("token");
-
-  if (!token) return null;
-
-  return {
-    Authorization:`Bearer ${token}`
-  };
-
-};
 
 const deleteRole = async (id:number)=>{
 
@@ -47,79 +32,25 @@ const deleteRole = async (id:number)=>{
     "Delete this role?"
   );
 
-
   if(!confirmed){
     return;
   }
-
-
-  const headers = authHeaders();
-
-
-  if(!headers){
-    await navigateTo("/login",{replace:true});
-    return;
-  }
-
-
   try{
-
-
-    await $fetch(
-      `${config.public.apiBase}/roles/${id}`,
-      {
-        method:"DELETE",
-        headers
-      }
-    );
-
-
-    roles.value =
-      roles.value.filter(
-        role => role.id !== id
-      );
-
-
+   roles.value = await roleService.getRoles();
   }
   catch(error:any){
 
     errorMessage.value =
       error?.data?.message ||
       "Delete failed";
-
   }
-
 };
 
 const loadRoles = async()=>{
-
-const headers = authHeaders();
-
-if(!headers){
-
-await navigateTo("/login");
-
-return;
-
-}
-
-
 loading.value=true;
 
-
 try{
-
-const response = await $fetch(
-`${config.public.apiBase}/roles`,
-{
-headers
-}
-);
-
-
-roles.value = response.data;
-
-
+roles.value = await roleService.getRoles();
 }
 catch(error:any){
 

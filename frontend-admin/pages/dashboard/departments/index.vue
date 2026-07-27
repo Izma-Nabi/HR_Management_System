@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import authService from "~/services/auth.service";
+import departmentService from "~/services/department.service";
 type Person = {
   id: number;
   firstName: string;
@@ -32,20 +34,8 @@ const canCreateDepartment = computed(() => hasPermission("CREATE_DEPARTMENT"));
 const canUpdateDepartment = computed(() => hasPermission("UPDATE_DEPARTMENT"));
 const canDeleteDepartment = computed(() => hasPermission("DELETE_DEPARTMENT"));
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
-
 const loadDepartments = async () => {
-  const headers = authHeaders();
+  const headers = authService.getAuthHeaders();
 
   if (!headers) {
     await navigateTo("/login", { replace: true });
@@ -56,11 +46,7 @@ const loadDepartments = async () => {
   errorMessage.value = "";
 
   try {
-    const response = await $fetch<{ data: Department[] }>(`${config.public.apiBase}/departments`, {
-      headers
-    });
-
-    departments.value = response.data;
+   departments.value = await departmentService.getDepartments();
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load departments";
   } finally {
@@ -92,7 +78,7 @@ const deleteDepartment = async (id: number) => {
     return;
   }
 
-  const headers = authHeaders();
+  const headers = authService.getAuthHeaders();
 
   if (!headers) {
     await navigateTo("/login", { replace: true });
@@ -100,12 +86,7 @@ const deleteDepartment = async (id: number) => {
   }
 
   try {
-    await $fetch(`${config.public.apiBase}/departments/${id}`, {
-      method: "DELETE",
-      headers
-    });
-
-    departments.value = departments.value.filter((department) => department.id !== id);
+    await departmentService.deleteDepartment(id);
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Delete failed";
   }

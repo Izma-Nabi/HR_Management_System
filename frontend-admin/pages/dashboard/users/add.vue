@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import departmentService from "~/services/department.service";
+import roleService from "~/services/role.service";
+import userService from "~/services/user.service";
+
 type FieldError = {
   field: string;
   message: string;
@@ -37,7 +41,6 @@ definePageMeta({
   layout: "dashboard"
 });
 
-const config = useRuntimeConfig();
 const { hasPermission, hasAnyPermission } = useAuthUser();
 
 const canCreateUser = computed(() =>
@@ -78,43 +81,16 @@ const fieldErrorMap = computed(() => {
   }, {});
 });
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
-
 const loadDepartments = async (headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Department[] }>(
-    `${config.public.apiBase}/departments`,
-    { headers }
-  );
-
-  departments.value = response.data;
+  departments.value = await departmentService.getDepartments();
 };
 
 const loadRoles = async (headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Role[] }>(
-    `${config.public.apiBase}/roles`,
-    { headers }
-  );
-
-  roles.value = response.data;
+   roles.value = await roleService.getRoles();
 };
 
 const loadDesignations = async (departmentId: number, headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Designation[] }>(
-    `${config.public.apiBase}/departments/${departmentId}/designations`,
-    { headers }
-  );
-
-  designations.value = response.data;
+  designations.value =  await departmentService.getDesignations(departmentId);
 };
 
 watch(
@@ -127,14 +103,8 @@ watch(
       return;
     }
 
-    const headers = authHeaders();
-
-    if (!headers) {
-      return;
-    }
-
     try {
-      await loadDesignations(departmentId, headers);
+      await loadDesignations(departmentId);
     } catch (error: any) {
       errorMessage.value = error?.data?.message || "Unable to load designations";
     }
@@ -337,7 +307,7 @@ const saveUser = async () => {
 
         <label class="form-group">
           <span>Joining Date</span>
-          <input v-model="form.joiningDate" type="date">
+          <input v-model="form.joiningDate" type="date" :min="today">
           <small v-if="fieldErrorMap.joiningDate">{{ fieldErrorMap.joiningDate }}</small>
         </label>
 

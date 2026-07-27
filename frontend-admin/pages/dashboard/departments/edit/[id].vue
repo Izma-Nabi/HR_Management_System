@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import departmentService from "~/services/department.service";
 definePageMeta({
   layout: "dashboard"
 });
 
 const route = useRoute();
-const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
 
 const loading = ref(false);
@@ -17,36 +17,15 @@ const form = reactive({
   description: ""
 });
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
 
 const loadDepartment = async () => {
-  const headers = authHeaders();
 
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
 
   try {
-    const response = await $fetch<{ data: { departmentName: string; description: string | null } }>(
-      `${config.public.apiBase}/departments/${route.params.id}`,
-      {
-        headers
-      }
-    );
+    const department = await departmentService.getDepartment(route.params.id);
 
-    form.departmentName = response.data.departmentName;
-    form.description = response.data.description || "";
+    form.departmentName = department.departmentName;
+    form.description = department.description || "";
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load department";
   } finally {
@@ -64,26 +43,14 @@ onMounted(async () => {
 });
 
 const updateDepartment = async () => {
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
-
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    await $fetch(`${config.public.apiBase}/departments/${route.params.id}`, {
-      method: "PUT",
-      headers,
-      body: {
-        departmentName: form.departmentName,
-        description: form.description
-      }
+    await departmentService.updateDepartment(route.params.id, {
+      departmentName: form.departmentName,
+      description: form.description
     });
-
     await navigateTo("/dashboard/departments");
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Update failed";

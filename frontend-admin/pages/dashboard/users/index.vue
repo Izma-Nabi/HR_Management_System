@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import roleService from "~/services/role.service";
+import userService from "~/services/user.service";
+
 type UserRow = {
   id: number;
   userId: number;
@@ -23,42 +26,24 @@ type UserRow = {
 
 definePageMeta({ layout: "dashboard" });
 
-const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
 
 const users = ref<UserRow[]>([]);
 const loading = ref(true);
 const search = ref("");
 const errorMessage = ref("");
-const canViewUsers = computed(() => hasPermission("UPDATE_USER"));
+const canViewUsers = computed(() => hasPermission("VIEW_USERS"));
 const canEditUser = computed(() => hasPermission("UPDATE_USER"));
 const canDeleteUser = computed(() => hasPermission("DELETE_ADMIN") || hasPermission("DELETE_EMPLOYEE"));
 const canCreateUser = computed(() => hasPermission("CREATE_ADMIN") || hasPermission("CREATE_EMPLOYEE"));
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return { Authorization: `Bearer ${token}` };
-};
-
 const loadUsers = async () => {
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
 
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    const response = await $fetch<{ data: UserRow[] }>(`${config.public.apiBase}/users`, { headers });
-    users.value = response.data;
+    users.value = await userService.getUsers();
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load users";
   } finally {
@@ -73,19 +58,12 @@ const deleteUser = async (id: number) => {
     return;
   }
 
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
-
   try {
-    await $fetch(`${config.public.apiBase}/users/admin/${id}`, {
-      method: "DELETE",
-      headers
-    });
-    users.value = users.value.filter((user) => user.id !== id);
+   await userService.deleteUser(id);
+
+    users.value = users.value.filter(
+      (user) => user.id !== id
+    );
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Delete failed";
   }

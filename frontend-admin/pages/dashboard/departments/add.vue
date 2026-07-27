@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import departmentService from "~/services/department.service";
+
 definePageMeta({
   layout: "dashboard"
 });
 
-const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
 
 const loading = ref(false);
@@ -15,17 +16,6 @@ const form = reactive({
   description: ""
 });
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
 
 onMounted(async () => {
   if (!canCreateDepartment.value) {
@@ -34,29 +24,20 @@ onMounted(async () => {
 });
 
 const saveDepartment = async () => {
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
-
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    await $fetch(`${config.public.apiBase}/departments`, {
-      method: "POST",
-      headers,
-      body: {
-        departmentName: form.departmentName,
-        description: form.description
-      }
+    await departmentService.createDepartment({
+      departmentName: form.departmentName,
+      description: form.description
     });
 
     await navigateTo("/dashboard/departments");
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to create department";
+    errorMessage.value =
+      error?.data?.message ||
+      "Unable to create department";
   } finally {
     loading.value = false;
   }

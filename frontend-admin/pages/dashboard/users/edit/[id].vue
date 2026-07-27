@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import roleService from "~/services/role.service";
+import departmentService from "~/services/department.service";
+import userService from "~/services/user.service";
+
 type Department = {
   id: number;
   departmentName: string;
@@ -37,9 +41,9 @@ definePageMeta({
 });
 
 const route = useRoute();
-const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
-const userId = route.params.id;
+
+const userId = Number(route.params.id);
 
 const roles = ref<Role[]>([]);
 const departments = ref<Department[]>([]);
@@ -48,7 +52,10 @@ const loading = ref(false);
 const pageLoading = ref(true);
 const errorMessage = ref("");
 const photoInputKey = ref(0);
-const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
+
+const canUpdateUser = computed(() =>
+  hasPermission("UPDATE_USER")
+);
 
 const employmentStatuses = [
   "ACTIVE",
@@ -71,18 +78,6 @@ const form = reactive({
   photo: null as File | null
 });
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return null;
-  }
-
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
-
 const formatDate = (value: string | null) => {
   return value ? value.substring(0, 10) : "";
 };
@@ -92,40 +87,21 @@ const selectPhoto = (event: Event) => {
   form.photo = input.files?.[0] || null;
 };
 
-const loadDepartments = async (headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Department[] }>(
-    `${config.public.apiBase}/departments`,
-    { headers }
-  );
-
-  departments.value = response.data;
+const loadDepartments = async () => {
+  departments.value = await departmentService.getDepartments();
 };
 
-const loadRoles = async (headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Role[] }>(
-    `${config.public.apiBase}/roles`,
-    { headers }
-  );
-
-  roles.value = response.data;
+const loadRoles = async () => {
+  roles.value = await roleService.getRoles();
 };
 
-const loadDesignations = async (departmentId: number, headers: Record<string, string>) => {
-  const response = await $fetch<{ data: Designation[] }>(
-    `${config.public.apiBase}/departments/${departmentId}/designations`,
-    { headers }
-  );
-
-  designations.value = response.data;
+const loadDesignations = async (departmentId: number) => {
+  designations.value =
+    await departmentService.getDepartmentDesignations(departmentId);
 };
 
-const loadUser = async (headers: Record<string, string>) => {
-  const response = await $fetch<{ data: UserProfile }>(
-    `${config.public.apiBase}/users/${userId}`,
-    { headers }
-  );
-
-  const user = response.data;
+const loadUser = async () => {
+  const user: UserProfile = await userService.getUser(userId);
 
   form.email = user.email;
   form.firstName = user.firstName;
@@ -138,7 +114,8 @@ const loadUser = async (headers: Record<string, string>) => {
   form.employmentStatus = user.employmentStatus || "ACTIVE";
   form.joiningDate = formatDate(user.joiningDate);
   form.photo = null;
-  photoInputKey.value += 1;
+
+  photoInputKey.value++;
 };
 
 watch(
@@ -155,16 +132,11 @@ watch(
       return;
     }
 
-    const headers = authHeaders();
-
-    if (!headers) {
-      return;
-    }
-
     try {
-      await loadDesignations(departmentId, headers);
+      await loadDesignations(departmentId);
     } catch (error: any) {
-      errorMessage.value = error?.data?.message || "Unable to load designations";
+      errorMessage.value =
+        error?.data?.message || "Unable to load designations";
     }
   }
 );
@@ -175,38 +147,26 @@ onMounted(async () => {
     return;
   }
 
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
-
   try {
     await Promise.all([
-      loadDepartments(headers),
-      loadRoles(headers)
+      loadDepartments(),
+      loadRoles()
     ]);
-    await loadUser(headers);
+
+    await loadUser();
 
     if (form.departmentId) {
-      await loadDesignations(form.departmentId, headers);
+      await loadDesignations(form.departmentId);
     }
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to load user";
+    errorMessage.value =
+      error?.data?.message || "Unable to load user";
   } finally {
     pageLoading.value = false;
   }
 });
 
 const saveUser = async () => {
-  const headers = authHeaders();
-
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
-  }
-
   loading.value = true;
   errorMessage.value = "";
 
@@ -228,15 +188,12 @@ const saveUser = async () => {
       body.append("photo", form.photo);
     }
 
-    await $fetch(`${config.public.apiBase}/users/${userId}`, {
-      method: "PUT",
-      headers,
-      body
-    });
+    await userService.updateUser(userId, body);
 
     await navigateTo("/dashboard/users");
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Update failed";
+    errorMessage.value =
+      error?.data?.message || "Update failed";
   } finally {
     loading.value = false;
   }
