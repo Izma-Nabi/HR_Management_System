@@ -1,5 +1,3 @@
--- DropForeignKey
-ALTER TABLE `attendance` DROP FOREIGN KEY `attendance_user_id_fkey`;
-
--- AddForeignKey
-ALTER TABLE `attendance` ADD CONSTRAINT `attendance_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- attendance.user_id is introduced by the later
+-- 20260727100000_link_attendance_to_users migration. The foreign key must be
+-- created there so a fresh shadow database can replay migrations in order.

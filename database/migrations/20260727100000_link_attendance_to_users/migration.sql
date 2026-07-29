@@ -41,7 +41,7 @@ DEALLOCATE PREPARE add_attendance_user_date_index_statement;
 SET @add_attendance_user_fk = (
   SELECT IF(
     COUNT(*) = 0,
-    'ALTER TABLE `attendance` ADD CONSTRAINT `attendance_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE',
+    'ALTER TABLE `attendance` ADD CONSTRAINT `attendance_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE',
     'SELECT 1'
   )
   FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`

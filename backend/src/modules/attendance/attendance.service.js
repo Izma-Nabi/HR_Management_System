@@ -5,6 +5,7 @@ const axios = require("axios");
 const attendanceRepository = require("./attendance.repository");
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1uNA77aFV8J1Mj8uKKKc0gnOQIXaD0WZ7uYgCWdNQE7w/export?format=xlsx";
+const PAKISTAN_TIME_ZONE = "Asia/Karachi";
 
 const padTwo = (value) => {
   return String(value).padStart(2, "0");
@@ -22,6 +23,129 @@ const timeFromParts = (hours, minutes = 0, seconds = 0) => {
   return `${padTwo(hours)}:${padTwo(minutes)}:${padTwo(seconds)}`;
 };
 
+const dateStringInPakistan = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PAKISTAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const valueByType = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${valueByType.year}-${valueByType.month}-${valueByType.day}`;
+};
+
+const dateAtUtcMidnight = (date) => {
+  const [year, month, day] = date.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const utcDateString = (date) => {
+  return date.toISOString().slice(0, 10);
+};
+
+const currentWeek = () => {
+  const today = dateStringInPakistan();
+  const todayDate = dateAtUtcMidnight(today);
+  const daysFromMonday = (todayDate.getUTCDay() + 6) % 7;
+  const startDate = new Date(todayDate);
+
+  startDate.setUTCDate(startDate.getUTCDate() - daysFromMonday);
+
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(startDate);
+
+    date.setUTCDate(date.getUTCDate() + index);
+
+    return utcDateString(date);
+  });
+
+  return {
+    today,
+    startDate: dates[0],
+    endDate: dates[6],
+    dates
+  };
+};
+
+const requestedWeek = (startDate) => {
+  if (!startDate) {
+    return currentWeek();
+  }
+
+  const start = dateAtUtcMidnight(startDate);
+
+  if (
+    utcDateString(start) !== startDate ||
+    start.getUTCDay() !== 1
+  ) {
+    throw new ApiError(
+      400,
+      "startDate must be a valid Monday"
+    );
+  }
+
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+
+    date.setUTCDate(date.getUTCDate() + index);
+
+    return utcDateString(date);
+  });
+
+  return {
+    today: dateStringInPakistan(),
+    startDate: dates[0],
+    endDate: dates[6],
+    dates
+  };
+};
+
+const isDateInCurrentWeek = (date) => {
+  const week = currentWeek();
+
+  return date >= week.startDate && date <= week.endDate;
+};
+
+const dayNameFromDate = (date) => {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "UTC"
+  }).format(dateAtUtcMidnight(date));
+};
+
+const dateOnlyFromValue = (value) => {
+  if (typeof value === "string") {
+    return value.slice(0, 10);
+  }
+
+  return value.toISOString().slice(0, 10);
+};
+
+const databaseInteger = (value) => {
+  return typeof value === "bigint" ? Number(value) : value;
+};
+
+const isMissingDailyAttendanceTable = (error) => {
+  return (
+    error?.code === "P2010" &&
+    (
+      String(error?.meta?.code || "") === "1146" ||
+      String(error?.meta?.message || "").includes("daily_attendance")
+    )
+  );
+};
+
+const dailyAttendanceUnavailableError = () => {
+  return new ApiError(
+    503,
+    "Daily attendance processing is not available yet"
+  );
+};
+
 const normalizeUserCode = (value) => {
   return String(value || "").trim();
 };
@@ -30,19 +154,14 @@ const userCodeKey = (value) => {
   return normalizeUserCode(value).toUpperCase();
 };
 
-const fullNameFromUser = (user) => {
-  return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
-};
-
 const sourceHashFromRecord = (record) => {
   return crypto
     .createHash("sha256")
     .update(JSON.stringify([
       record.userId,
       record.attendanceDate,
-      record.checkIn,
-      record.checkOut,
-      record.status,
+      record.eventType,
+      record.eventTime,
       record.remarks || ""
     ]))
     .digest("hex")
@@ -153,13 +272,6 @@ const parseExcelTime = (value) => {
   return timeFromParts(hours, minutes, seconds);
 };
 
-const VALID_STATUSES = [
-  "Present",
-  "Absent",
-  "Late",
-  "Leave"
-];
-
 const validateRow = (row, rowNumber) => {
 
   if (!normalizeUserCode(row["User Code"])) {
@@ -175,16 +287,6 @@ const validateRow = (row, rowNumber) => {
       `Row ${rowNumber}: Date is required.`
     );
   }
-
-  const status = String(row["Status"] || "").trim();
-
-  if (!VALID_STATUSES.includes(status)) {
-    throw new ApiError(
-      400,
-      `Row ${rowNumber}: Invalid Status '${status}'.`
-    );
-  }
-
 };
 
 
@@ -256,39 +358,259 @@ const importAttendance = async () => {
       );
     }
 
-    const attendanceRecord = {
-      userId: user.id,
-      userCode: user.userCode,
-      fullName: fullNameFromUser(user),
-      role: user.role?.roleName || "Unassigned",
-      department: user.department?.departmentName || "Unassigned",
-      attendanceDate: parsedRow.attendanceDate,
-      checkIn: parseExcelTime(row["Check-In"]),
-      checkOut: parseExcelTime(row["Check-Out"]),
-      status: row["Status"].toString().trim(),
-      remarks: row["Remarks"]?.toString().trim() || null
-    };
+    const eventTimes = [
+      {
+        eventType: "CHECK_IN",
+        time: parseExcelTime(row["Check-In"])
+      },
+      {
+        eventType: "CHECK_OUT",
+        time: parseExcelTime(row["Check-Out"])
+      }
+    ];
 
-    const sourceHash = sourceHashFromRecord(attendanceRecord);
-    const sourceOccurrence = (sourceHashCounts.get(sourceHash) || 0) + 1;
+    for (const event of eventTimes) {
+      if (!event.time) {
+        continue;
+      }
 
-    sourceHashCounts.set(sourceHash, sourceOccurrence);
+      const attendanceRecord = {
+        userId: user.id,
+        userCode: user.userCode,
+        departmentId: user.departmentId,
+        designationId: user.designationId,
+        attendanceDate: parsedRow.attendanceDate,
+        eventType: event.eventType,
+        eventTime: `${parsedRow.attendanceDate} ${event.time}`,
+        remarks: row["Remarks"]?.toString().trim() || null
+      };
+      const sourceHash = sourceHashFromRecord(attendanceRecord);
+      const sourceOccurrence = (sourceHashCounts.get(sourceHash) || 0) + 1;
 
-    attendanceRecord.sourceKey = `${sourceHash}:${sourceOccurrence}`;
+      sourceHashCounts.set(sourceHash, sourceOccurrence);
+      attendanceRecord.sourceKey = `${sourceHash}:${sourceOccurrence}`;
 
-    attendanceRecords.push(attendanceRecord);
+      attendanceRecords.push(attendanceRecord);
+    }
   }
 
   const result = await attendanceRepository.syncNewAttendance(attendanceRecords);
 
   return {
     totalRows: rows.length,
+    totalEvents: attendanceRecords.length,
     insertedRows: result.insertedRows,
     matchedRows: result.matchedRows,
     skippedRows: result.skippedRows
   };
 };
 
+const getMyCurrentWeek = async (userId, startDate) => {
+  const week = requestedWeek(startDate);
+  let summaries;
+
+  try {
+    summaries = await attendanceRepository.findDailyAttendanceForWeek(
+      userId,
+      week.startDate,
+      week.endDate
+    );
+  } catch (error) {
+    if (isMissingDailyAttendanceTable(error)) {
+      throw dailyAttendanceUnavailableError();
+    }
+
+    throw error;
+  }
+
+  const summaryByDate = new Map(
+    summaries.map((summary) => [summary.attendanceDate, summary])
+  );
+
+  const days = week.dates.map((attendanceDate) => {
+    const summary = summaryByDate.get(attendanceDate);
+    const dayName = dayNameFromDate(attendanceDate);
+    let status = summary?.status || "NO_RECORD";
+
+    if (!summary && attendanceDate > week.today) {
+      status = "UPCOMING";
+    } else if (!summary && ["Saturday", "Sunday"].includes(dayName)) {
+      status = "WEEKEND";
+    }
+
+    return {
+      dailyAttendanceId: summary ? databaseInteger(summary.id) : null,
+      attendanceDate,
+      dayName,
+      firstCheckIn: summary?.firstCheckIn || null,
+      finalCheckOut: summary?.finalCheckOut || null,
+      workedMinutes: summary
+        ? databaseInteger(summary.workedMinutes)
+        : null,
+      lateMinutes: summary
+        ? databaseInteger(summary.lateMinutes)
+        : null,
+      earlyLeaveMinutes: summary
+        ? databaseInteger(summary.earlyLeaveMinutes)
+        : null,
+      overtimeMinutes: summary
+        ? databaseInteger(summary.overtimeMinutes)
+        : null,
+      status,
+      source: summary?.source || null,
+      adjustmentReason: summary?.adjustmentReason || null,
+      canComplain: Boolean(
+        summary &&
+        isDateInCurrentWeek(attendanceDate) &&
+        attendanceDate <= week.today
+      )
+    };
+  });
+
+  return {
+    weekStart: week.startDate,
+    weekEnd: week.endDate,
+    today: week.today,
+    isCurrentWeek: week.startDate === currentWeek().startDate,
+    days
+  };
+};
+
+const getMyDayDetails = async (userId, attendanceDate) => {
+  let dailyAttendance;
+
+  try {
+    dailyAttendance = await attendanceRepository.findDailyAttendanceByDate(
+      userId,
+      attendanceDate
+    );
+  } catch (error) {
+    if (isMissingDailyAttendanceTable(error)) {
+      throw dailyAttendanceUnavailableError();
+    }
+
+    throw error;
+  }
+
+  const rawRecords = await attendanceRepository.findRawAttendanceForDay(
+    userId,
+    attendanceDate
+  );
+  const complaints = await attendanceRepository.findLatestComplaintsForRawAttendance(
+    userId,
+    rawRecords.map((record) => databaseInteger(record.id))
+  );
+  const latestComplaintByRawId = new Map();
+
+  for (const complaint of complaints) {
+    if (!latestComplaintByRawId.has(complaint.rawAttendanceId)) {
+      latestComplaintByRawId.set(complaint.rawAttendanceId, complaint);
+    }
+  }
+
+  const week = currentWeek();
+
+  return {
+    attendanceDate,
+    dailyAttendanceId: dailyAttendance
+      ? databaseInteger(dailyAttendance.id)
+      : null,
+    canComplain: Boolean(
+      dailyAttendance &&
+      isDateInCurrentWeek(attendanceDate) &&
+      attendanceDate <= week.today
+    ),
+    records: rawRecords.map((record) => ({
+      ...record,
+      id: databaseInteger(record.id),
+      userId: databaseInteger(record.userId),
+      complaint: latestComplaintByRawId.get(
+        databaseInteger(record.id)
+      ) || null
+    }))
+  };
+};
+
+const createAttendanceComplaint = async (userId, input) => {
+  let dailyAttendance;
+
+  try {
+    dailyAttendance = await attendanceRepository.findDailyAttendanceById(
+      input.dailyAttendanceId,
+      userId
+    );
+  } catch (error) {
+    if (isMissingDailyAttendanceTable(error)) {
+      throw dailyAttendanceUnavailableError();
+    }
+
+    throw error;
+  }
+
+  if (!dailyAttendance) {
+    throw new ApiError(
+      404,
+      "The selected daily attendance record was not found"
+    );
+  }
+
+  const attendanceDate = dailyAttendance.attendanceDate;
+  const week = currentWeek();
+
+  if (
+    !isDateInCurrentWeek(attendanceDate) ||
+    attendanceDate > week.today
+  ) {
+    throw new ApiError(
+      400,
+      "Attendance complaints can only be submitted for the current week"
+    );
+  }
+
+  const rawAttendance = await attendanceRepository.findRawAttendanceById(
+    input.rawAttendanceId,
+    userId,
+    attendanceDate
+  );
+
+  if (!rawAttendance) {
+    throw new ApiError(
+      404,
+      "The selected check-in/check-out record was not found"
+    );
+  }
+
+  const pendingComplaint = await attendanceRepository.findPendingComplaint(
+    userId,
+    databaseInteger(rawAttendance.id),
+    input.complaintType
+  );
+
+  if (pendingComplaint) {
+    throw new ApiError(
+      409,
+      "A pending complaint of this type already exists for the selected record"
+    );
+  }
+
+  const complaint = await attendanceRepository.createComplaint({
+    userId,
+    dailyAttendanceId: databaseInteger(dailyAttendance.id),
+    rawAttendanceId: databaseInteger(rawAttendance.id),
+    attendanceDate: dateAtUtcMidnight(attendanceDate),
+    complaintType: input.complaintType,
+    reason: input.reason
+  });
+
+  return {
+    ...complaint,
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
+  };
+};
+
 module.exports = {
+  createAttendanceComplaint,
+  getMyCurrentWeek,
+  getMyDayDetails,
   importAttendance
 };

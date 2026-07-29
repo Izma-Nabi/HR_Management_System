@@ -27,6 +27,21 @@ enum AttendanceStatus {
   Leave
 }
 
+enum AttendanceComplaintType {
+  CHECK_IN
+  CHECK_OUT
+  BOTH
+  STATUS
+  OTHER
+}
+
+enum AttendanceComplaintStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum LeaveRequestStatus {
   PENDING
   APPROVED
@@ -137,6 +152,7 @@ model User {
   leaveApprovalHistory LeaveApprovalHistory[] @relation("LeaveHistoryRefersTo")
 
   attendanceRecords Attendance[]
+  attendanceComplaints AttendanceComplaint[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
@@ -176,9 +192,33 @@ model Attendance {
   sourceKey      String?          @unique @map("source_key") @db.VarChar(128)
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
+  complaints     AttendanceComplaint[]
 
   @@index([userId, attendanceDate])
   @@map("attendance")
+}
+
+model AttendanceComplaint {
+  id                Int                       @id @default(autoincrement())
+  userId            Int                       @map("user_id") @db.UnsignedInt
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyAttendanceId Int                       @map("daily_attendance_id")
+  rawAttendanceId   Int                       @map("raw_attendance_id")
+  rawAttendance     Attendance                @relation(fields: [rawAttendanceId], references: [id], onDelete: Cascade)
+  attendanceDate    DateTime                  @map("attendance_date") @db.Date
+  complaintType     AttendanceComplaintType   @map("complaint_type")
+  reason            String                    @db.Text
+  status            AttendanceComplaintStatus @default(PENDING)
+  reviewNote        String?                   @map("review_note") @db.Text
+  reviewedAt        DateTime?                 @map("reviewed_at") @db.DateTime(0)
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  @@index([userId, attendanceDate])
+  @@index([dailyAttendanceId])
+  @@index([rawAttendanceId])
+  @@index([status])
+  @@map("attendance_complaints")
 }
 
 model LeaveRequest {

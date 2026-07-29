@@ -25,18 +25,8 @@ const findUsersByCodes = async (userCodes) => {
     select: {
       id: true,
       userCode: true,
-      firstName: true,
-      lastName: true,
-      role: {
-        select: {
-          roleName: true
-        }
-      },
-      department: {
-        select: {
-          departmentName: true
-        }
-      }
+      departmentId: true,
+      designationId: true
     }
   });
 };
@@ -62,9 +52,8 @@ const exactRecordCondition = (record) => {
   return Prisma.sql`(
     user_id = ${record.userId}
     AND attendance_date = ${record.attendanceDate}
-    AND ${equalsOrNull("check_in", record.checkIn)}
-    AND ${equalsOrNull("check_out", record.checkOut)}
-    AND status = ${record.status}
+    AND event_type = ${record.eventType}
+    AND event_time = ${record.eventTime}
     AND ${equalsOrNull("remarks", record.remarks)}
   )`;
 };
@@ -88,13 +77,11 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
     INSERT INTO attendance (
       user_id,
       user_code,
-      full_name,
-      role,
-      department,
+      department_id,
+      designation_id,
       attendance_date,
-      check_in,
-      check_out,
-      status,
+      event_type,
+      event_time,
       remarks,
       source_key,
       created_at,
@@ -103,13 +90,11 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
     SELECT
       ${record.userId},
       ${record.userCode},
-      ${record.fullName},
-      ${record.role},
-      ${record.department},
+      ${record.departmentId},
+      ${record.designationId},
       ${record.attendanceDate},
-      ${record.checkIn},
-      ${record.checkOut},
-      ${record.status},
+      ${record.eventType},
+      ${record.eventTime},
       ${record.remarks},
       ${record.sourceKey},
       ${pakistanNowSql()},
@@ -159,9 +144,182 @@ const getAttendanceCount = async () => {
   return prisma.attendance.count();
 };
 
+const findDailyAttendanceForWeek = async (userId, startDate, endDate) => {
+  return prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
+      TIME_FORMAT(first_check_in, '%H:%i:%s') AS firstCheckIn,
+      TIME_FORMAT(last_check_out, '%H:%i:%s') AS finalCheckOut,
+      working_minutes AS workedMinutes,
+      late_minutes AS lateMinutes,
+      early_leave_minutes AS earlyLeaveMinutes,
+      overtime_minutes AS overtimeMinutes,
+      CAST(attendance_status AS CHAR) AS status,
+      NULL AS source,
+      remarks AS adjustmentReason
+    FROM attendance_summary
+    WHERE user_id = ${userId}
+      AND attendance_date BETWEEN ${startDate} AND ${endDate}
+    ORDER BY attendance_date ASC
+  `;
+};
+
+const findDailyAttendanceByDate = async (userId, attendanceDate) => {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
+      TIME_FORMAT(first_check_in, '%H:%i:%s') AS firstCheckIn,
+      TIME_FORMAT(last_check_out, '%H:%i:%s') AS finalCheckOut,
+      working_minutes AS workedMinutes,
+      late_minutes AS lateMinutes,
+      early_leave_minutes AS earlyLeaveMinutes,
+      overtime_minutes AS overtimeMinutes,
+      CAST(attendance_status AS CHAR) AS status,
+      NULL AS source,
+      remarks AS adjustmentReason
+    FROM attendance_summary
+    WHERE user_id = ${userId}
+      AND attendance_date = ${attendanceDate}
+    LIMIT 1
+  `;
+
+  return rows[0] || null;
+};
+
+const findDailyAttendanceById = async (dailyAttendanceId, userId) => {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate
+    FROM attendance_summary
+    WHERE id = ${dailyAttendanceId}
+      AND user_id = ${userId}
+    LIMIT 1
+  `;
+
+  return rows[0] || null;
+};
+
+const findRawAttendanceForDay = async (userId, attendanceDate) => {
+  return prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      user_code AS userCode,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
+      CAST(event_type AS CHAR) AS eventType,
+      TIME_FORMAT(event_time, '%H:%i:%s') AS eventTime,
+      remarks
+    FROM attendance
+    WHERE user_id = ${userId}
+      AND attendance_date = ${attendanceDate}
+    ORDER BY event_time ASC, id ASC
+  `;
+};
+
+const findRawAttendanceById = async (rawAttendanceId, userId, attendanceDate) => {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
+      CAST(event_type AS CHAR) AS eventType,
+      TIME_FORMAT(event_time, '%H:%i:%s') AS eventTime,
+      remarks
+    FROM attendance
+    WHERE id = ${rawAttendanceId}
+      AND user_id = ${userId}
+      AND attendance_date = ${attendanceDate}
+    LIMIT 1
+  `;
+
+  return rows[0] || null;
+};
+
+const findLatestComplaintsForRawAttendance = async (userId, rawAttendanceIds) => {
+  if (!rawAttendanceIds.length) {
+    return [];
+  }
+
+  return prisma.attendanceComplaint.findMany({
+    where: {
+      userId,
+      rawAttendanceId: {
+        in: rawAttendanceIds
+      }
+    },
+    select: {
+      id: true,
+      rawAttendanceId: true,
+      complaintType: true,
+      reason: true,
+      status: true,
+      reviewNote: true,
+      reviewedAt: true,
+      createdAt: true,
+      updatedAt: true
+    },
+    orderBy: [
+      {
+        createdAt: "desc"
+      },
+      {
+        id: "desc"
+      }
+    ]
+  });
+};
+
+const findPendingComplaint = async (userId, rawAttendanceId, complaintType) => {
+  return prisma.attendanceComplaint.findFirst({
+    where: {
+      userId,
+      rawAttendanceId,
+      complaintType,
+      status: "PENDING"
+    },
+    select: {
+      id: true
+    }
+  });
+};
+
+const createComplaint = async (data) => {
+  return prisma.attendanceComplaint.create({
+    data,
+    select: {
+      id: true,
+      userId: true,
+      dailyAttendanceId: true,
+      rawAttendanceId: true,
+      attendanceDate: true,
+      complaintType: true,
+      reason: true,
+      status: true,
+      reviewNote: true,
+      reviewedAt: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  });
+};
+
 module.exports = {
   createManyAttendance,
+  createComplaint,
   deleteAttendanceByDates,
+  findDailyAttendanceByDate,
+  findDailyAttendanceById,
+  findDailyAttendanceForWeek,
+  findLatestComplaintsForRawAttendance,
+  findPendingComplaint,
+  findRawAttendanceById,
+  findRawAttendanceForDay,
   findUsersByCodes,
   getAttendanceCount,
   syncNewAttendance
