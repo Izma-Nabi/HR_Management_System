@@ -124,6 +124,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
+  passwordResetTokens PasswordResetToken[]
+  
   @@index([roleId])
   @@index([departmentId])
   @@map("users")
@@ -215,4 +217,23 @@ model LeaveApprovalHistory {
   @@index([leaveRequestId])
   @@index([refersTo])
   @@map("leave_approval_history")
+}
+
+
+model PasswordResetToken {
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  userId Int @map("user_id") @db.UnsignedInt
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @map("token_hash") @db.VarChar(255)
+
+  expiresAt DateTime @map("expires_at") @db.Timestamp(0)
+  usedAt    DateTime? @map("used_at") @db.Timestamp(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
