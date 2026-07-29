@@ -87,6 +87,48 @@ const countFromSummary = (value) => {
   return Number(value || 0);
 };
 
+const getEmployeeWeeklyAttendance = async (userId) => {
+
+  const today = new Date();
+
+  today.setHours(23, 59, 59, 999);
+
+  const monday = new Date(today);
+
+  monday.setHours(0, 0, 0, 0);
+
+  const day = monday.getDay();
+
+  const diff = day === 0 ? 6 : day - 1;
+
+  monday.setDate(monday.getDate() - diff);
+
+  return prisma.attendance.findMany({
+
+    where: {
+
+      userId,
+
+      attendanceDate: {
+
+        gte: monday,
+
+        lte: today
+
+      }
+
+    },
+
+    orderBy: {
+
+      attendanceDate: "asc"
+
+    }
+
+  });
+
+};
+
 const getSummary = async (scopeWhere = {}) => {
   const targetDate = currentAttendanceDateKey();
   const [summary] = await prisma.$queryRaw`
@@ -216,11 +258,47 @@ const getRecentAttendance = async (scopeWhere = {}, take = 10) => {
   `;
 };
 
+const getEmployeeTodayAttendance = async (userId) => {
 
+  const today = new Date();
+
+  today.setHours(0, 0, 0, 0);
+
+  const tomorrow = new Date(today);
+
+  tomorrow.setDate(today.getDate() + 1);
+
+  return prisma.attendance.findMany({
+
+    where: {
+
+      userId,
+
+      attendanceDate: {
+
+        gte: today,
+
+        lt: tomorrow
+
+      }
+
+    },
+
+    orderBy: {
+
+      eventTime: "asc"
+
+    }
+
+  });
+
+};
 module.exports = {
   getSummary,
   getAttendanceTrend,
   getDepartmentAttendance,
   getTopLateEmployees,
-  getRecentAttendance
+  getRecentAttendance,
+  getEmployeeTodayAttendance,
+  getEmployeeWeeklyAttendance
 };

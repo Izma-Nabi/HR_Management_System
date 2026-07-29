@@ -377,6 +377,10 @@ const importAttendance = async () => {
       const attendanceRecord = {
         userId: user.id,
         userCode: user.userCode,
+        fullName: [user.firstName, user.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || user.userCode,
         departmentId: user.departmentId,
         designationId: user.designationId,
         attendanceDate: parsedRow.attendanceDate,

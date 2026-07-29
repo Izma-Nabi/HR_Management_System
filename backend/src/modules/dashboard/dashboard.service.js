@@ -1,4 +1,5 @@
 const dashboardRepository = require("./dashboard.repository");
+const attendanceCalculator = require("../attendance/attendance.calculator");
 
 const hasPermission = (user, permission) => {
   return Array.isArray(user?.permissions) && user.permissions.includes(permission);
@@ -58,9 +59,23 @@ const teamScopeFromUser = (user) => {
   };
 };
 
-const ownScopeFromUser = (user) => {
+const uniqueEntriesByEventType = (records) => {
+  return records.filter(
+    (record, index, allRecords) =>
+      index === allRecords.findIndex(
+        (candidate) => candidate.eventType === record.eventType
+      )
+  );
+};
+
+const getEmployeeAttendance = async (user) => {
+  const todayAttendance = await dashboardRepository.getEmployeeTodayAttendance(
+    user.id
+  );
+
   return {
-    userId: Number(user?.id) || -1
+    today: attendanceCalculator.calculateEmployeeLiveAttendance(todayAttendance),
+    entries: uniqueEntriesByEventType(todayAttendance)
   };
 };
 
@@ -82,12 +97,7 @@ const getDashboard = async (user) => {
   }
 
   if (hasPermission(user, "VIEW_OWN_ATTENDANCE")) {
-    const ownAttendance = await getAttendanceBundle(ownScopeFromUser(user));
-
-    sections.ownAttendance = {
-      summary: ownAttendance.summary,
-      recentAttendance: ownAttendance.recentAttendance
-    };
+    sections.employeeAttendance = await getEmployeeAttendance(user);
   }
 
   return {

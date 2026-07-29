@@ -25,6 +25,8 @@ const findUsersByCodes = async (userCodes) => {
     select: {
       id: true,
       userCode: true,
+      firstName: true,
+      lastName: true,
       departmentId: true,
       designationId: true
     }
@@ -77,6 +79,7 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
     INSERT INTO attendance (
       user_id,
       user_code,
+      full_name,
       department_id,
       designation_id,
       attendance_date,
@@ -90,6 +93,7 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
     SELECT
       ${record.userId},
       ${record.userCode},
+      ${record.fullName},
       ${record.departmentId},
       ${record.designationId},
       ${record.attendanceDate},
