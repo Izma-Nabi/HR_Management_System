@@ -1,8 +1,14 @@
 const dashboardRepository = require("./dashboard.repository");
+const attendanceCalculator = require("../attendance/attendance.calculator");
+const attendanceRules = require("../../config/attendance.config");
 
 const hasPermission = (user, permission) => {
-  return Array.isArray(user?.permissions) && user.permissions.includes(permission);
+  return (
+    Array.isArray(user?.permissions) && 
+    user.permissions.includes(permission)
+  );
 };
+
 
 const withAttendancePercentage = (summary) => {
   const attendancePercentage =
@@ -21,6 +27,7 @@ const withAttendancePercentage = (summary) => {
     attendancePercentage
   };
 };
+
 
 const getAttendanceBundle = async (scopeWhere = {}) => {
   const [
@@ -46,10 +53,14 @@ const getAttendanceBundle = async (scopeWhere = {}) => {
   };
 };
 
+
 const teamScopeFromUser = (user) => {
-  const departmentNames = (user?.managedDepartments || [])
-    .map((department) => department.departmentName)
-    .filter(Boolean);
+  const departmentNames =
+    (user?.managedDepartments || [])
+      .map(
+        (department) => department.departmentName
+      )
+      .filter(Boolean);
 
   return {
     department: {
@@ -58,36 +69,92 @@ const teamScopeFromUser = (user) => {
   };
 };
 
-const ownScopeFromUser = (user) => {
+
+const getEmployeeAttendance = async (user) => {
+
+  const todayAttendance =
+    await dashboardRepository.getEmployeeTodayAttendance(
+      user.id
+    );
+
+  const today =
+    attendanceCalculator.calculateEmployeeLiveAttendance(
+      todayAttendance
+    );
+
   return {
-    userCode: user?.userCode || "__NO_USER_CODE__"
+
+    today,
+
+    entries:
+todayAttendance.filter(
+  (item, index, array) =>
+    index ===
+    array.findIndex(
+      x =>
+        x.eventType === item.eventType
+    )
+)
+
   };
+
 };
 
 const getDashboard = async (user) => {
   const sections = {};
 
-  if (hasPermission(user, "VIEW_SYSTEM_SUMMARY")) {
-    const systemAttendance = await getAttendanceBundle();
 
-    sections.systemSummary = systemAttendance.summary;
-    sections.attendanceTrend = systemAttendance.attendanceTrend;
-    sections.departmentAttendance = systemAttendance.departmentAttendance;
-    sections.topLateEmployees = systemAttendance.topLateEmployees;
-    sections.recentAttendance = systemAttendance.recentAttendance;
+  /*
+    SUPER ADMIN / ADMIN DASHBOARD
+  */
+
+  if (hasPermission(user, "VIEW_SYSTEM_SUMMARY")) {
+    const systemAttendance =
+      await getAttendanceBundle();
+
+
+    sections.systemSummary =
+      systemAttendance.summary;
+
+
+    sections.attendanceTrend =
+      systemAttendance.attendanceTrend;
+
+
+    sections.departmentAttendance =
+      systemAttendance.departmentAttendance;
+
+
+    sections.topLateEmployees =
+      systemAttendance.topLateEmployees;
+
+
+    sections.recentAttendance =
+      systemAttendance.recentAttendance;
   }
+
+
+  /*
+    TEAM LEAD DASHBOARD
+  */
 
   if (hasPermission(user, "VIEW_TEAM_ATTENDANCE")) {
-    sections.teamAttendance = await getAttendanceBundle(teamScopeFromUser(user));
+    sections.teamAttendance =
+      await getAttendanceBundle(
+        teamScopeFromUser(user)
+      );
   }
 
-  if (hasPermission(user, "VIEW_OWN_ATTENDANCE")) {
-    const ownAttendance = await getAttendanceBundle(ownScopeFromUser(user));
 
-    sections.ownAttendance = {
-      summary: ownAttendance.summary,
-      recentAttendance: ownAttendance.recentAttendance
-    };
+  /*
+    EMPLOYEE LIVE ATTENDANCE DASHBOARD
+  */
+
+  if (hasPermission(user, "VIEW_OWN_ATTENDANCE")) {
+    const employeeAttendance =
+      await getEmployeeAttendance(user);
+
+    sections.employeeAttendance = employeeAttendance;
   }
 
   return {
@@ -97,10 +164,11 @@ const getDashboard = async (user) => {
       role: user.role,
       permissions: user.permissions
     },
+
     sections
   };
-
 };
+
 
 module.exports = {
   getDashboard

@@ -26,18 +26,15 @@ const sourceHashFromRecord = (record) => {
   return crypto
     .createHash("sha256")
     .update(JSON.stringify([
+      record.userId,
       record.userCode,
-      record.fullName,
-      record.role,
-      record.department,
       record.attendanceDate,
-      record.checkIn,
-      record.checkOut,
-      record.status,
+      record.eventType,
+      record.eventTime,
       record.remarks || ""
     ]))
     .digest("hex")
-    .slice(0, 48);
+    .slice(0,48);
 };
 
 const parseExcelDate = (value) => {
@@ -144,11 +141,11 @@ const parseExcelTime = (value) => {
   return timeFromParts(hours, minutes, seconds);
 };
 
-const VALID_STATUSES = [
-  "Present",
-  "Absent",
-  "Late",
-  "Leave"
+const VALID_EVENT_TYPES = [
+  "CHECK_IN",
+  "CHECK_OUT",
+  "BREAK_START",
+  "BREAK_END"
 ];
 
 const validateRow = (row, rowNumber) => {
@@ -167,13 +164,6 @@ const validateRow = (row, rowNumber) => {
     );
   }
 
-  if (isMissing(row["Role"])) {
-    throw new ApiError(
-      400,
-      `Row ${rowNumber}: Role is required.`
-    );
-  }
-
   if (isMissing(row["Department"])) {
     throw new ApiError(
       400,
@@ -188,10 +178,12 @@ const validateRow = (row, rowNumber) => {
     );
   }
 
-  if (!VALID_STATUSES.includes(row["Status"])) {
+  const eventType = String(row["Event Type"] || "").trim();
+
+  if (!VALID_EVENT_TYPES.includes(eventType)) {
     throw new ApiError(
       400,
-      `Row ${rowNumber}: Invalid Status '${row["Status"]}'.`
+      `Row ${rowNumber}: Invalid Event Type '${eventType}'.`
     );
   }
 
@@ -207,8 +199,7 @@ const importAttendance = async () => {
     type: "buffer"
   });
 
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
   const rows = XLSX.utils.sheet_to_json(worksheet, {
     defval: null,
@@ -222,6 +213,19 @@ const importAttendance = async () => {
     };
   }
 
+  const userCodes = rows.map(
+    (row) => row["User Code"]
+  );
+
+  const users = await attendanceRepository.findUsersByCodes(userCodes);
+
+  const usersByCode = new Map(
+    users.map((user) => [
+      user.userCode.toUpperCase(),
+      user
+    ])
+  );
+
   const attendanceRecords = [];
   const sourceHashCounts = new Map();
 
@@ -230,38 +234,71 @@ const importAttendance = async () => {
 
     validateRow(row, index + 2);
 
-    const attendanceDate = parseExcelDate(row["Date"]);
+    const attendanceDate = parseExcelDate(
+      row["Date"]
+    );
 
     if (!attendanceDate) {
       throw new ApiError(
         400,
-        `Row ${index + 2}: Invalid Date.`
+        `Row ${index + 2}: Invalid Date`
       );
     }
 
+    const user = usersByCode.get(
+      String(row["User Code"]).toUpperCase()
+    );
+
+    if (!user) {
+      throw new ApiError(
+        400,
+        `Row ${index + 2}: User not found`
+      );
+    }
+
+    const eventTime = parseExcelTime(
+      row["Event Time"]
+    );
+
     const attendanceRecord = {
-      userCode: row["User Code"].toString().trim(),
-      fullName: row["Full Name"].toString().trim(),
-      role: row["Role"].toString().trim(),
-      department: row["Department"].toString().trim(),
+      userId: user.id,
+      userCode: user.userCode,
+      fullName: `${user.firstName} ${user.lastName}`,
+      departmentId: user.departmentId,
+      designationId: user.designationId,
       attendanceDate,
-      checkIn: parseExcelTime(row["Check-In"]),
-      checkOut: parseExcelTime(row["Check-Out"]),
-      status: row["Status"].toString().trim(),
+      eventType: row["Event Type"],
+      eventTime: combineDateTime(
+        attendanceDate,
+        parseExcelTime(row["Event Time"])
+      ),
+
       remarks: row["Remarks"]?.toString().trim() || null
-    };
+      };
 
-    const sourceHash = sourceHashFromRecord(attendanceRecord);
-    const sourceOccurrence = (sourceHashCounts.get(sourceHash) || 0) + 1;
+    const sourceHash = sourceHashFromRecord(
+      attendanceRecord
+    );
 
-    sourceHashCounts.set(sourceHash, sourceOccurrence);
+    const sourceOccurrence =
+      (sourceHashCounts.get(sourceHash) || 0) + 1;
 
-    attendanceRecord.sourceKey = `${sourceHash}:${sourceOccurrence}`;
+    sourceHashCounts.set(
+      sourceHash,
+      sourceOccurrence
+    );
 
-    attendanceRecords.push(attendanceRecord);
+    attendanceRecord.sourceKey =
+      `${sourceHash}:${sourceOccurrence}`;
+
+    attendanceRecords.push(
+      attendanceRecord
+    );
   }
 
-  const result = await attendanceRepository.syncNewAttendance(attendanceRecords);
+  const result = await attendanceRepository.syncNewAttendance(
+    attendanceRecords
+  );
 
   return {
     totalRows: rows.length,
@@ -271,6 +308,15 @@ const importAttendance = async () => {
   };
 };
 
+const combineDateTime = (date, time) => {
+  if (!date || !time) {
+    return null;
+  }
+
+  return `${date} ${time}`;
+};
+
 module.exports = {
-  importAttendance
+  importAttendance,
+  combineDateTime
 };

@@ -1,14 +1,54 @@
 <script setup lang="ts">
+definePageMeta({
+  layout: "dashboard"
+});
+
+const router = useRouter();
+
+const {
+  dashboard,
+  fetchDashboard
+} = useDashboard();
+
+
 onMounted(async () => {
   const token = localStorage.getItem("token");
 
-  await navigateTo(token ? "/dashboard" : "/login", { replace: true });
+  if (!token) {
+    await navigateTo("/login", {
+      replace: true
+    });
+
+    return;
+  }
+
+
+  await fetchDashboard();
+
+
+  const role =
+    dashboard.value?.user?.role;
+
+
+  if (role === "EMPLOYEE") {
+    await router.replace(
+      "/dashboard/employee"
+    );
+
+    return;
+  }
+
+
+  // Admin / Super Admin stay here
 });
 </script>
 
+
 <template>
   <main class="redirect-page">
-    <p>Loading...</p>
+    <p>
+      Loading dashboard...
+    </p>
   </main>
 </template>
 

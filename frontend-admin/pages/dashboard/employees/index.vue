@@ -1,378 +1,763 @@
 <script setup lang="ts">
-type EmployeeAccount = {
-  user: {
-    id: number;
-    fullName: string;
-    email: string;
-    status: string;
-  };
-  employee: {
-    id: number;
-    employeeCode: string;
-    firstName: string;
-    lastName: string;
-    phone: string | null;
-    photo: string | null;
-    department: {
-      id: number;
-      departmentName: string;
-    } | null;
-    designation: string | null;
-    joiningDate: string | null;
-  };
-};
 
 definePageMeta({
   layout: "dashboard"
 });
 
-const config = useRuntimeConfig();
-const { hasPermission } = useAuthUser();
 
-const employees = ref<EmployeeAccount[]>([]);
-const loading = ref(true);
-const search = ref("");
-const errorMessage = ref("");
-const canViewEmployees = computed(() => hasPermission("VIEW_EMPLOYEES"));
-const canCreateEmployee = computed(() => hasPermission("CREATE_EMPLOYEE"));
-const canUpdateUser = computed(() => hasPermission("UPDATE_USER"));
+const {
+  dashboard,
+  loading,
+  error,
+  fetchEmployeeDashboard
+} = useEmployeeDashboard();
 
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
 
-  if (!token) {
-    return null;
-  }
 
-  return {
-    Authorization: `Bearer ${token}`
-  };
-};
-
-const apiOrigin = computed(() => {
-  return String(config.public.apiBase).replace(/\/api\/?$/, "");
+const user = computed(() => {
+  return dashboard.value?.user || {};
 });
 
-const photoUrl = (photo: string | null) => {
-  if (!photo) {
-    return "";
+
+
+const employeeAttendance = computed(() => {
+  return dashboard.value?.sections?.employeeAttendance || {};
+});
+
+
+
+const today = computed(() => {
+  return employeeAttendance.value.today || {};
+});
+
+
+
+const weekly = computed(() => {
+  return employeeAttendance.value.weekly || {};
+});
+
+
+
+const entries = computed(() => {
+  return employeeAttendance.value.entries || [];
+});
+
+
+
+// get first check in of today
+const checkIn = computed(() => {
+
+  const record = entries.value.find(
+    (item:any) => item.eventType === "CHECK_IN"
+  );
+
+  return record?.eventTime || null;
+
+});
+
+
+
+// get last checkout of today
+const checkOut = computed(() => {
+
+  const record = [...entries.value]
+    .reverse()
+    .find(
+      (item:any) => item.eventType === "CHECK_OUT"
+    );
+
+  return record?.eventTime || null;
+
+});
+
+
+
+// realtime working hours
+const workingMinutes = computed(() => {
+
+
+  if (!checkIn.value) {
+
+    return today.value.workingMinutes || 0;
+
   }
 
-  if (photo.startsWith("http://") || photo.startsWith("https://")) {
-    return photo;
-  }
 
-  return `${apiOrigin.value}${photo}`;
+  const start = new Date(checkIn.value);
+
+  const end = checkOut.value
+    ? new Date(checkOut.value)
+    : new Date();
+
+
+  const diff = Math.floor(
+    (end.getTime() - start.getTime()) / 60000
+  );
+
+
+  return diff > 0 ? diff : 0;
+
+});
+
+
+
+const formatMinutes = (minutes:number)=>{
+
+  const hours = Math.floor(minutes / 60);
+
+  const mins = minutes % 60;
+
+
+  return `${hours}h ${mins}m`;
+
 };
 
-const employeeName = (employee: EmployeeAccount) => {
-  return `${employee.employee.firstName} ${employee.employee.lastName}`.trim();
-};
 
-const loadEmployees = async () => {
-  const headers = authHeaders();
 
-  if (!headers) {
-    await navigateTo("/login", { replace: true });
-    return;
+// status
+const attendanceStatus = computed(()=>{
+
+
+  if(!checkIn.value){
+
+    return "-";
+
   }
 
-  loading.value = true;
-  errorMessage.value = "";
 
-  try {
-    const response = await $fetch<{ data: EmployeeAccount[] }>(`${config.public.apiBase}/admin/employees`, {
-      headers
+  if(today.value.lateMinutes > 0){
+
+    return "LATE";
+
+  }
+
+
+  return "PRESENT";
+
+
+});
+
+
+const formatTime = (time:any)=>{
+
+  if(!time){
+    return "-";
+  }
+
+
+  const value =
+    String(time)
+      .replace("T"," ")
+      .split(".")[0];
+
+
+  const clock =
+    value.split(" ")[1];
+
+
+  if(!clock){
+    return "-";
+  }
+
+
+  const [hour,minute] =
+    clock.split(":");
+
+
+  const date = new Date();
+
+
+  date.setHours(
+    Number(hour),
+    Number(minute),
+    0
+  );
+
+
+  return date.toLocaleTimeString(
+    [],
+    {
+      hour:"2-digit",
+      minute:"2-digit"
+    }
+  );
+
+};
+
+const attendanceDate = computed(()=>{
+
+
+  if(entries.value.length){
+
+    return entries.value[0].attendanceDate;
+
+  }
+
+
+  return null;
+
+
+});
+
+
+
+const formatDate = (value:any)=>{
+
+
+  if(!value){
+
+    return "-";
+
+  }
+
+
+  return new Date(value)
+    .toLocaleDateString();
+
+
+};
+
+
+
+let refreshTimer:any = null;
+
+
+
+onMounted(async()=>{
+
+
+  await fetchEmployeeDashboard();
+
+
+
+  refreshTimer=setInterval(()=>{
+
+
+    fetchEmployeeDashboard({
+
+      silent:true
+
     });
 
-    employees.value = response.data;
-  } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to load employees";
-  } finally {
-    loading.value = false;
-  }
-};
 
-onMounted(async () => {
-  if (!canViewEmployees.value) {
-    await navigateTo("/dashboard", { replace: true });
-    return;
-  }
+  },30000);
 
-  await loadEmployees();
+
+
 });
 
-const filteredEmployees = computed(() => {
-  const keyword = search.value.toLowerCase();
 
-  return employees.value.filter((employee) => {
-    return employee.employee.employeeCode.toLowerCase().includes(keyword)
-      || employeeName(employee).toLowerCase().includes(keyword)
-      || employee.user.email.toLowerCase().includes(keyword)
-      || (employee.employee.department?.departmentName || "").toLowerCase().includes(keyword)
-      || (employee.employee.designation || "").toLowerCase().includes(keyword)
-      || (employee.employee.phone || "").toLowerCase().includes(keyword);
-  });
+
+onUnmounted(()=>{
+
+
+  if(refreshTimer){
+
+    clearInterval(refreshTimer);
+
+  }
+
+
 });
+
+
 </script>
 
 <template>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1>Employees</h1>
-        <p>{{ employees.length }} Employee(s)</p>
+  <div class="page-wrap">
+
+    <!-- Header -->
+
+    <div class="header-block">
+      <h1 class="page-title">
+        Welcome, {{ user.fullName || "User" }}
+      </h1>
+
+      <p class="page-subtitle">
+        {{ user.role || "Employee" }} Dashboard
+      </p>
+    </div>
+
+
+    <!-- Loading -->
+
+    <div
+      v-if="loading"
+      class="state-panel"
+    >
+      <div class="spinner"></div>
+      Loading dashboard...
+    </div>
+
+
+    <!-- Error -->
+
+    <div
+      v-else-if="error"
+      class="state-panel error-panel"
+    >
+      {{ error }}
+    </div>
+
+
+    <template v-else>
+
+      <!-- TODAY ATTENDANCE -->
+
+      <div class="section-block">
+        <h2 class="section-title">
+          Today's Attendance
+        </h2>
+
+
+        <div class="stats-row">
+
+
+          <!-- Check In -->
+
+          <div class="card">
+            <div class="card-icon icon-blue">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            </div>
+            <p class="card-label">Check In</p>
+            <h2 class="card-value">
+              {{ formatTime(today.checkIn) }}
+            </h2>
+          </div>
+
+
+
+          <!-- Check Out -->
+
+          <div class="card">
+            <div class="card-icon icon-rose">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </div>
+            <p class="card-label">Check Out</p>
+            <h2 class="card-value">
+              {{ formatTime(today.checkOut) }}
+            </h2>
+          </div>
+
+
+
+          <!-- Working -->
+
+          <div class="card">
+            <div class="card-icon icon-emerald">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <p class="card-label">Working Hours</p>
+            <h2 class="card-value">
+              {{ formatMinutes(workingMinutes) }}
+            </h2>
+          </div>
+
+
+
+          <!-- Late -->
+
+          <div class="card">
+            <div class="card-icon icon-amber">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <p class="card-label">Late Minutes</p>
+            <h2 class="card-value">
+              {{ today.lateMinutes || 0 }} min
+            </h2>
+          </div>
+
+
+
+          <!-- Extra -->
+
+          <div class="card">
+            <div class="card-icon icon-violet">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.24 7.76 2.83-2.83"/><path d="M18 12h4"/><path d="m16.24 16.24 2.83 2.83"/><path d="M12 18v4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M2 12h4"/><path d="m4.93 4.93 2.83 2.83"/></svg>
+            </div>
+            <p class="card-label">Extra Time</p>
+            <h2 class="card-value">
+              {{ formatMinutes(today.overtimeMinutes || 0) }}
+            </h2>
+          </div>
+
+
+        </div>
       </div>
 
-      <NuxtLink v-if="canCreateEmployee" to="/dashboard/users/add-employee" class="add-btn">
-        + Add Employee
-      </NuxtLink>
-    </div>
 
-    <div class="toolbar">
-      <input
-        v-model="search"
-        type="text"
-        placeholder="Search by code, name, email, department, designation, or phone..."
-      >
-    </div>
 
-    <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
 
-    <div v-if="loading" class="loading">
-      Loading employees...
-    </div>
 
-    <table v-else class="table">
-      <thead>
-        <tr>
-          <th>Employee</th>
-          <th>Code</th>
-          <th>Email</th>
-          <th>Department</th>
-          <th>Designation</th>
-          <th>Phone</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
+      <!-- TODAY DATE -->
 
-      <tbody>
-        <tr v-for="employee in filteredEmployees" :key="employee.employee.id">
-          <td>
-            <div class="employee-cell">
-              <img
-                v-if="employee.employee.photo"
-                :src="photoUrl(employee.employee.photo)"
-                :alt="employeeName(employee)"
-              >
-              <span v-else class="avatar-placeholder">
-                {{ employee.employee.firstName.charAt(0) }}{{ employee.employee.lastName.charAt(0) }}
-              </span>
+      <div class="panel">
 
-              <span>{{ employeeName(employee) }}</span>
-            </div>
-          </td>
-          <td>{{ employee.employee.employeeCode }}</td>
-          <td>{{ employee.user.email }}</td>
-          <td>{{ employee.employee.department?.departmentName || "-" }}</td>
-          <td>{{ employee.employee.designation || "-" }}</td>
-          <td>{{ employee.employee.phone || "-" }}</td>
-          <td>
-            <span class="status" :class="employee.user.status.toLowerCase()">
-              {{ employee.user.status }}
-            </span>
-          </td>
-          <td>
-            <NuxtLink
-              v-if="canUpdateUser"
-              class="edit"
-              :to="`/dashboard/users/edit/${employee.user.id}`"
+        <h2 class="panel-title">
+          Attendance Date
+        </h2>
+
+
+        <p class="panel-text">
+          {{ formatDate(today.date || new Date()) }}
+        </p>
+
+      </div>
+
+
+
+
+
+      <!-- TODAY EVENTS -->
+
+      <div class="panel table-panel">
+
+        <div class="panel-header">
+
+          <h2 class="panel-title">
+            Today's Attendance Events
+          </h2>
+
+        </div>
+
+
+
+        <div class="table-scroll">
+
+        <table class="events-table">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Event
+              </th>
+
+
+              <th>
+                Time
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+
+          <tbody>
+
+            <tr
+              v-for="item in entries"
+              :key="item.id"
             >
-              Edit User
-            </NuxtLink>
-          </td>
-        </tr>
-      </tbody>
-    </table>
 
-    <div v-if="!loading && filteredEmployees.length === 0" class="empty">
-      No employees found.
-    </div>
+              <td>
+                <span
+                  class="event-badge"
+                  :class="item.eventType === 'CHECK_IN' ? 'badge-in' : 'badge-out'"
+                >
+                  {{ item.eventType }}
+                </span>
+              </td>
+
+
+              <td class="event-time">
+                {{ formatTime(item.eventTime) }}
+              </td>
+
+            </tr>
+
+
+
+            <tr v-if="entries.length === 0">
+
+              <td
+                colspan="2"
+                class="empty-state"
+              >
+                No attendance events today.
+              </td>
+
+            </tr>
+
+
+          </tbody>
+
+        </table>
+
+        </div>
+
+      </div>
+
+
+    </template>
+
+
   </div>
 </template>
 
 <style scoped>
-.page {
-  max-width: 1200px;
+* {
+  box-sizing: border-box;
 }
 
-.page-header {
+.page-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 4px;
+}
+
+/* Header */
+.header-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.page-subtitle {
+  color: #6b7280;
+  font-size: 15px;
+}
+
+/* Loading / error states */
+.state-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 25px;
+  justify-content: center;
+  gap: 12px;
+  font-weight: 500;
 }
 
-.page-header h1 {
-  margin: 0 0 6px;
-  color: #1f2937;
-  font-size: 30px;
+.error-panel {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
-.page-header p {
-  margin: 0;
-  color: #6b7280;
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
-.add-btn {
-  padding: 10px 18px;
-  color: #ffffff;
-  text-decoration: none;
-  background: #4f46e5;
-  border-radius: 8px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Section */
+.section-title {
+  font-size: 18px;
   font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
 }
 
-.toolbar {
-  margin-bottom: 20px;
+/* Stats row - always horizontal in a single line */
+.stats-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
 }
 
-.toolbar input {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  outline: none;
+.stats-row::-webkit-scrollbar {
+  height: 6px;
 }
 
-.table {
-  width: 100%;
+.stats-row::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.card {
+  flex: 1 1 0;
+  min-width: 170px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  border-collapse: collapse;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid #f1f5f9;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-blue {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.icon-rose {
+  background: #fef2f2;
+  color: #e11d48;
+}
+
+.icon-emerald {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.icon-amber {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.icon-violet {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.card-label {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Generic panel */
+.panel {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid #f1f5f9;
+  padding: 20px;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.panel-text {
+  color: #6b7280;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.table-panel {
+  padding: 0;
   overflow: hidden;
 }
 
-th,
-td {
-  padding: 12px;
+.panel-header {
+  padding: 20px 20px 12px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Table */
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.events-table thead {
+  background: #f9fafb;
+}
+
+.events-table th {
   text-align: left;
-  border-bottom: 1px solid #eef2f7;
-  vertical-align: middle;
-}
-
-th {
-  color: #4b5563;
-  font-size: 13px;
+  padding: 12px 20px;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 12px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.employee-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 180px;
-  font-weight: 800;
+.events-table td {
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  color: #111827;
 }
 
-.employee-cell img,
-.avatar-placeholder {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  border-radius: 50%;
+.event-time {
+  color: #374151;
+  font-variant-numeric: tabular-nums;
 }
 
-.employee-cell img {
-  object-fit: cover;
-  border: 1px solid #e5e7eb;
-}
-
-.avatar-placeholder {
-  display: inline-grid;
-  place-items: center;
-  color: #ffffff;
-  background: #4f46e5;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.status {
+.event-badge {
   display: inline-flex;
-  padding: 4px 8px;
-  color: #0f6b3d;
-  background: #ecfdf3;
-  border: 1px solid #b7ebc9;
+  align-items: center;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
-.status.inactive,
-.status.suspended {
-  color: #9f1d1d;
-  background: #fff0f0;
-  border-color: #f4c7c7;
+.badge-in {
+  background: #ecfdf5;
+  color: #059669;
 }
 
-.edit {
-  display: inline-flex;
-  min-height: 36px;
-  align-items: center;
-  padding: 8px 12px;
-  color: #ffffff;
-  background: #4f46e5;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: 800;
+.badge-out {
+  background: #fef2f2;
+  color: #e11d48;
 }
 
-.loading,
-.empty,
-.notice {
-  padding: 14px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-weight: 700;
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  color: #9ca3af;
 }
 
-.notice.error {
-  color: #9f1d1d;
-  background: #fff0f0;
-  border-color: #f4c7c7;
-}
-
-@media (max-width: 900px) {
-  .page-header {
-    align-items: stretch;
-    flex-direction: column;
+/* Responsive */
+@media (max-width: 768px) {
+  .card {
+    min-width: 150px;
   }
 
-  .table,
-  thead,
-  tbody,
-  tr,
-  th,
-  td {
-    display: block;
-  }
-
-  thead {
-    display: none;
-  }
-
-  tr {
-    padding: 10px 0;
-    border-bottom: 1px solid #eef2f7;
-  }
-
-  td {
-    border-bottom: 0;
+  .card-value {
+    font-size: 19px;
   }
 }
 </style>
