@@ -118,6 +118,7 @@ const syncNewAttendance = async (records) => {
   if (!records.length) {
     return {
       insertedRows: 0,
+      matchedRows: 0,
       skippedRows: 0
     };
   }

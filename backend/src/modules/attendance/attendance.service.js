@@ -154,6 +154,39 @@ const userCodeKey = (value) => {
   return normalizeUserCode(value).toUpperCase();
 };
 
+const ATTENDANCE_EVENT_TYPES = new Set([
+  "CHECK_IN",
+  "CHECK_OUT",
+  "BREAK_START",
+  "BREAK_END"
+]);
+
+const EVENT_TYPE_ALIASES = new Map([
+  ["CHECKIN", "CHECK_IN"],
+  ["CHECK_IN", "CHECK_IN"],
+  ["IN", "CHECK_IN"],
+  ["CHECKOUT", "CHECK_OUT"],
+  ["CHECK_OUT", "CHECK_OUT"],
+  ["OUT", "CHECK_OUT"],
+  ["BREAKSTART", "BREAK_START"],
+  ["BREAK_START", "BREAK_START"],
+  ["BREAKEND", "BREAK_END"],
+  ["BREAK_END", "BREAK_END"]
+]);
+
+const normalizeEventType = (value) => {
+  if (isMissing(value)) {
+    return null;
+  }
+
+  const key = String(value)
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  return EVENT_TYPE_ALIASES.get(key) || (ATTENDANCE_EVENT_TYPES.has(key) ? key : null);
+};
+
 const sourceHashFromRecord = (record) => {
   return crypto
     .createHash("sha256")
@@ -289,6 +322,52 @@ const validateRow = (row, rowNumber) => {
   }
 };
 
+const eventsFromRow = (row, rowNumber) => {
+  const eventTypeValue = row["Event Type"];
+  const eventTimeValue = row["Event Time"];
+  const usesEventRowFormat =
+    !isMissing(eventTypeValue) ||
+    !isMissing(eventTimeValue);
+
+  if (usesEventRowFormat) {
+    const eventType = normalizeEventType(eventTypeValue);
+
+    if (!eventType) {
+      throw new ApiError(
+        400,
+        `Row ${rowNumber}: Event Type must be CHECK_IN, CHECK_OUT, BREAK_START, or BREAK_END.`
+      );
+    }
+
+    const time = parseExcelTime(eventTimeValue);
+
+    if (!time) {
+      throw new ApiError(
+        400,
+        `Row ${rowNumber}: Event Time is required and must be a valid time.`
+      );
+    }
+
+    return [
+      {
+        eventType,
+        time
+      }
+    ];
+  }
+
+  return [
+    {
+      eventType: "CHECK_IN",
+      time: parseExcelTime(row["Check-In"])
+    },
+    {
+      eventType: "CHECK_OUT",
+      time: parseExcelTime(row["Check-Out"])
+    }
+  ].filter((event) => event.time);
+};
+
 
 const importAttendance = async () => {
   const response = await axios.get(GOOGLE_SHEET_URL, {
@@ -358,22 +437,9 @@ const importAttendance = async () => {
       );
     }
 
-    const eventTimes = [
-      {
-        eventType: "CHECK_IN",
-        time: parseExcelTime(row["Check-In"])
-      },
-      {
-        eventType: "CHECK_OUT",
-        time: parseExcelTime(row["Check-Out"])
-      }
-    ];
+    const eventTimes = eventsFromRow(row, parsedRow.rowNumber);
 
     for (const event of eventTimes) {
-      if (!event.time) {
-        continue;
-      }
-
       const attendanceRecord = {
         userId: user.id,
         userCode: user.userCode,

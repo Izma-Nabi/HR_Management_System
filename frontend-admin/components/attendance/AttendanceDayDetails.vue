@@ -62,13 +62,17 @@ const formatTime = (time: string | null) => {
 const statusClass = (status: string) => {
   return status.toLowerCase().replaceAll("_", "-");
 };
+
+const logNumber = (index: number) => {
+  return String(index + 1).padStart(2, "0");
+};
 </script>
 
 <template>
   <section class="day-details" aria-labelledby="attendance-detail-heading">
     <header class="details-header">
       <div>
-        <p>Attendance details</p>
+        <p>Complete event log</p>
         <h2 id="attendance-detail-heading">{{ heading }}</h2>
       </div>
       <span class="record-count">
@@ -82,13 +86,14 @@ const statusClass = (status: string) => {
     </div>
 
     <div v-else-if="props.records.length === 0" class="state-message">
-      No check-in or check-out records found for this day.
+      No attendance events found for this day.
     </div>
 
     <div v-else class="table-scroll">
       <table>
         <thead>
           <tr>
+            <th scope="col" class="sequence-column">#</th>
             <th scope="col">Event</th>
             <th scope="col">Time</th>
             <th scope="col">Remarks</th>
@@ -96,7 +101,13 @@ const statusClass = (status: string) => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in props.records" :key="record.id">
+          <tr
+            v-for="(record, index) in props.records"
+            :key="record.id"
+          >
+            <td class="sequence-column">
+              {{ logNumber(index) }}
+            </td>
             <td>
               <span
                 class="event-type"
@@ -187,7 +198,7 @@ const statusClass = (status: string) => {
 
 table {
   width: 100%;
-  min-width: 620px;
+  min-width: 680px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -214,6 +225,13 @@ tbody tr:last-child td {
 
 tbody tr:hover {
   background: #fbfdff;
+}
+
+.sequence-column {
+  width: 56px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .time {

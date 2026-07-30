@@ -26,8 +26,10 @@ onMounted(async () => {
   await fetchDashboard();
 
 
-  const role =
-    dashboard.value?.user?.role;
+  const role = String(dashboard.value?.user?.role || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
 
 
   if (role === "EMPLOYEE") {
@@ -38,8 +40,7 @@ onMounted(async () => {
     return;
   }
 
-
-  // Admin / Super Admin stay here
+  await router.replace("/dashboard");
 });
 </script>
 
