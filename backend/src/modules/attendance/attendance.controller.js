@@ -57,9 +57,23 @@ const createComplaint = asyncHandler(async (req, res) => {
   );
 });
 
+const getMyTodayAttendance = asyncHandler(async (req, res) => {
+  const result =
+    await attendanceService.getMyTodayAttendance(req.user.id);
+
+  return sendSuccess(
+    res,
+    200,
+    "Today's attendance fetched successfully",
+    result
+  );
+});
+
+
 module.exports = {
   createComplaint,
   getMyCurrentWeek,
   getMyDayDetails,
-  importAttendance
+  importAttendance,
+  getMyTodayAttendance
 };

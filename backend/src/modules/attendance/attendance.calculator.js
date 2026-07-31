@@ -69,6 +69,45 @@ const calculateWorkingMinutes = (
   );
 };
 
+// Pair CHECK_IN/CHECK_OUT events chronologically and sum each session's
+// duration. Also counts a still-open CHECK_IN (no matching CHECK_OUT yet)
+// as ongoing up to "now". This replaces naive first-check-in -> last-checkout
+// math, which incorrectly counts breaks between sessions as working time.
+const calculatePairedWorkingMinutes = (events) => {
+  let totalMinutes = 0;
+  let activeCheckIn = null;
+
+  const sortedEvents = [...events].sort(
+    (a, b) => new Date(a.eventTime) - new Date(b.eventTime)
+  );
+
+  for (const event of sortedEvents) {
+    if (event.eventType === "CHECK_IN") {
+      activeCheckIn = new Date(event.eventTime);
+    }
+
+    if (event.eventType === "CHECK_OUT" && activeCheckIn) {
+      const end = new Date(event.eventTime);
+
+      totalMinutes += Math.max(
+        0,
+        Math.floor((end - activeCheckIn) / 60000)
+      );
+
+      activeCheckIn = null;
+    }
+  }
+
+  if (activeCheckIn) {
+    totalMinutes += Math.max(
+      0,
+      Math.floor((new Date() - activeCheckIn) / 60000)
+    );
+  }
+
+  return totalMinutes;
+};
+
 // Get employee events of one day
 const getAttendanceEvents = async (
   userId,
@@ -126,7 +165,7 @@ const calculateDailySummary = async (
 
 
   const workingMinutes =
-    calculateWorkingMinutes(events);
+    calculatePairedWorkingMinutes(events);
 
 
 
@@ -493,14 +532,15 @@ const formatMinutes = (minutes) => {
 
   minutes = Number(minutes || 0);
 
-  const hours = Math.floor(minutes / 60);
+  const hours =
+    Math.floor(minutes / 60);
 
-  const remainingMinutes = minutes % 60;
+  const mins =
+    minutes % 60;
 
+  return `${hours}h ${String(mins).padStart(2, "0")}m`;
 
-  return `${hours}h ${remainingMinutes}m`;
 };
-
 
 const calculateCurrentWorkingMinutes = (
   checkIn,
@@ -511,168 +551,219 @@ const calculateCurrentWorkingMinutes = (
     return 0;
   }
 
-
   const start = new Date(checkIn);
 
   const end = checkOut
     ? new Date(checkOut)
     : new Date();
 
-
-  const diff =
-    Math.floor(
-      (end - start) / 60000
-    );
-
-
-  return Math.max(0, diff);
+  return Math.max(
+    0,
+    Math.floor((end.getTime() - start.getTime()) / 60000)
+  );
 
 };
 
+const calculateEmployeeLiveAttendance = (records) => {
 
-
-const calculateEmployeeLiveAttendance = (
-  records
-) => {
-
-
-  if (!records.length) {
-
+  if (!records || !records.length) {
     return {
-
       checkIn: null,
-
       checkOut: null,
-
       workingMinutes: 0,
-
-      workingHours: "0h 0m",
-
+      workingHours: "0h 00m",
       lateMinutes: 0,
-
+      lateTime: "00:00",
       overtimeMinutes: 0,
-
+      overtimeHours: "0h 00m",
       status: "ABSENT"
-
     };
-
   }
 
-
-
-  const checkInRecord =
-    records.find(
-      r => r.eventType === "CHECK_IN"
-    );
-
-
-
-  const checkOutRecord =
-    records
-      .filter(
-        r => r.eventType === "CHECK_OUT"
-      )
-      .pop();
-
-
-
-let workingMinutes =
-  calculateCurrentWorkingMinutes(
-    checkInRecord?.eventTime,
-    checkOutRecord?.eventTime
+  const sortedRecords = [...records].sort(
+    (a,b) =>
+      new Date(a.eventTime) - new Date(b.eventTime)
   );
 
-if (workingMinutes > 240) {
-  workingMinutes -= 60;
-}
+  /*
+    First check-in only for late calculation
+  */
+  const firstCheckIn =
+    sortedRecords.find(
+      (r) =>
+        r.eventType === "CHECK_IN"
+    );
 
+  /*
+    Last checkout
+  */
+  const lastCheckOut =
+    [...sortedRecords]
+      .reverse()
+      .find(
+        (r) =>
+          r.eventType === "CHECK_OUT"
+      );
 
+  let totalSeconds = 0;
+  let overtimeSeconds = 0;
+  let activeCheckIn = null;
 
-  const officeStart =
-    attendanceRules.office.startMinutes;
+  // Office end (6 PM) as an actual Date on this attendance day, so we
+  // can measure overlap of each session with the post-6PM window.
+  const officeEndDate = new Date(
+    `${records[0].attendanceDate}T00:00:00`
+  );
 
+  officeEndDate.setMinutes(
+    officeEndDate.getMinutes() +
+    attendanceRules.office.endMinutes
+  );
 
+  // How much of a [start, end] session falls after office end (6 PM),
+  // regardless of how many total hours were worked that day.
+  const overlapWithOvertime = (start, end) => {
+    const overtimeStart =
+      start > officeEndDate ? start : officeEndDate;
 
+    return Math.max(0, (end - overtimeStart) / 1000);
+  };
+
+  /*
+    Calculate all working sessions
+
+    IN  -> OUT
+    IN  -> OUT
+    IN  -> NOW
+  */
+  for (const record of sortedRecords) {
+
+    if (record.eventType === "CHECK_IN") {
+      activeCheckIn = record.eventTime;
+    }
+
+    if (
+      record.eventType === "CHECK_OUT" &&
+      activeCheckIn
+    ) {
+
+      const start =
+        new Date(
+          `${records[0].attendanceDate}T${activeCheckIn}`
+        );
+
+      const end =
+        new Date(
+          `${records[0].attendanceDate}T${record.eventTime}`
+        );
+
+      totalSeconds +=
+        Math.max(
+          0,
+          (end - start) / 1000
+        );
+
+      overtimeSeconds += overlapWithOvertime(start, end);
+
+      activeCheckIn = null;
+    }
+  }
+
+  /*
+    Still working after last check-in
+  */
+  if (activeCheckIn) {
+
+    const start =
+      new Date(
+        `${records[0].attendanceDate}T${activeCheckIn}`
+      );
+
+    const now =
+      new Date();
+
+    totalSeconds +=
+      Math.max(
+        0,
+        (now - start) / 1000
+      );
+
+    overtimeSeconds += overlapWithOvertime(start, now);
+  }
+
+  const workingMinutes =
+    Math.floor(
+      totalSeconds / 60
+    );
+
+  /*
+    Late calculation ONLY FIRST CHECK-IN
+  */
   let lateMinutes = 0;
 
+  if (firstCheckIn) {
 
-
-  if(checkInRecord){
-
-    const checkIn =
-      new Date(
-        checkInRecord.eventTime
-      );
+    const checkInDate =
+    new Date(firstCheckIn.eventTime);
 
 
     const actualMinutes =
-      checkIn.getHours() * 60 +
-      checkIn.getMinutes();
+      checkInDate.getHours() * 60 +
+      checkInDate.getMinutes();
 
+    const allowed =
+      attendanceRules.office.startMinutes +
+      attendanceRules.office.graceMinutes;
 
     lateMinutes =
       Math.max(
         0,
-        actualMinutes -
-        officeStart -
-        attendanceRules.office.graceMinutes
+        actualMinutes - allowed
       );
-
   }
 
-
-
-const overtimeMinutes =
-  Math.max(
-    0,
-    workingMinutes -
-    attendanceRules.office.workingMinutes
-  );
-
-
-  let status="WORKING";
-
-
-  if(checkOutRecord){
-    status="COMPLETED";
-  }
-
+  /*
+    Overtime = time worked after 6 PM (office end), regardless of
+    total hours worked that day. Tracked per-session above so it
+    correctly counts time from every session that spills past 6 PM,
+    not just the most recent one.
+  */
+  const overtimeMinutes =
+    Math.floor(overtimeSeconds / 60);
 
   return {
 
     checkIn:
-      checkInRecord?.eventTime || null,
-
+      firstCheckIn?.eventTime || null,
 
     checkOut:
-      checkOutRecord?.eventTime || null,
-
+      lastCheckOut?.eventTime || null,
 
     workingMinutes,
-
 
     workingHours:
       formatMinutes(
         workingMinutes
       ),
 
-
     lateMinutes,
 
     lateTime:
-      formatHHMM(lateMinutes),
+      formatHHMM(
+        lateMinutes
+      ),
 
     overtimeMinutes,
-
 
     overtimeHours:
       formatMinutes(
         overtimeMinutes
       ),
 
-
-    status
-
+    status:
+      activeCheckIn
+        ? "WORKING"
+        : "COMPLETED"
   };
 
 };
@@ -681,6 +772,7 @@ module.exports = {
   calculateTodayAttendance,
   calculateWeeklyMinutes,
   calculateWorkingMinutes,
+  calculatePairedWorkingMinutes,
   calculateLateMinutes,
   calculateOvertimeMinutes,
   formatMinutes,

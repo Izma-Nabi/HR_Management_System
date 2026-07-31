@@ -32,6 +32,13 @@ router.get(
   attendanceController.getMyDayDetails
 );
 
+router.get(
+  "/my/today",
+  authMiddleware,
+  canViewOwnAttendance,
+  attendanceController.getMyTodayAttendance
+);
+
 router.post(
   "/complaints",
   authMiddleware,
