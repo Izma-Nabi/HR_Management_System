@@ -100,7 +100,7 @@ const filteredUsers = computed(() => {
         <p>{{ users.length }} user(s)</p>
       </div>
 
-      <NuxtLink v-if="canCreateUser" to="/dashboard/users/add" class="add-btn">
+      <NuxtLink v-if="canCreateUser" to="/dashboard/users/create" class="add-btn">
         Create User
       </NuxtLink>
     </div>

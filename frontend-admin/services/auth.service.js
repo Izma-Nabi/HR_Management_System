@@ -64,11 +64,41 @@ const clearSession = () => {
   localStorage.removeItem("user");
 };
 
+const forgotPassword = async (email) => {
+  const config = useRuntimeConfig();
+
+  return $fetch(`${config.public.apiBase}/forgot-password`, {
+    method: "POST",
+    body: {
+      email
+    }
+  });
+};
+
+const resetPassword = async ({
+  token,
+  password,
+  confirmPassword
+}) => {
+  const config = useRuntimeConfig();
+
+  return $fetch(`${config.public.apiBase}/reset-password`, {
+    method: "POST",
+    body: {
+      token,
+      password,
+      confirmPassword
+    }
+  });
+};
+
 export default {
   getAuthHeaders,
   login,
   me,
   logout,
+  forgotPassword,
+  resetPassword,
   setSession,
   clearSession
 };

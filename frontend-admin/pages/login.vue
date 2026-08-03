@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import authService from "~/services/auth.service";
+const showPassword = ref(false);
 
 type LoginResponse = {
   success: boolean;
@@ -102,14 +103,40 @@ const loginUser = async () => {
 
         <label class="field">
           <span>Password</span>
-          <input
-            v-model="form.password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="Enter password"
-            required
-          >
+
+          <div class="password-wrapper">
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="Enter password"
+              required
+            >
+
+            <button
+              type="button"
+              class="eye-button"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
         </label>
+
+      <div class="forgot-password">
+        <NuxtLink to="/forgot-password">
+          Forgot Password?
+        </NuxtLink>
+      </div>
 
         <button class="primary-button" type="submit" :disabled="loading">
           {{ loading ? "Signing in..." : "Sign in" }}
@@ -233,4 +260,56 @@ h1 {
   background: #fff0f0;
   border: 1px solid #f4c7c7;
 }
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper input {
+  padding-right: 48px;
+}
+
+.eye-button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 6px;
+  color: #6b7280;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.eye-button:hover {
+  color: #374151;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.eye-button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.forgot-password {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.forgot-password a {
+  color: #1f6feb;
+  font-size: 14px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+
 </style>

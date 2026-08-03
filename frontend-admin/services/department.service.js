@@ -65,6 +65,7 @@ const getDepartmentDesignations = async (departmentId) => {
   return response.data;
 };
 
+
 export default {
   getDepartments,
   getDepartment,

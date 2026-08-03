@@ -1,5 +1,15 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (!process.client || to.path === "/login") {
+  if (!process.client) {
+    return;
+  }
+
+  const publicRoutes = [
+    "/login",
+    "/forgot-password",
+    "/reset-password"
+  ];
+
+  if (publicRoutes.includes(to.path)) {
     return;
   }
 
@@ -21,7 +31,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     });
 
     authUser.value = response.data.user;
-    localStorage.setItem("user", JSON.stringify(response.data.user));
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify(response.data.user)
+    );
+
   } catch {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
