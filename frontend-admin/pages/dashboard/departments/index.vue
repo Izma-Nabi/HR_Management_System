@@ -91,83 +91,145 @@ const deleteDepartment = async (id: number) => {
     errorMessage.value = error?.data?.message || "Delete failed";
   }
 };
+
+const initials = (first: string, last: string | null) => {
+  const a = first?.charAt(0) || "";
+  const b = last?.charAt(0) || "";
+  return (a + b).toUpperCase();
+};
 </script>
 
 <template>
   <div class="page">
     <div class="page-header">
       <div>
+        <p class="eyebrow">Organization</p>
         <h1>Departments</h1>
-        <p>{{ departments.length }} Department(s)</p>
+        <p class="subtitle">{{ departments.length }} department{{ departments.length === 1 ? "" : "s" }} in total</p>
       </div>
 
       <NuxtLink v-if="canCreateDepartment" to="/dashboard/departments/add" class="add-btn">
-        + Add Department
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Add Department
       </NuxtLink>
     </div>
 
     <div class="toolbar">
+      <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
       <input v-model="search" type="text" placeholder="Search department...">
     </div>
 
-    <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
+    <transition name="fade">
+      <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
+    </transition>
 
     <div v-if="loading" class="loading">
+      <span class="spinner"></span>
       Loading departments...
     </div>
 
     <div v-else class="department-list">
       <article
-        v-for="department in filteredDepartments"
+        v-for="(department, index) in filteredDepartments"
         :key="department.id"
         class="card"
+        :style="{ '--i': index }"
       >
         <div class="card-header">
-          <div>
-            <h2>{{ department.departmentName }}</h2>
-            <p>{{ department.description || "No description" }}</p>
+          <div class="card-title">
+            <span class="dept-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21V7l9-4 9 4v14" />
+                <path d="M9 21v-6h6v6" />
+                <path d="M9 12h.01M15 12h.01M9 9h.01M15 9h.01" />
+              </svg>
+            </span>
+
+            <div>
+              <h2>{{ department.departmentName }}</h2>
+              <p>{{ department.description || "No description" }}</p>
+            </div>
           </div>
 
           <div class="card-actions">
             <NuxtLink v-if="canUpdateDepartment" class="edit" :to="`/dashboard/departments/edit/${department.id}`">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
               Edit
             </NuxtLink>
             <button v-if="canDeleteDepartment" class="delete" type="button" @click="deleteDepartment(department.id)">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
               Delete
             </button>
           </div>
         </div>
 
-        <section class="section">
-          <h3>Employees ({{ department.employees.length }})</h3>
+        <div class="section-grid">
+          <section class="section">
+            <h3>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+              Employees
+              <span class="count-pill">{{ department.employees.length }}</span>
+            </h3>
 
-          <div v-if="department.employees.length">
-            <div v-for="employee in department.employees" :key="employee.id" class="person">
-              <strong>{{ employee.firstName }} {{ employee.lastName }}</strong>
-              <span>{{ employee.user.email }}</span>
+            <div v-if="department.employees.length" class="people">
+              <div v-for="employee in department.employees" :key="employee.id" class="person">
+                <span class="avatar">{{ initials(employee.firstName, employee.lastName) }}</span>
+                <div class="person-info">
+                  <strong>{{ employee.firstName }} {{ employee.lastName }}</strong>
+                  <span>{{ employee.user.email }}</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <p v-else>No employees assigned.</p>
-        </section>
+            <p v-else class="empty-line">No employees assigned.</p>
+          </section>
 
-        <section class="section">
-          <h3>Administrators ({{ department.admins.length }})</h3>
+          <section class="section">
+            <h3>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3z" />
+              </svg>
+              Administrators
+              <span class="count-pill">{{ department.admins.length }}</span>
+            </h3>
 
-          <div v-if="department.admins.length">
-            <div v-for="admin in department.admins" :key="admin.id" class="person">
-              <strong>{{ admin.firstName }} {{ admin.lastName }}</strong>
-              <span>{{ admin.user.email }}</span>
+            <div v-if="department.admins.length" class="people">
+              <div v-for="admin in department.admins" :key="admin.id" class="person">
+                <span class="avatar avatar--admin">{{ initials(admin.firstName, admin.lastName) }}</span>
+                <div class="person-info">
+                  <strong>{{ admin.firstName }} {{ admin.lastName }}</strong>
+                  <span>{{ admin.user.email }}</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <p v-else>No administrators assigned.</p>
-        </section>
+            <p v-else class="empty-line">No administrators assigned.</p>
+          </section>
+        </div>
       </article>
     </div>
 
     <div v-if="!loading && filteredDepartments.length === 0" class="empty">
-      No departments found.
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 21V7l9-4 9 4v14" />
+        <path d="M9 21v-6h6v6" />
+      </svg>
+      <p>No departments found.</p>
     </div>
   </div>
 </template>
@@ -179,43 +241,91 @@ const deleteDepartment = async (id: number) => {
 
 .page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 25px;
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
 }
 
 .page-header h1 {
   margin: 0 0 6px;
-  color: #1f2937;
+  color: #16192b;
   font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
 }
 
-.page-header p {
+.subtitle {
   margin: 0;
-  color: #6b7280;
+  color: #7c8497;
+  font-size: 14.5px;
 }
 
 .add-btn {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
   color: #ffffff;
   text-decoration: none;
-  background: #4f46e5;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  border-radius: 10px;
   font-weight: 700;
+  font-size: 14.5px;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.28);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.36);
+}
+
+.add-btn:active {
+  transform: translateY(0);
 }
 
 .toolbar {
-  margin-bottom: 20px;
+  position: relative;
+  margin-bottom: 22px;
+  max-width: 360px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9aa1b3;
+  pointer-events: none;
 }
 
 .toolbar input {
   width: 100%;
   min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  padding: 10px 14px 10px 40px;
+  color: #1f2937;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
   outline: none;
+  font-size: 14.5px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toolbar input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 
 .department-list {
@@ -224,10 +334,22 @@ const deleteDepartment = async (id: number) => {
 }
 
 .card {
-  padding: 20px;
+  padding: 22px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #eaecf3;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  opacity: 0;
+  transform: translateY(10px);
+  animation: cardIn 0.4s ease forwards;
+  animation-delay: calc(var(--i) * 60ms);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  border-color: #dfe2f5;
+  box-shadow: 0 12px 28px rgba(31, 41, 55, 0.08);
+  transform: translateY(-2px);
 }
 
 .card-header {
@@ -236,81 +358,216 @@ const deleteDepartment = async (id: number) => {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #f0f1f6;
+}
+
+.card-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.dept-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 10px;
 }
 
 .card-header h2 {
-  margin: 0 0 5px;
-  color: #1f2937;
-  font-size: 20px;
+  margin: 0 0 4px;
+  color: #1f2333;
+  font-size: 19px;
+  font-weight: 800;
 }
 
 .card-header p {
   margin: 0;
-  color: #6b7280;
+  color: #8b93a7;
+  font-size: 13.5px;
 }
 
 .card-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .edit,
 .delete {
-  min-height: 36px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .edit {
-  color: #ffffff;
+  color: #4f46e5;
   text-decoration: none;
-  background: #4f46e5;
-  border: 1px solid #4f46e5;
+  background: #eef2ff;
+  border: 1px solid #e0e4ff;
+}
+
+.edit:hover {
+  background: #e2e7ff;
+  transform: translateY(-1px);
 }
 
 .delete {
-  color: #ffffff;
-  background: #dc2626;
-  border: 1px solid #dc2626;
-  cursor: pointer;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fbdede;
 }
 
-.section {
-  margin-top: 18px;
+.delete:hover {
+  background: #fde3e3;
+  transform: translateY(-1px);
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
 .section h3 {
-  margin: 0 0 10px;
-  color: #374151;
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  color: #4b5265;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
-.section p {
-  margin: 0;
-  color: #6b7280;
+.count-pill {
+  padding: 1px 8px;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.people {
+  display: grid;
+  gap: 4px;
 }
 
 .person {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #eef2f7;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
 }
 
-.person span {
-  color: #6b7280;
+.person:hover {
+  background: #f8f9fd;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.avatar--admin {
+  color: #b45309;
+  background: #fef3e2;
+}
+
+.person-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.person-info strong {
+  color: #1f2937;
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.person-info span {
+  color: #8b93a7;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-line {
+  margin: 0;
+  padding: 8px 6px;
+  color: #a4abbd;
+  font-size: 13px;
 }
 
 .loading,
 .empty,
 .notice {
-  padding: 14px;
+  padding: 16px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 700;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6b7280;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e0e4ff;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: #a4abbd;
+  text-align: center;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .notice.error {
@@ -319,12 +576,58 @@ const deleteDepartment = async (id: number) => {
   border-color: #f4c7c7;
 }
 
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 760px) {
-  .page-header,
-  .card-header,
-  .person {
+  .page-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .person {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 </style>

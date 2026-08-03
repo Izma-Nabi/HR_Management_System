@@ -1,4 +1,11 @@
 <script setup lang="ts">
+
+definePageMeta({
+  layout: "auth"
+})
+
+
+
 import authService from "~/services/auth.service";
 const showPassword = ref(false);
 
@@ -90,28 +97,33 @@ const loginUser = async () => {
       </div>
 
       <form class="login-form" @submit.prevent="loginUser">
-        <label class="field">
-          <span>Email</span>
-          <input
-            v-model="form.email"
-            type="email"
-            autocomplete="email"
-            placeholder="superadmin@company.com"
-            required
-          >
-        </label>
+        <div class="field">
+          <div class="input-container">
+            <input
+              v-model="form.email"
+              type="email"
+              class="input-field"
+              autocomplete="email"
+              placeholder=" "
+              required
+            >
+            <label class="input-label">Email</label>
+            <span class="input-highlight"></span>
+          </div>
+        </div>
 
-        <label class="field">
-          <span>Password</span>
-
-          <div class="password-wrapper">
+        <div class="field">
+          <div class="input-container">
             <input
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
+              class="input-field input-field--icon"
               autocomplete="current-password"
-              placeholder="Enter password"
+              placeholder=" "
               required
             >
+            <label class="input-label">Password</label>
+            <span class="input-highlight"></span>
 
             <button
               type="button"
@@ -130,7 +142,7 @@ const loginUser = async () => {
               </svg>
             </button>
           </div>
-        </label>
+        </div>
 
       <div class="forgot-password">
         <NuxtLink to="/forgot-password">
@@ -139,7 +151,9 @@ const loginUser = async () => {
       </div>
 
         <button class="primary-button" type="submit" :disabled="loading">
-          {{ loading ? "Signing in..." : "Sign in" }}
+          <span class="transition"></span>
+          <span class="gradient"></span>
+          <span class="label">{{ loading ? "Signing in..." : "Sign in" }}</span>
         </button>
 
         <p v-if="errorMessage" class="alert error">{{ errorMessage }}</p>
@@ -160,8 +174,8 @@ const loginUser = async () => {
 }
 
 .login-panel {
-  width: min(100%, 420px);
-  padding: 28px;
+  width: min(100%, 480px);
+  padding: 40px 40px 80px;
   background: #ffffff;
   border: 1px solid #dfe5ef;
   border-radius: 8px;
@@ -208,43 +222,129 @@ h1 {
 
 .field {
   display: grid;
-  gap: 7px;
 }
 
-.field span {
-  color: #354052;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.field input {
+.input-container {
+  position: relative;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  color: #172033;
-  background: #ffffff;
-  border: 1px solid #cfd7e6;
-  border-radius: 6px;
-  outline: none;
 }
 
-.field input:focus {
+.input-field {
+  display: block;
+  width: 100%;
+  padding: 16px 12px 8px;
+  font-size: 16px;
+  color: #172033;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #cfd7e6;
+  border-radius: 0;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.input-field--icon {
+  padding-right: 44px;
+}
+
+.input-label {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  color: #8792a3;
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.input-highlight {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: #1f6feb;
+  transition: width 0.25s ease;
+}
+
+.input-field:focus {
   border-color: #1f6feb;
-  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
+}
+
+.input-field:focus + .input-label,
+.input-field:not(:placeholder-shown) + .input-label {
+  top: -2px;
+  font-size: 14px;
+  color: #1f6feb;
+}
+
+.input-field:focus + .input-label + .input-highlight,
+.input-field:not(:placeholder-shown) + .input-label + .input-highlight {
+  width: 100%;
 }
 
 .primary-button {
+  position: relative;
+  width: 100%;
   min-height: 44px;
-  border: 0;
-  border-radius: 6px;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
   color: #ffffff;
-  font-weight: 800;
   background: #1f6feb;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.primary-button .gradient {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background-image: linear-gradient(
+    rgba(0, 0, 0, 0),
+    rgba(0, 0, 0, 0),
+    rgba(0, 0, 0, 0.25)
+  );
+}
+
+.primary-button .label {
+  position: relative;
+  top: -1px;
+}
+
+.primary-button .transition {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  transition-duration: 500ms;
+}
+
+.primary-button:hover .transition {
+  width: 30em;
+  height: 30em;
+}
+
+.primary-button:active {
+  transform: scale(0.97);
 }
 
 .primary-button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.primary-button:disabled .transition {
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .alert {
@@ -261,19 +361,10 @@ h1 {
   border: 1px solid #f4c7c7;
 }
 
-.password-wrapper {
-  position: relative;
-}
-
-.password-wrapper input {
-  padding-right: 48px;
-}
-
 .eye-button {
   position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
+  top: 14px;
+  right: 4px;
   display: flex;
   align-items: center;
   justify-content: center;

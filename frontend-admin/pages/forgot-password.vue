@@ -51,22 +51,27 @@ const sendResetLink = async () => {
 
       <form class="login-form" @submit.prevent="sendResetLink">
 
-        <label class="field">
-          <span>Email Address</span>
-
-          <input
-            v-model="email"
-            type="email"
-            placeholder="Enter your email"
-            required
-          >
-        </label>
+        <div class="field">
+          <div class="input-container">
+            <input
+              v-model="email"
+              type="email"
+              class="input-field"
+              placeholder=" "
+              required
+            >
+            <label class="input-label">Email Address</label>
+            <span class="input-highlight"></span>
+          </div>
+        </div>
 
         <button
           class="primary-button"
           :disabled="loading"
         >
-          {{ loading ? "Sending..." : "Send Reset Link" }}
+          <span class="transition"></span>
+          <span class="gradient"></span>
+          <span class="label">{{ loading ? "Sending..." : "Send Reset Link" }}</span>
         </button>
 
         <NuxtLink
@@ -106,8 +111,8 @@ background:#f6f8fb;
 }
 
 .login-panel{
-width:min(100%,420px);
-padding:28px;
+width:min(100%,480px);
+padding:40px;
 background:#fff;
 border-radius:8px;
 box-shadow:0 18px 45px rgba(0,0,0,.08);
@@ -138,24 +143,125 @@ gap:16px;
 
 .field{
 display:grid;
-gap:8px;
 }
 
-.field input{
-height:42px;
-padding:0 12px;
-border:1px solid #ccc;
-border-radius:6px;
+.input-container{
+position:relative;
+width:100%;
+}
+
+.input-field{
+display:block;
+width:100%;
+padding:16px 12px 8px;
+font-size:15px;
+color:#172033;
+background:transparent;
+border:none;
+border-bottom:2px solid #cfd7e6;
+border-radius:0;
+outline:none;
+transition:border-color 0.2s ease;
+}
+
+.input-label{
+position:absolute;
+left:12px;
+top:16px;
+color:#8792a3;
+font-size:15px;
+font-weight:600;
+pointer-events:none;
+transition:all 0.2s ease;
+}
+
+.input-highlight{
+position:absolute;
+bottom:0;
+left:0;
+height:2px;
+width:0;
+background:#1f6feb;
+transition:width 0.25s ease;
+}
+
+.input-field:focus{
+border-color:#1f6feb;
+}
+
+.input-field:focus + .input-label,
+.input-field:not(:placeholder-shown) + .input-label{
+top:-2px;
+font-size:12px;
+color:#1f6feb;
+}
+
+.input-field:focus + .input-label + .input-highlight,
+.input-field:not(:placeholder-shown) + .input-label + .input-highlight{
+width:100%;
 }
 
 .primary-button{
-height:44px;
-border:none;
-background:#1f6feb;
-color:#fff;
-border-radius:6px;
+position:relative;
+width:100%;
+min-height:44px;
+overflow:hidden;
+font-size:16px;
 font-weight:700;
+color:#fff;
+background:#1f6feb;
+border:none;
+border-radius:8px;
 cursor:pointer;
+transition:transform 0.15s ease;
+}
+
+.primary-button .gradient{
+position:absolute;
+inset:0;
+border-radius:8px;
+background-image:linear-gradient(
+  rgba(0,0,0,0),
+  rgba(0,0,0,0),
+  rgba(0,0,0,0.25)
+);
+}
+
+.primary-button .label{
+position:relative;
+top:-1px;
+}
+
+.primary-button .transition{
+position:absolute;
+left:50%;
+top:50%;
+width:0;
+height:0;
+background-color:rgba(255,255,255,0.25);
+border-radius:9999px;
+transform:translate(-50%,-50%);
+transition-timing-function:cubic-bezier(0,0,0.2,1);
+transition-duration:500ms;
+}
+
+.primary-button:hover .transition{
+width:30em;
+height:30em;
+}
+
+.primary-button:active{
+transform:scale(0.97);
+}
+
+.primary-button:disabled{
+cursor:wait;
+opacity:0.72;
+}
+
+.primary-button:disabled .transition{
+width:0!important;
+height:0!important;
 }
 
 .back-link{

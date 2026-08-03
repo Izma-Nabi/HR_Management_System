@@ -1,73 +1,229 @@
 <script setup>
-defineProps({
+import { computed } from "vue";
+
+const props = defineProps({
   summary: {
     type: Object,
     default: () => ({})
   }
 });
+
+const cards = computed(() => [
+  {
+    key: "total",
+    label: "Total",
+    value: props.summary.total ?? 0,
+    accent: "#4f46e5",
+    bg: "#eef2ff",
+    icon: "clipboard"
+  },
+  {
+    key: "present",
+    label: "Present",
+    value: props.summary.present ?? 0,
+    accent: "#16a34a",
+    bg: "#ecfdf3",
+    icon: "check"
+  },
+  {
+    key: "absent",
+    label: "Absent",
+    value: props.summary.absent ?? 0,
+    accent: "#dc2626",
+    bg: "#fef2f2",
+    icon: "close"
+  },
+  {
+    key: "late",
+    label: "Late",
+    value: props.summary.late ?? 0,
+    accent: "#ca8a04",
+    bg: "#fefce8",
+    icon: "clock"
+  },
+  {
+    key: "leave",
+    label: "Leave",
+    value: props.summary.leave ?? 0,
+    accent: "#2563eb",
+    bg: "#eff6ff",
+    icon: "palm"
+  }
+]);
 </script>
 
 <template>
+  <div class="summary-row">
+    <div
+      v-for="(card, index) in cards"
+      :key="card.key"
+      class="summary-card"
+      :style="{ '--accent': card.accent, '--bg': card.bg, '--i': index }"
+    >
+      <div class="icon-wrap">
+        <svg v-if="card.icon === 'clipboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="4" width="12" height="17" rx="2" />
+          <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+          <path d="M9 11h6M9 15h6" />
+        </svg>
 
-<div
-  style="display:flex; gap:16px; width:100%; overflow-x:auto; align-items:stretch;"
->
+        <svg v-else-if="card.icon === 'check'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 12.5l2.3 2.3L15.5 9.5" />
+        </svg>
 
-  <!-- Total -->
-  <div
-    style="min-width:150px; flex:1 1 0; background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:20px; text-align:center;"
-  >
-    <div style="font-size:30px; margin-bottom:8px;">📋</div>
-    <p style="font-size:14px; color:#6b7280;">Total</p>
-    <h2 style="font-size:30px; font-weight:700; margin-top:8px;">
-      {{ summary.total ?? 0 }}
-    </h2>
+        <svg v-else-if="card.icon === 'close'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
+        </svg>
+
+        <svg v-else-if="card.icon === 'clock'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3.5 2" />
+        </svg>
+
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21c4-1 6-4 6-8" />
+          <path d="M9 13c0-5 4-9 9-9-1 4-2 8-6 9-1.5 4-4 6-8 7" />
+        </svg>
+      </div>
+
+      <p class="label">{{ card.label }}</p>
+      <h2 class="value">{{ card.value }}</h2>
+
+      <div class="bar"></div>
+    </div>
   </div>
-
-  <!-- Present -->
-  <div
-    style="min-width:150px; flex:1 1 0; background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:20px; text-align:center;"
-  >
-    <div style="font-size:30px; margin-bottom:8px;">✅</div>
-    <p style="font-size:14px; color:#16a34a;">Present</p>
-    <h2 style="font-size:30px; font-weight:700; color:#16a34a; margin-top:8px;">
-      {{ summary.present ?? 0 }}
-    </h2>
-  </div>
-
-  <!-- Absent -->
-  <div
-    style="min-width:150px; flex:1 1 0; background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:20px; text-align:center;"
-  >
-    <div style="font-size:30px; margin-bottom:8px;">❌</div>
-    <p style="font-size:14px; color:#dc2626;">Absent</p>
-    <h2 style="font-size:30px; font-weight:700; color:#dc2626; margin-top:8px;">
-      {{ summary.absent ?? 0 }}
-    </h2>
-  </div>
-
-  <!-- Late -->
-  <div
-    style="min-width:150px; flex:1 1 0; background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:20px; text-align:center;"
-  >
-    <div style="font-size:30px; margin-bottom:8px;">⏰</div>
-    <p style="font-size:14px; color:#ca8a04;">Late</p>
-    <h2 style="font-size:30px; font-weight:700; color:#ca8a04; margin-top:8px;">
-      {{ summary.late ?? 0 }}
-    </h2>
-  </div>
-
-  <!-- Leave -->
-  <div
-    style="min-width:150px; flex:1 1 0; background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:20px; text-align:center;"
-  >
-    <div style="font-size:30px; margin-bottom:8px;">🌴</div>
-    <p style="font-size:14px; color:#2563eb;">Leave</p>
-    <h2 style="font-size:30px; font-weight:700; color:#2563eb; margin-top:8px;">
-      {{ summary.leave ?? 0 }}
-    </h2>
-  </div>
-
-</div>
-
 </template>
+
+<style scoped>
+.summary-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  overflow-x: auto;
+  align-items: stretch;
+  padding-bottom: 4px;
+}
+
+.summary-card {
+  position: relative;
+  min-width: 150px;
+  flex: 1 1 0;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #eef0f4;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  padding: 22px 18px;
+  text-align: center;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: card-in 0.4s ease forwards;
+  animation-delay: calc(var(--i) * 70ms);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: default;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(16, 24, 40, 0.08);
+  border-color: var(--accent);
+}
+
+.summary-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% -10%, var(--bg), transparent 70%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.summary-card:hover .icon-wrap {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.icon-wrap svg {
+  width: 22px;
+  height: 22px;
+}
+
+.label {
+  position: relative;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.value {
+  position: relative;
+  margin: 6px 0 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+  animation: pop 0.35s ease forwards;
+  animation-delay: calc(var(--i) * 70ms + 0.15s);
+}
+
+.bar {
+  position: relative;
+  height: 3px;
+  width: 28px;
+  margin: 12px auto 0;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.35;
+  transition: width 0.25s ease, opacity 0.25s ease;
+}
+
+.summary-card:hover .bar {
+  width: 48px;
+  opacity: 0.9;
+}
+
+@keyframes card-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-card,
+  .value {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>
