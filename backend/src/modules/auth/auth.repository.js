@@ -263,9 +263,70 @@ const createAdmin = async ({ fullName, email, passwordHash, role }) => {
   });
 };
 
+const createPasswordResetToken = async ({
+  userId,
+  tokenHash,
+  expiresAt
+}) => {
+  return prisma.passwordResetToken.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt
+    }
+  });
+};
+
+const findPasswordResetToken = async (tokenHash) => {
+  return prisma.passwordResetToken.findFirst({
+    where: {
+      tokenHash,
+      expiresAt: {
+        gt: new Date()
+      }
+    },
+    include: {
+      user: true
+    }
+  });
+};
+
+const updateUserPassword = async (userId, passwordHash) => {
+  return prisma.user.update({
+    where: {
+      id: Number(userId)
+    },
+    data: {
+      passwordHash
+    }
+  });
+};
+
+
+const removePasswordResetToken = async (id) => {
+  return prisma.passwordResetToken.delete({
+    where: {
+      id
+    }
+  });
+};
+
+const deletePasswordResetToken = async (userId) => {
+  return prisma.passwordResetToken.deleteMany({
+    where: {
+      userId: Number(userId)
+    }
+  });
+};
+
 module.exports = {
   createAdmin,
   findUserByEmail,
   findUserById,
-  toSafeUser
+  toSafeUser,
+  deletePasswordResetToken,
+  createPasswordResetToken,
+  findPasswordResetToken,
+  updateUserPassword,
+  removePasswordResetToken
 };

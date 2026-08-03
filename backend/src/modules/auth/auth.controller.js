@@ -26,9 +26,33 @@ const logout = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Logout successful", result);
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const result = await authService.forgotPassword(req.body.email);
+
+  return sendSuccess(
+    res,
+    200,
+    "If an account exists, a password reset email has been sent.",
+    result
+  );
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+
+  return sendSuccess(
+    res,
+    200,
+    "Password reset successfully.",
+    result
+  );
+});
+
 module.exports = {
   login,
   me,
   signup,
-  logout
+  logout,
+  forgotPassword,
+  resetPassword
 };

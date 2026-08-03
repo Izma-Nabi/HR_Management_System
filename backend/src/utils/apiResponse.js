@@ -12,19 +12,41 @@ class ApiError extends Error {
 
 // Every successful API response should have the same shape.
 // This makes frontend handling predictable.
-const sendSuccess = (res, statusCode, message, data = {}) => {
+const serializeBigInt = (value) => {
+  return JSON.parse(
+    JSON.stringify(value, (_, item) =>
+      typeof item === "bigint"
+        ? Number(item)
+        : item
+    )
+  );
+};
+
+
+const sendSuccess = (
+  res,
+  statusCode = 200,
+  message = "Request successful",
+  data = null
+) => {
   return res.status(statusCode).json({
     success: true,
+    statusCode,
     message,
-    data
+    data: serializeBigInt(data)
   });
 };
 
-// Every failed API response should also have the same shape.
-// The centralized error middleware uses this helper.
-const sendError = (res, statusCode, message, errors = []) => {
+
+const sendError = (
+  res,
+  statusCode = 500,
+  message = "Something went wrong",
+  errors = null
+) => {
   return res.status(statusCode).json({
     success: false,
+    statusCode,
     message,
     errors
   });
@@ -33,6 +55,6 @@ const sendError = (res, statusCode, message, errors = []) => {
 module.exports = {
   ApiError,
   sendSuccess,
-  sendError
+  sendError,
+  serializeBigInt
 };
-

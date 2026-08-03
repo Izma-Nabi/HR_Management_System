@@ -2,6 +2,10 @@ const { ApiError } = require("../../utils/apiResponse");
 const { comparePassword, hashPassword } = require("../../utils/password");
 const { signAccessToken } = require("../../utils/jwt");
 const authRepository = require("./auth.repository");
+const crypto = require("crypto");
+const transporter = require("./mail.service");
+const resetPasswordTemplate = require("./reset-password-template");
+
 
 const login = async ({ email, password }) => {
   const user = await authRepository.findUserByEmail(email);
@@ -77,9 +81,87 @@ const logout = async () => {
   return {};
 };
 
+const forgotPassword = async (email) => {
+  const user = await authRepository.findUserByEmail(email);
+
+  // Don't reveal whether the email exists
+  if (!user) {
+    return {};
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await authRepository.deletePasswordResetToken(user.id);
+
+  await authRepository.createPasswordResetToken({
+    userId: user.id,
+    tokenHash,
+    expiresAt
+  });
+
+  const resetLink =
+    `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM,
+    to: user.email,
+    subject: "Reset Your Password",
+    html: resetPasswordTemplate(
+      user.firstName,
+      resetLink
+    )
+  });
+
+  return {};
+};
+
+const resetPassword = async ({
+  token,
+  password
+}) => {
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const resetToken =
+    await authRepository.findPasswordResetToken(tokenHash);
+
+  if (!resetToken) {
+    throw new ApiError(
+      400,
+      "Reset link is invalid or has expired"
+    );
+  }
+
+  const passwordHash =
+    await hashPassword(password);
+
+  await authRepository.updateUserPassword(
+    resetToken.userId,
+    passwordHash
+  );
+
+  await authRepository.removePasswordResetToken(
+    resetToken.id
+  );
+
+  return {};
+};
+
 module.exports = {
   login,
   getCurrentUser,
   signup,
-  logout
+  logout,
+  forgotPassword,
+  resetPassword
 };

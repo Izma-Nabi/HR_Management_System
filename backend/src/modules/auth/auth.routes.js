@@ -4,7 +4,9 @@ const authMiddleware = require("../../middlewares/auth.middleware");
 const authController = require("./auth.controller");
 const {
   loginSchema,
-  signupSchema
+  signupSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema
 } = require("./auth.validation");
 
 const router = express.Router();
@@ -31,6 +33,18 @@ router.post(
   "/logout",
   authMiddleware,
   authController.logout
+);
+
+router.post(
+  "/forgot-password",
+  validate(forgotPasswordSchema),
+  authController.forgotPassword
+);
+
+router.post(
+  "/reset-password",
+  validate(resetPasswordSchema),
+  authController.resetPassword
 );
 
 module.exports = router;
