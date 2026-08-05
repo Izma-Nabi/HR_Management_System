@@ -50,6 +50,12 @@ const canViewLeaves = computed(() =>
     "VIEW_ALL_LEAVES"
   )
 );
+
+const canViewAttendanceComplaints = computed(() =>
+  hasAnyPermission(
+    "VIEW_ATTENDANCE_COMPLAINTS"
+  )
+);
 </script>
 
 <template>
@@ -170,6 +176,35 @@ const canViewLeaves = computed(() =>
         <span class="nav-label">Attendance</span>
       </NuxtLink>
 
+      <NuxtLink
+        v-if="canViewAttendanceComplaints"
+        to="/dashboard/attendance-complaints"
+        class="nav-item"
+        style="--i: 7"
+      >
+        <span class="nav-icon">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <path d="M8 9h8"/>
+            <path d="M8 13h5"/>
+          </svg>
+        </span>
+
+        <span class="nav-label">
+          Attendance Complaints
+        </span>
+      </NuxtLink>
+
+
       <NuxtLink to="/dashboard/reports" class="nav-item" style="--i: 7">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -197,7 +232,7 @@ const canViewLeaves = computed(() =>
 
 <style scoped>
 .sidebar {
-  width: 250px;
+  width: 260px;
   background: #ffffff;
   border-right: 1px solid #ececec;
   height: 100vh;

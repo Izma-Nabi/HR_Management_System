@@ -43,8 +43,56 @@ const createComplaint = async (payload) => {
   return response.data;
 };
 
+const getAttendanceComplaints = async () => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/attendance/admin/complaints`,
+    {
+      method: "GET",
+      headers: authService.getAuthHeaders()
+    }
+  );
+
+  return response.data;
+};
+
+const reviewAttendanceComplaint = async (id, payload) => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/attendance/admin/complaints/${id}`,
+    {
+      method: "PATCH",
+      headers: authService.getAuthHeaders(),
+      body: payload
+    }
+  );
+
+  return response.data;
+};
+
+const editAttendanceComplaint = async (id, data) => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/attendance/admin/complaints/${id}/edit`,
+    {
+      method: "PATCH",
+      headers: authService.getAuthHeaders(),
+      body: data
+    }
+  );
+
+  return response.data;
+};
+
+
 export default {
   createComplaint,
   getMyCurrentWeek,
-  getMyDayDetails
+  getMyDayDetails,
+  getAttendanceComplaints,
+  reviewAttendanceComplaint,
+  editAttendanceComplaint
 };

@@ -1,57 +1,45 @@
 const express = require("express");
 
+const router = express.Router();
+
+const attendanceController = require("./attendance.controller");
+
 const authMiddleware = require("../../middlewares/auth.middleware");
 const {
-  requireAnyPermission,
   requirePermission
 } = require("../../middlewares/permission.middleware");
-const validate = require("../../middlewares/validate.middleware");
-const attendanceController = require("./attendance.controller");
-const attendanceValidation = require("./attendance.validation");
 
-const router = express.Router();
-const canViewOwnAttendance = requireAnyPermission(
-  "VIEW_OWN_ATTENDANCE",
-  "VIEW_TEAM_ATTENDANCE",
-  "IMPORT_ATTENDANCE"
-);
 
-router.get(
-  "/my/week",
-  authMiddleware,
-  canViewOwnAttendance,
-  validate(attendanceValidation.weekQuery, "query"),
-  attendanceController.getMyCurrentWeek
-);
-
-router.get(
-  "/my/day/:date",
-  authMiddleware,
-  canViewOwnAttendance,
-  validate(attendanceValidation.dayParams, "params"),
-  attendanceController.getMyDayDetails
-);
-
-router.get(
-  "/my/today",
-  authMiddleware,
-  canViewOwnAttendance,
-  attendanceController.getMyTodayAttendance
-);
-
+// Employee routes
 router.post(
   "/complaints",
   authMiddleware,
-  canViewOwnAttendance,
-  validate(attendanceValidation.createComplaint),
   attendanceController.createComplaint
 );
 
-router.post(
-  "/import",
+
+// Admin - View complaints
+router.get(
+  "/admin/complaints",
   authMiddleware,
-  requirePermission("IMPORT_ATTENDANCE"),
-  attendanceController.importAttendance
+  requirePermission("VIEW_ATTENDANCE_COMPLAINTS"),
+  attendanceController.getAttendanceComplaints
 );
+
+
+// Admin - Review complaint
+router.patch(
+  "/admin/complaints/:id",
+  authMiddleware,
+  requirePermission("MANAGE_ATTENDANCE"),
+  attendanceController.reviewAttendanceComplaint
+);
+
+router.patch(
+  "/admin/complaints/:id/edit",
+  authMiddleware,
+  attendanceController.editAttendanceComplaint
+);
+
 
 module.exports = router;

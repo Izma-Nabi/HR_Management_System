@@ -2,7 +2,6 @@ const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
 
 const attendanceService = require("./attendance.service");
-
 const importAttendance = asyncHandler(async (req, res) => {
 
   const result = await attendanceService.importAttendance();
@@ -69,11 +68,60 @@ const getMyTodayAttendance = asyncHandler(async (req, res) => {
   );
 });
 
+const getAttendanceComplaints = asyncHandler(async (req, res) => {
+  const result = await attendanceService.getAttendanceComplaints();
+
+  return sendSuccess(
+    res,
+    200,
+    "Attendance complaints fetched successfully",
+    result
+  );
+});
+
+
+const reviewAttendanceComplaint = asyncHandler(async (req, res) => {
+  const result = await attendanceService.reviewAttendanceComplaint(
+    req.params.id,
+    req.body,
+    req.user.id
+  );
+
+  return sendSuccess(
+    res,
+    200,
+    "Attendance complaint reviewed successfully",
+    result
+  );
+});
+
+
+const editAttendanceComplaint = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const result =
+    await attendanceService.editAttendanceComplaint(
+      Number(id),
+      req.body,
+      req.user.id
+    );
+
+  return sendSuccess(
+    res,
+    200,
+    "Attendance updated successfully",
+    result
+  );
+});
+
 
 module.exports = {
   createComplaint,
   getMyCurrentWeek,
   getMyDayDetails,
   importAttendance,
-  getMyTodayAttendance
+  getMyTodayAttendance,
+  getAttendanceComplaints,
+  reviewAttendanceComplaint,
+  editAttendanceComplaint,
 };

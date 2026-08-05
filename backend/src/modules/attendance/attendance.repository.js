@@ -314,6 +314,199 @@ const createComplaint = async (data) => {
   });
 };
 
+const findAttendanceComplaints = async () => {
+  return prisma.attendanceComplaint.findMany({
+    orderBy: {
+      createdAt: "desc"
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          userCode: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true
+        }
+      },
+      rawAttendance: true,
+      dailyAttendance: true
+    }
+  });
+};
+
+
+const findComplaintById = async (id) => {
+  return prisma.attendanceComplaint.findUnique({
+    where: {
+      id: Number(id)
+    },
+    include: {
+      rawAttendance: true,
+      dailyAttendance: true
+    }
+  });
+};
+
+
+const updateComplaintStatus = async (id, data) => {
+  return prisma.attendanceComplaint.update({
+    where: {
+      id: Number(id)
+    },
+    data
+  });
+};
+
+
+const applyAttendanceCorrection = async (complaint) => {
+
+  if (complaint.complaintType === "CHECK_IN") {
+
+    return prisma.attendance.update({
+      where: {
+        id: complaint.rawAttendanceId
+      },
+      data: {
+        eventType: "CHECK_IN"
+      }
+    });
+
+  }
+
+
+  if (complaint.complaintType === "CHECK_OUT") {
+
+    return prisma.attendance.update({
+      where: {
+        id: complaint.rawAttendanceId
+      },
+      data: {
+        eventType: "CHECK_OUT"
+      }
+    });
+
+  }
+
+
+  return null;
+};
+
+
+const updateOrCreateAttendance = async ({
+  complaint,
+  checkIn,
+  checkOut,
+  status,
+  remarks
+}) => {
+  const attendanceDate = complaint.attendanceDate
+    .toISOString()
+    .slice(0, 10);
+
+  const checkInDate = checkIn
+    ? new Date(`${attendanceDate} ${checkIn}`)
+    : null;
+
+  const checkOutDate = checkOut
+    ? new Date(`${attendanceDate} ${checkOut}`)
+    : null;
+
+  // CASE 1: Existing attendance found
+  const existingAttendance = await prisma.attendance.findUnique({
+    where: {
+      id: complaint.dailyAttendanceId
+    }
+  });
+
+  if (existingAttendance) {
+
+    return await prisma.attendance.update({
+
+      where:{
+        id: existingAttendance.id
+      },
+
+      data:{
+
+        eventType:
+          checkIn
+            ? "CHECK_IN"
+            : "CHECK_OUT",
+
+        eventTime:
+          checkIn
+            ? new Date(`${attendanceDate}T${checkIn}:00`)
+            : new Date(`${attendanceDate}T${checkOut}:00`),
+
+        remarks
+
+      }
+
+    });
+
+  }
+
+  // CASE 2: No attendance exists - CREATE NEW RECORD
+  return await prisma.dailyAttendance.create({
+    data: {
+      userId: complaint.userId,
+
+      attendanceDate: complaint.attendanceDate,
+
+      firstCheckIn: checkInDate,
+
+      finalCheckOut: checkOutDate,
+
+      workedMinutes: calculateWorkedMinutes(
+        checkInDate,
+        checkOutDate
+      ),
+
+      lateMinutes: 0,
+
+      earlyLeaveMinutes: 0,
+
+      overtimeMinutes: 0,
+
+      status: status || "Present",
+
+      source: "ADMIN_CORRECTION",
+
+      adjustmentReason:
+        remarks || "Created by admin after complaint"
+    }
+  });
+};
+
+
+const updateAttendanceFromComplaint = async (
+  complaint,
+  data
+) => {
+
+  return prisma.attendance.update({
+    where:{
+      id: complaint.rawAttendanceId
+    },
+
+    data:{
+      eventType:
+        data.eventType ||
+        complaint.rawAttendance.eventType,
+
+      eventTime:
+        data.eventTime ||
+        complaint.rawAttendance.eventTime,
+
+      remarks:
+        data.remarks ||
+        complaint.rawAttendance.remarks
+    }
+  });
+
+};
 module.exports = {
   createManyAttendance,
   createComplaint,
@@ -327,5 +520,11 @@ module.exports = {
   findRawAttendanceForDay,
   findUsersByCodes,
   getAttendanceCount,
-  syncNewAttendance
+  syncNewAttendance,
+  findAttendanceComplaints,
+  findComplaintById,
+  updateComplaintStatus,
+  applyAttendanceCorrection,
+  updateOrCreateAttendance,
+  updateAttendanceFromComplaint
 };

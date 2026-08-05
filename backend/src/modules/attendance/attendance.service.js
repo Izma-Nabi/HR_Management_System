@@ -678,9 +678,172 @@ const createAttendanceComplaint = async (userId, input) => {
   };
 };
 
+
+const getAttendanceComplaints = async () => {
+  const complaints = await attendanceRepository.findAttendanceComplaints();
+
+  return complaints.map((complaint) => ({
+    ...complaint,
+    id: databaseInteger(complaint.id),
+    userId: databaseInteger(complaint.userId),
+    dailyAttendanceId: databaseInteger(complaint.dailyAttendanceId),
+    rawAttendanceId: databaseInteger(complaint.rawAttendanceId),
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
+  }));
+};
+
+
+const reviewAttendanceComplaint = async (
+  complaintId,
+  input,
+  reviewerId
+) => {
+
+  const complaint =
+    await attendanceRepository.findComplaintById(
+      complaintId
+    );
+
+  if (!complaint) {
+    throw new ApiError(
+      404,
+      "Attendance complaint not found"
+    );
+  }
+
+
+  if (complaint.status !== "PENDING") {
+    throw new ApiError(
+      400,
+      "This complaint has already been reviewed"
+    );
+  }
+
+
+  if (
+    !["APPROVED", "REJECTED"].includes(input.status)
+  ) {
+    throw new ApiError(
+      400,
+      "Invalid complaint status"
+    );
+  }
+
+
+  const updatedComplaint =
+    await attendanceRepository.updateComplaintStatus(
+      complaintId,
+      {
+        status: input.status,
+        reviewNote: input.reviewNote || null,
+        reviewedAt: new Date()
+      }
+    );
+
+
+  // If approved then update attendance
+  if (input.status === "APPROVED") {
+
+    await attendanceRepository.applyAttendanceCorrection(
+      complaint
+    );
+
+  }
+
+
+  return {
+    ...updatedComplaint,
+    attendanceDate: dateOnlyFromValue(
+      updatedComplaint.attendanceDate
+    )
+  };
+};
+
+
+const editAttendanceComplaint = async (
+  complaintId,
+  input,
+  reviewerId
+) => {
+
+  const complaint =
+    await attendanceRepository.findComplaintById(
+      Number(complaintId)
+    );
+
+
+  if (!complaint) {
+    throw new ApiError(
+      404,
+      "Attendance complaint not found"
+    );
+  }
+
+
+  if (complaint.status !== "PENDING") {
+    throw new ApiError(
+      400,
+      "Complaint already reviewed"
+    );
+  }
+
+
+  const updatedAttendance =
+    await attendanceRepository.updateOrCreateAttendance({
+      complaint,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      status: input.status,
+      remarks: input.remarks || null
+    });
+
+
+
+  const updatedComplaint =
+    await attendanceRepository.updateComplaintStatus(
+      Number(complaintId),
+      {
+        status: "APPROVED",
+        reviewNote:
+          input.reviewNote ||
+          "Attendance updated by admin",
+        reviewedAt: new Date(),
+        reviewedBy: reviewerId
+      }
+    );
+
+
+  return {
+    complaint: updatedComplaint,
+    attendance: updatedAttendance
+  };
+};
+
+const calculateWorkedMinutes = (
+  checkIn,
+  checkOut
+) => {
+
+  if(!checkIn || !checkOut){
+    return 0;
+  }
+
+
+  return Math.floor(
+    (checkOut - checkIn)
+    /
+    (1000 * 60)
+  );
+
+};
+
+
 module.exports = {
   createAttendanceComplaint,
   getMyCurrentWeek,
   getMyDayDetails,
-  importAttendance
+  importAttendance,
+  getAttendanceComplaints,
+  reviewAttendanceComplaint,
+  editAttendanceComplaint
 };
