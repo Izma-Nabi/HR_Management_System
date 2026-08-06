@@ -353,9 +353,13 @@ const findComplaintById = async (id) => {
 const updateComplaintStatus = async (id, data) => {
   return prisma.attendanceComplaint.update({
     where: {
-      id: Number(id)
+      id
     },
-    data
+    data: {
+      status: data.status,
+      reviewNote: data.reviewNote,
+      reviewedAt: new Date()
+    }
   });
 };
 
@@ -401,26 +405,49 @@ const updateOrCreateAttendance = async ({
   status,
   remarks
 }) => {
-  const attendanceDate = complaint.attendanceDate
-    .toISOString()
-    .slice(0, 10);
 
-  const checkInDate = checkIn
-    ? new Date(`${attendanceDate} ${checkIn}`)
-    : null;
+  const attendanceDate =
+    complaint.attendanceDate
+      .toISOString()
+      .slice(0, 10);
 
-  const checkOutDate = checkOut
-    ? new Date(`${attendanceDate} ${checkOut}`)
-    : null;
 
-  // CASE 1: Existing attendance found
-  const existingAttendance = await prisma.attendance.findUnique({
-    where: {
-      id: complaint.dailyAttendanceId
-    }
-  });
+  /**
+   * CASE 1:
+   * Edit existing attendance record
+   */
+  const existingAttendance = complaint.rawAttendance;
+
 
   if (existingAttendance) {
+
+    let eventType;
+    let eventTime;
+
+
+    // Complaint is CHECK_IN
+    if (checkIn) {
+
+      eventType = "CHECK_IN";
+
+      eventTime = new Date(
+        `${attendanceDate}T${checkIn}:00`
+      );
+
+    }
+
+
+    // Complaint is CHECK_OUT
+    else if (checkOut) {
+
+      eventType = "CHECK_OUT";
+
+      eventTime = new Date(
+        `${attendanceDate}T${checkOut}:00`
+      );
+
+    }
+
 
     return await prisma.attendance.update({
 
@@ -428,19 +455,15 @@ const updateOrCreateAttendance = async ({
         id: existingAttendance.id
       },
 
+
       data:{
 
-        eventType:
-          checkIn
-            ? "CHECK_IN"
-            : "CHECK_OUT",
+        eventType,
 
-        eventTime:
-          checkIn
-            ? new Date(`${attendanceDate}T${checkIn}:00`)
-            : new Date(`${attendanceDate}T${checkOut}:00`),
+        eventTime,
 
-        remarks
+        remarks:
+          remarks || existingAttendance.remarks
 
       }
 
@@ -448,38 +471,114 @@ const updateOrCreateAttendance = async ({
 
   }
 
-  // CASE 2: No attendance exists - CREATE NEW RECORD
-  return await prisma.dailyAttendance.create({
-    data: {
-      userId: complaint.userId,
 
-      attendanceDate: complaint.attendanceDate,
 
-      firstCheckIn: checkInDate,
+  /**
+   * CASE 2:
+   * Insert new attendance record
+   */
+  const user = await prisma.user.findUnique({
 
-      finalCheckOut: checkOutDate,
-
-      workedMinutes: calculateWorkedMinutes(
-        checkInDate,
-        checkOutDate
-      ),
-
-      lateMinutes: 0,
-
-      earlyLeaveMinutes: 0,
-
-      overtimeMinutes: 0,
-
-      status: status || "Present",
-
-      source: "ADMIN_CORRECTION",
-
-      adjustmentReason:
-        remarks || "Created by admin after complaint"
+    where:{
+      id: complaint.userId
     }
-  });
-};
 
+  });
+
+
+  if(!user){
+    throw new Error(
+      "User not found"
+    );
+  }
+
+
+
+  let eventType;
+  let eventTime;
+
+
+  if(checkIn){
+
+    eventType="CHECK_IN";
+
+    eventTime =
+      new Date(
+        `${attendanceDate}T${checkIn}:00`
+      );
+
+  }
+
+
+  else if(checkOut){
+
+    eventType="CHECK_OUT";
+
+    eventTime =
+      new Date(
+        `${attendanceDate}T${checkOut}:00`
+      );
+
+  }
+
+
+  else{
+
+    throw new Error(
+      "Check-in or Check-out time required"
+    );
+
+  }
+
+
+
+  return await prisma.attendance.create({
+
+    data:{
+
+
+      userId:
+        complaint.userId,
+
+
+      userCode:
+        user.userCode,
+
+
+      fullName:
+        `${user.firstName} ${user.lastName}`,
+
+
+      departmentId:
+        user.departmentId || null,
+
+
+      designationId:
+        user.designationId || null,
+
+
+      attendanceDate:
+        new Date(attendanceDate),
+
+
+      eventType,
+
+
+      eventTime,
+
+
+      remarks:
+        remarks || "Added by admin correction",
+
+
+      sourceKey:
+        `ADMIN_CORRECTION_${Date.now()}`
+
+    }
+
+  });
+
+};
 
 const updateAttendanceFromComplaint = async (
   complaint,
