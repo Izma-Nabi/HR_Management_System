@@ -837,6 +837,39 @@ const calculateWorkedMinutes = (
 
 };
 
+const insertManualAttendance = async (input, reviewerId) => {
+
+  const attendance =
+    await attendanceRepository.insertManualAttendance({
+      userId: input.userId,
+      attendanceDate: input.attendanceDate,
+      eventType: input.eventType,
+      eventTime: input.eventTime,
+      remarks: input.remarks
+    });
+
+  const complaint =
+    await attendanceRepository.updateComplaintStatus(
+      Number(input.complaintId),
+      {
+        status: "APPROVED",
+        reviewNote: "Attendance inserted by admin",
+        reviewedAt: new Date(),
+        reviewedBy: reviewerId
+      }
+    );
+
+  return {
+    attendance,
+    complaint
+  };
+};
+
+const autoCheckoutEmployees = async () => {
+
+  await attendanceRepository.autoCheckoutEmployees();
+
+};
 
 module.exports = {
   createAttendanceComplaint,
@@ -845,5 +878,7 @@ module.exports = {
   importAttendance,
   getAttendanceComplaints,
   reviewAttendanceComplaint,
-  editAttendanceComplaint
+  editAttendanceComplaint,
+  insertManualAttendance,
+  autoCheckoutEmployees
 };

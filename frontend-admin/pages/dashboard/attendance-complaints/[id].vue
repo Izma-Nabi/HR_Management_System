@@ -2,7 +2,7 @@
 import attendanceService from "~/services/attendance.service";
 
 definePageMeta({
-  layout: "dashboard"
+  layout: "dashboard",
 });
 
 const route = useRoute();
@@ -16,25 +16,13 @@ const showEditOptions = ref(false);
 const complaint = ref<any>(null);
 const showEdit = ref(false);
 
-const showEditForm = ref(false);
-
-const editForm = ref({
-  checkIn: "",
-  checkOut: "",
-  status: "Present",
-  remarks: "",
-  reviewNote: ""
-});
-
 const loadComplaint = async () => {
   loading.value = true;
 
   try {
     const complaints = await attendanceService.getAttendanceComplaints();
 
-    complaint.value = complaints.find(
-      (item: any) => item.id === complaintId
-    );
+    complaint.value = complaints.find((item: any) => item.id === complaintId);
 
     if (!complaint.value) {
       error.value = "Complaint not found";
@@ -46,210 +34,87 @@ const loadComplaint = async () => {
   }
 };
 
-
 const badgeClass = computed(() => {
-
   if (!complaint.value) {
     return "";
   }
 
-
   switch (complaint.value.status) {
-
     case "APPROVED":
       return "approved";
-
 
     case "REJECTED":
       return "rejected";
 
-
     default:
       return "pending";
   }
-
 });
 
-const reviewComplaint = async (
-  status: "APPROVED" | "REJECTED"
-) => {
-
+const reviewComplaint = async (status: "APPROVED" | "REJECTED") => {
   if (!complaint.value) return;
-
 
   submitting.value = true;
   error.value = "";
 
-
   try {
+    await attendanceService.reviewAttendanceComplaint(complaint.value.id, {
+      status,
+      reviewNote: reviewNote.value,
+    });
 
-    await attendanceService.reviewAttendanceComplaint(
-      complaint.value.id,
-      {
-        status,
-        reviewNote: reviewNote.value
-      }
-    );
-
-
-    success.value =
-      `Complaint ${status.toLowerCase()} successfully.`;
-
+    success.value = `Complaint ${status.toLowerCase()} successfully.`;
 
     await loadComplaint();
-
-
-  } catch(err:any){
-
-    error.value =
-      err?.data?.message ||
-      "Unable to review complaint";
-
-
+  } catch (err: any) {
+    error.value = err?.data?.message || "Unable to review complaint";
   } finally {
-
     submitting.value = false;
-
   }
-
 };
 
-
-
 const rejectComplaint = async () => {
-  await attendanceService.reviewAttendanceComplaint(
-    complaint.value.id,
-    {
-      status: "REJECTED",
-      reviewNote: "Rejected by admin"
-    }
-  );
+  await attendanceService.reviewAttendanceComplaint(complaint.value.id, {
+    status: "REJECTED",
+    reviewNote: "Rejected by admin",
+  });
 
   success.value = "Complaint rejected";
   await loadComplaint();
 };
 
-
-const closeEdit = () => {
-  showEditForm.value = false;
-};
-
-
-
-const submitEditAttendance = async()=>{
-
-if(!complaint.value)return;
-
-
-submitting.value=true;
-
-
-try{
-
-
-await attendanceService.editAttendanceComplaint(
-  complaint.value.id,
-  {
-    checkIn: editForm.value.checkIn,
-    checkOut: editForm.value.checkOut,
-    status: editForm.value.status,
-    remarks: editForm.value.remarks,
-    reviewNote:editForm.value.reviewNote
-  }
-);
-
-
-success.value =
-"Attendance updated successfully";
-
-
-showEditForm.value=false;
-
-
-await loadComplaint();
-
-
-
-}catch(err:any){
-
-error.value =
-err?.data?.message ||
-"Unable to update attendance";
-
-
-}
-finally{
-
-submitting.value=false;
-
-}
-
-
-}
-
-
 const openEditExisting = () => {
-
   if (!complaint.value) return;
-
-
   showEditOptions.value = false;
-  showEditForm.value = true;
 
-
-  const eventType =
-    complaint.value.rawAttendance?.eventType;
-
-
-  const eventTime =
-    complaint.value.rawAttendance?.eventTime;
-
-
-  editForm.value = {
-
-    checkIn:
-      eventType === "CHECK_IN" && eventTime
-        ? eventTime.substring(11,16)
-        : "",
-
-
-    checkOut:
-      eventType === "CHECK_OUT" && eventTime
-        ? eventTime.substring(11,16)
-        : "",
-
-
-    status:
-      complaint.value.dailyAttendance?.status || "PRESENT",
-
-
-    remarks:
-      complaint.value.rawAttendance?.remarks || "",
-
-
-    reviewNote:""
-
-  };
-
+  navigateTo({
+    path: "/dashboard/attendance-complaints/update",
+    query: {
+      mode: "edit",
+      complaintId: complaint.value.id,
+      userId: complaint.value.user.id,
+      attendanceDate: complaint.value.attendanceDate,
+      complaintType: complaint.value.complaintType,
+    },
+  });
 };
 
 const openInsertAttendance = () => {
-
+  if (!complaint.value) return;
   showEditOptions.value = false;
 
-
-  editForm.value = {
-    checkIn:"",
-    checkOut:"",
-    status:"PRESENT",
-    remarks:"",
-    reviewNote:""
-  };
-
-
-  showEdit.value = true;
-
+  navigateTo({
+    path: "/dashboard/attendance-complaints/update",
+    query: {
+      mode: "insert",
+      complaintId: complaint.value.id,
+      userId: complaint.value.user.id,
+      attendanceDate: complaint.value.attendanceDate,
+      complaintType: complaint.value.complaintType,
+    },
+  });
 };
+
 const goBack = () => {
   navigateTo("/dashboard/attendance-complaints");
 };
@@ -259,50 +124,39 @@ onMounted(loadComplaint);
 
 <template>
   <div class="page">
-
     <div class="header">
       <div>
         <h1>Attendance Complaint</h1>
         <p>Review employee attendance complaint</p>
       </div>
 
-      <button class="back-btn" @click="goBack">
-        ← Back
-      </button>
+      <button class="back-btn" @click="goBack">← Back</button>
     </div>
 
-    <div v-if="loading" class="loading">
-      Loading complaint...
-    </div>
+    <div v-if="loading" class="loading">Loading complaint...</div>
 
     <div v-else-if="error" class="error-box">
       {{ error }}
     </div>
 
     <div v-else>
-
       <div v-if="success" class="success-box">
         {{ success }}
       </div>
 
       <div class="card">
-
         <div class="card-header">
-          <h2>
-            Complaint #{{ complaint.id }}
-          </h2>
+          <h2>Complaint #{{ complaint.id }}</h2>
 
           <span class="badge" :class="badgeClass">
             {{ complaint.status }}
           </span>
         </div>
 
-
         <div class="section">
           <h3>Employee Information</h3>
 
           <div class="grid">
-
             <div>
               <label>Name</label>
               <p>
@@ -337,16 +191,13 @@ onMounted(loadComplaint);
                 }}
               </p>
             </div>
-
           </div>
         </div>
-
 
         <div class="section">
           <h3>Attendance Details</h3>
 
           <div class="grid">
-
             <div>
               <label>Date</label>
               <p>{{ complaint.attendanceDate }}</p>
@@ -366,16 +217,13 @@ onMounted(loadComplaint);
               <label>Daily Status</label>
               <p>{{ complaint.dailyAttendance.status }}</p>
             </div>
-
           </div>
         </div>
-
 
         <div class="section">
           <h3>Complaint Details</h3>
 
           <div class="grid">
-
             <div>
               <label>Complaint Type</label>
               <p>{{ complaint.complaintType }}</p>
@@ -385,18 +233,13 @@ onMounted(loadComplaint);
               <label>Submitted On</label>
               <p>{{ complaint.createdAt }}</p>
             </div>
-
           </div>
 
-
-          <label class="reason-label">
-            Employee Reason
-          </label>
+          <label class="reason-label"> Employee Reason </label>
 
           <div class="reason-box">
             {{ complaint.reason }}
           </div>
-
 
           <div v-if="complaint.reviewNote" class="review-section">
             <label>Previous Review Note</label>
@@ -406,9 +249,7 @@ onMounted(loadComplaint);
             </div>
           </div>
 
-
           <div v-if="complaint.status === 'PENDING'" class="review-section">
-
             <label>Add Review Note</label>
 
             <textarea
@@ -417,205 +258,72 @@ onMounted(loadComplaint);
               placeholder="Write a review note (optional)..."
             />
 
-
             <div class="actions">
-
-              <button
-                class="approve-btn"
-                @click="showEditOptions = true"
-              >
+              <button class="approve-btn" @click="showEditOptions = true">
                 Edit Attendance
               </button>
-
-
-              <!-- Attendance Correction Choice Modal -->
-
-              <div v-if="showEditOptions" class="edit-overlay">
-
-                <div class="edit-card">
-
-                  <div class="edit-header">
-                    <h2>Attendance Correction</h2>
-
-                    <button
-                      class="close-btn"
-                      @click="showEditOptions = false"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-
-                  <p class="edit-description">
-                    Select the action you want to perform.
-                  </p>
-
-
-                  <div class="edit-options">
-
-                    <button
-                      class="option-card"
-                      @click="openEditExisting"
-                    >
-                      <h3>Edit Existing Attendance</h3>
-
-                      <p>
-                        Modify current check-in, check-out,
-                        status or remarks.
-                      </p>
-                    </button>
-
-
-                    <button
-                      class="option-card"
-                      @click="openInsertAttendance"
-                    >
-                      <h3>Insert New Attendance</h3>
-
-                      <p>
-                        Create a new attendance entry for
-                        this employee.
-                      </p>
-                    </button>
-
-                  </div>
-
-
-                  <button
-                    class="cancel-btn"
-                    @click="showEditOptions = false"
-                  >
-                    Cancel
-                  </button>
-
-                </div>
-              </div>
-
-
-              <div v-if="showEditForm" class="edit-card">
-
-                <h3>Edit Attendance Time</h3>
-
-                <div class="edit-grid">
-
-                  <div>
-                    <label>Check In</label>
-
-                    <input
-                    v-if="complaint.rawAttendance.eventType==='CHECK_IN'"
-                    type="time"
-                    v-model="editForm.checkIn"
-                    />
-                  </div>
-
-
-                  <div>
-                    <label>Check Out</label>
-
-                    <input
-                    v-if="complaint.rawAttendance.eventType==='CHECK_OUT'"
-                    type="time"
-                    v-model="editForm.checkOut"
-                    />
-                  </div>
-
-
-                  <div>
-                    <label>Status</label>
-
-                    <select v-model="editForm.status">
-                      <option value="PRESENT">Present</option>
-                      <option value="LATE">Late</option>
-                      <option value="ABSENT">Absent</option>
-                      <option value="LEAVE">Leave</option>
-                    </select>
-                  </div>
-
-                </div>
-
-
-                <label>Remarks</label>
-
-                <textarea
-                  v-model="editForm.remarks"
-                  rows="3"
-                />
-
-
-                <label>Review Note</label>
-
-                <textarea
-                  v-model="editForm.reviewNote"
-                  rows="3"
-                  placeholder="Reason for change"
-                />
-
-
-                <div class="actions">
-
-                  <button
-                    class="reject-btn"
-                    @click="closeEdit"
-                  >
-                    Cancel
-                  </button>
-
-
-                  <button
-                    class="approve-btn"
-                    :disabled="submitting"
-                    @click="submitEditAttendance"
-                  >
-                    {{
-                      submitting
-                        ? "Updating..."
-                        : "Save Changes"
-                    }}
-                  </button>
-
-                </div>
-
-              </div>
-
 
               <button
                 class="reject-btn"
                 :disabled="submitting"
                 @click="reviewComplaint('REJECTED')"
               >
-                {{
-                  submitting
-                    ? "Processing..."
-                    : "Reject"
-                }}
+                {{ submitting ? "Processing..." : "Reject" }}
               </button>
-
             </div>
 
+            <!-- Attendance Correction Choice Modal -->
+
+            <div v-if="showEditOptions" class="edit-overlay">
+              <div class="edit-card">
+                <div class="edit-header">
+                  <h2>Attendance Correction</h2>
+
+                  <button class="close-btn" @click="showEditOptions = false">
+                    ×
+                  </button>
+                </div>
+
+                <p class="edit-description">
+                  Select the action you want to perform.
+                </p>
+
+                <div class="edit-options">
+                  <button class="option-card" @click="openEditExisting">
+                    <h3>Edit Existing Attendance</h3>
+
+                    <p>
+                      Modify current check-in, check-out, status or remarks.
+                    </p>
+                  </button>
+
+                  <button class="option-card" @click="openInsertAttendance">
+                    <h3>Insert New Attendance</h3>
+
+                    <p>Create a new attendance entry for this employee.</p>
+                  </button>
+                </div>
+
+                <button class="cancel-btn" @click="showEditOptions = false">
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
 
-
           <div v-else class="completed-box">
-
-            <h3>
-              Complaint Reviewed
-            </h3>
+            <h3>Complaint Reviewed</h3>
 
             <p>
               This complaint has already been
               <strong>
-                {{ complaint.status.toLowerCase() }}
-              </strong>.
+                {{ complaint.status.toLowerCase() }} </strong
+              >.
             </p>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
-
   </div>
 </template>
 
@@ -652,7 +360,7 @@ onMounted(loadComplaint);
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: .2s;
+  transition: 0.2s;
 }
 
 .back-btn:hover {
@@ -686,7 +394,7 @@ onMounted(loadComplaint);
   background: white;
   border-radius: 14px;
   padding: 28px;
-  box-shadow: 0 12px 30px rgba(0,0,0,.06);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
 }
 
 .card-header {
@@ -714,7 +422,7 @@ onMounted(loadComplaint);
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 20px;
 }
 
@@ -766,7 +474,7 @@ textarea {
 textarea:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .actions {
@@ -784,7 +492,7 @@ textarea:focus {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: .2s;
+  transition: 0.2s;
 }
 
 .approve-btn {
@@ -805,7 +513,7 @@ textarea:focus {
 
 .approve-btn:disabled,
 .reject-btn:disabled {
-  opacity: .6;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -867,43 +575,137 @@ textarea:focus {
   }
 }
 
-.edit-card{
-
-margin-top:20px;
-padding:20px;
-background:white;
-border-radius:10px;
-border:1px solid #e2e8f0;
-
+.edit-card {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
 }
 
-
-.edit-grid{
-
-display:grid;
-grid-template-columns:repeat(2,1fr);
-gap:20px;
-
+.edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
 }
 
+.edit-overlay .edit-card {
+  margin-top: 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.edit-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #1e293b;
+}
+
+.close-btn {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.close-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.edit-description {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0 0 20px 0;
+}
+
+.edit-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.option-card {
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.option-card:hover {
+  border-color: #6366f1;
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.option-card h3 {
+  margin: 0 0 4px 0;
+  color: #1e293b;
+  font-size: 15px;
+}
+
+.option-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.cancel-btn {
+  width: 100%;
+  border: none;
+  background: #94a3b8;
+  color: white;
+  padding: 12px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #64748b;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
 
 .edit-card input,
 .edit-card select,
-.edit-card textarea{
-
-width:100%;
-padding:10px;
-border:1px solid #cbd5e1;
-border-radius:6px;
-
+.edit-card textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
 }
 
-
-.edit-card label{
-
-display:block;
-font-weight:600;
-margin-bottom:6px;
-
+.edit-card label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 </style>

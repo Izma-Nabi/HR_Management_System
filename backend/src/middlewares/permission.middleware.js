@@ -4,6 +4,14 @@ const normalizePermission = (permission) => {
   return String(permission || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 };
 
+const normalizeRole = (role) => {
+  return String(role || "").trim().toUpperCase().replace(/\s+/g, "_");
+};
+
+const isSuperAdminUser = (user) => {
+  return normalizeRole(user?.role || user?.roleName) === "SUPER_ADMIN";
+};
+
 const userPermissionSet = (user) => {
   return new Set((user?.permissions || []).map(normalizePermission));
 };
@@ -14,6 +22,10 @@ const requireAnyPermission = (...requiredPermissions) => {
   return (req, res, next) => {
     if (!req.user) {
       return next(new ApiError(401, "Authentication is required"));
+    }
+
+    if (isSuperAdminUser(req.user)) {
+      return next();
     }
 
     const permissions = userPermissionSet(req.user);

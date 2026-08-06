@@ -6,7 +6,9 @@ let syncRunning = false;
 
 const syncAttendanceFromSheet = async () => {
   if (syncRunning) {
-    console.log("Attendance sync skipped because a previous sync is still running.");
+    console.log(
+      "Attendance sync skipped because a previous sync is still running."
+    );
     return null;
   }
 
@@ -21,20 +23,51 @@ const syncAttendanceFromSheet = async () => {
 
     return result;
   } catch (error) {
-    console.error("Attendance sync failed:", error.message);
+    console.error(
+      "Attendance sync failed:",
+      error.message
+    );
+
     return null;
   } finally {
     syncRunning = false;
   }
 };
 
-const startAttendanceScheduler = () => {
-  console.log("Attendance scheduler started. Syncing Google Sheet every 30 seconds.");
+const autoCheckoutEmployees = async () => {
+  try {
+    console.log("Running auto checkout job...");
 
-  cron.schedule("*/30 * * * * *", syncAttendanceFromSheet);
+    await attendanceService.autoCheckoutEmployees();
+
+    console.log("Auto checkout completed.");
+  } catch (error) {
+    console.error(
+      "Auto checkout failed:",
+      error.message
+    );
+  }
+};
+
+const startAttendanceScheduler = () => {
+  console.log(
+    "Attendance scheduler started. Syncing Google Sheet every 30 seconds."
+  );
+
+  // Existing Google Sheet sync
+  cron.schedule(
+    "*/30 * * * * *",
+    syncAttendanceFromSheet
+  );
+
+  // Auto checkout every day at 11:59 PM
+  cron.schedule(
+    "59 23 * * *",
+    autoCheckoutEmployees
+  );
 };
 
 module.exports = {
   startAttendanceScheduler,
-  syncAttendanceFromSheet
+  syncAttendanceFromSheet,
 };

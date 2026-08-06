@@ -87,6 +87,20 @@ const editAttendanceComplaint = async (id, data) => {
   return response.data;
 };
 
+const insertManualAttendance = async (payload) => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/attendance/admin/manual`,
+    {
+      method: "POST",
+      headers: authService.getAuthHeaders(),
+      body: payload
+    }
+  );
+
+  return response.data;
+};
 
 export default {
   createComplaint,
@@ -94,5 +108,6 @@ export default {
   getMyDayDetails,
   getAttendanceComplaints,
   reviewAttendanceComplaint,
-  editAttendanceComplaint
+  editAttendanceComplaint,
+  insertManualAttendance
 };

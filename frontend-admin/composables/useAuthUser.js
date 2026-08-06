@@ -25,14 +25,20 @@ export const useAuthUser = () => {
     return String(permission || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
   };
 
+  const normalizeRole = (roleName) => {
+    return String(roleName || "").trim().toUpperCase().replace(/\s+/g, "_");
+  };
+
   const permissions = computed(() => authUser.value?.permissions || []);
   const permissionSet = computed(() =>
     new Set(permissions.value.map(normalizePermission))
   );
   const role = computed(() => authUser.value?.role || null);
+  const roleKey = computed(() => normalizeRole(role.value));
+  const isSuperAdmin = computed(() => roleKey.value === "SUPER_ADMIN");
 
   const hasPermission = (permission) => {
-    return permissionSet.value.has(normalizePermission(permission));
+    return isSuperAdmin.value || permissionSet.value.has(normalizePermission(permission));
   };
 
   const hasAnyPermission = (...requiredPermissions) => {
@@ -42,6 +48,8 @@ export const useAuthUser = () => {
   return {
     authUser,
     role,
+    roleKey,
+    isSuperAdmin,
     permissions,
     hasPermission,
     hasAnyPermission,

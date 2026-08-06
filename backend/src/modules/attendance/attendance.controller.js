@@ -115,6 +115,25 @@ const editAttendanceComplaint = asyncHandler(async (req, res) => {
 });
 
 
+const insertManualAttendance = asyncHandler(async (req, res) => {
+ console.log("=== insertManualAttendance called ===");
+  console.log(req.body);
+
+  const result =
+    await attendanceService.insertManualAttendance(
+    req.body,
+    req.user.id
+  );
+
+  return sendSuccess(
+    res,
+    201,
+    "Attendance record created successfully",
+    result
+  );
+
+});
+
 module.exports = {
   createComplaint,
   getMyCurrentWeek,
@@ -124,4 +143,5 @@ module.exports = {
   getAttendanceComplaints,
   reviewAttendanceComplaint,
   editAttendanceComplaint,
+  insertManualAttendance
 };

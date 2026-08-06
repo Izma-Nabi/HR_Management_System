@@ -17,6 +17,12 @@ router.post(
   attendanceController.createComplaint
 );
 
+router.get(
+  "/my/day/:date",
+  authMiddleware,
+  attendanceController.getMyDayDetails
+);
+
 
 // Admin - View complaints
 router.get(
@@ -39,6 +45,21 @@ router.patch(
   "/admin/complaints/:id/edit",
   authMiddleware,
   attendanceController.editAttendanceComplaint
+);
+
+router.post(
+  "/manual",
+  authMiddleware,
+  requirePermission("MANAGE_ATTENDANCE"),
+  attendanceController.insertManualAttendance
+
+);
+
+router.post(
+  "/admin/manual",
+  authMiddleware,
+  requirePermission("MANAGE_ATTENDANCE"),
+  attendanceController.insertManualAttendance
 );
 
 

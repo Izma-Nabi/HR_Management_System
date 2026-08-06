@@ -406,176 +406,135 @@ const updateOrCreateAttendance = async ({
   remarks
 }) => {
 
-  const attendanceDate =
-    complaint.attendanceDate
-      .toISOString()
-      .slice(0, 10);
+  const attendanceDate = complaint.attendanceDate.toISOString().slice(0, 10);
 
+  let eventType;
+  let timeValue;
 
-  /**
-   * CASE 1:
-   * Edit existing attendance record
-   */
-  const existingAttendance = complaint.rawAttendance;
+  if (checkIn) {
+    eventType = "CHECK_IN";
+    timeValue = checkIn; // "HH:mm"
+  } else if (checkOut) {
+    eventType = "CHECK_OUT";
+    timeValue = checkOut;
+  }
 
+  return prisma.$transaction(async (tx) => {
 
-  if (existingAttendance) {
+    let attendanceRecord;
 
-    let eventType;
-    let eventTime;
+    const existingAttendance = complaint.rawAttendance;
 
+    /**
+     * CASE 1:
+     * Edit existing attendance record
+     */
+    if (existingAttendance) {
 
-    // Complaint is CHECK_IN
-    if (checkIn) {
+      if (eventType && timeValue) {
 
-      eventType = "CHECK_IN";
+        await tx.$executeRaw`
+          UPDATE attendance
+          SET
+            event_type = ${eventType},
+            event_time = STR_TO_DATE(${`${attendanceDate} ${timeValue}:00`}, '%Y-%m-%d %H:%i:%s'),
+            remarks = ${remarks || existingAttendance.remarks},
+            updated_at = ${pakistanNowSql()}
+          WHERE id = ${existingAttendance.id}
+        `;
 
-      eventTime = new Date(
-        `${attendanceDate}T${checkIn}:00`
-      );
+      } else {
 
-    }
-
-
-    // Complaint is CHECK_OUT
-    else if (checkOut) {
-
-      eventType = "CHECK_OUT";
-
-      eventTime = new Date(
-        `${attendanceDate}T${checkOut}:00`
-      );
-
-    }
-
-
-    return await prisma.attendance.update({
-
-      where:{
-        id: existingAttendance.id
-      },
-
-
-      data:{
-
-        eventType,
-
-        eventTime,
-
-        remarks:
-          remarks || existingAttendance.remarks
+        // Only remarks changed, no time edit submitted
+        await tx.$executeRaw`
+          UPDATE attendance
+          SET
+            remarks = ${remarks || existingAttendance.remarks},
+            updated_at = ${pakistanNowSql()}
+          WHERE id = ${existingAttendance.id}
+        `;
 
       }
 
-    });
+      attendanceRecord = await tx.attendance.findUnique({
+        where: { id: existingAttendance.id }
+      });
 
-  }
+    } else {
 
+      /**
+       * CASE 2:
+       * Insert new attendance record
+       */
+      const user = await tx.user.findUnique({
+        where: { id: complaint.userId }
+      });
 
+      if (!user) {
+        throw new Error("User not found");
+      }
 
-  /**
-   * CASE 2:
-   * Insert new attendance record
-   */
-  const user = await prisma.user.findUnique({
+      if (!eventType || !timeValue) {
+        throw new Error("Check-in or Check-out time required");
+      }
 
-    where:{
-      id: complaint.userId
-    }
+      const sourceKey = `ADMIN_CORRECTION_${Date.now()}`;
 
-  });
+      await tx.$executeRaw`
+        INSERT INTO attendance (
+          user_id,
+          user_code,
+          full_name,
+          department_id,
+          designation_id,
+          attendance_date,
+          event_type,
+          event_time,
+          remarks,
+          source_key,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${complaint.userId},
+          ${user.userCode},
+          ${`${user.firstName} ${user.lastName}`},
+          ${user.departmentId || null},
+          ${user.designationId || null},
+          ${attendanceDate},
+          ${eventType},
+          STR_TO_DATE(${`${attendanceDate} ${timeValue}:00`}, '%Y-%m-%d %H:%i:%s'),
+          ${remarks || "Added by admin correction"},
+          ${sourceKey},
+          ${pakistanNowSql()},
+          ${pakistanNowSql()}
+        )
+      `;
 
-
-  if(!user){
-    throw new Error(
-      "User not found"
-    );
-  }
-
-
-
-  let eventType;
-  let eventTime;
-
-
-  if(checkIn){
-
-    eventType="CHECK_IN";
-
-    eventTime =
-      new Date(
-        `${attendanceDate}T${checkIn}:00`
-      );
-
-  }
-
-
-  else if(checkOut){
-
-    eventType="CHECK_OUT";
-
-    eventTime =
-      new Date(
-        `${attendanceDate}T${checkOut}:00`
-      );
-
-  }
-
-
-  else{
-
-    throw new Error(
-      "Check-in or Check-out time required"
-    );
-
-  }
-
-
-
-  return await prisma.attendance.create({
-
-    data:{
-
-
-      userId:
-        complaint.userId,
-
-
-      userCode:
-        user.userCode,
-
-
-      fullName:
-        `${user.firstName} ${user.lastName}`,
-
-
-      departmentId:
-        user.departmentId || null,
-
-
-      designationId:
-        user.designationId || null,
-
-
-      attendanceDate:
-        new Date(attendanceDate),
-
-
-      eventType,
-
-
-      eventTime,
-
-
-      remarks:
-        remarks || "Added by admin correction",
-
-
-      sourceKey:
-        `ADMIN_CORRECTION_${Date.now()}`
+      attendanceRecord = await tx.attendance.findUnique({
+        where: { sourceKey }
+      });
 
     }
 
+    /**
+     * Apply the manual status override to the daily summary.
+     * This is what the "Status" dropdown in the edit form controls —
+     * it was previously accepted but never persisted anywhere.
+     */
+    if (status) {
+      await tx.attendanceSummary.update({
+        where: { id: complaint.dailyAttendanceId },
+        data: {
+          attendanceStatus: status
+        }
+      });
+    }
+
+    return attendanceRecord;
+
+  }, {
+    timeout: 30000
   });
 
 };
@@ -606,6 +565,132 @@ const updateAttendanceFromComplaint = async (
   });
 
 };
+
+const insertManualAttendance = async ({
+  userId,
+  attendanceDate,
+  eventType,
+  eventTime,
+  remarks
+}) => {
+  console.log("Repository input:", {
+    userId,
+    attendanceDate,
+    eventType,
+    eventTime,
+    remarks
+  });
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: Number(userId)
+    }
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const sourceKey = `ADMIN_MANUAL_${Date.now()}`;
+
+  await prisma.$executeRaw`
+    INSERT INTO attendance (
+      user_id,
+      user_code,
+      full_name,
+      department_id,
+      designation_id,
+      attendance_date,
+      event_type,
+      event_time,
+      remarks,
+      source_key,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${user.id},
+      ${user.userCode},
+      ${`${user.firstName} ${user.lastName}`},
+      ${user.departmentId},
+      ${user.designationId},
+      ${attendanceDate},
+      ${eventType},
+      STR_TO_DATE(
+        ${`${attendanceDate} ${eventTime}:00`},
+        '%Y-%m-%d %H:%i:%s'
+      ),
+      ${remarks || null},
+      ${sourceKey},
+      ${pakistanNowSql()},
+      ${pakistanNowSql()}
+    )
+  `;
+
+  return prisma.attendance.findUnique({
+    where: {
+      sourceKey
+    }
+  });
+};
+
+
+const autoCheckoutEmployees = async () => {
+
+  const users = await prisma.$queryRaw`
+    SELECT DISTINCT a.user_id
+    FROM attendance a
+    WHERE a.event_type = 'CHECK_IN'
+      AND DATE(a.attendance_date) = CURDATE()
+      AND NOT EXISTS (
+        SELECT 1
+        FROM attendance b
+        WHERE b.user_id = a.user_id
+          AND DATE(b.attendance_date) = DATE(a.attendance_date)
+          AND b.event_type = 'CHECK_OUT'
+      )
+  `;
+
+  for (const row of users) {
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: row.user_id
+      }
+    });
+
+    if (!user) {
+      continue;
+    }
+
+    const sourceKey =
+      `AUTO_CHECKOUT_${user.id}_${new Date().toISOString().slice(0, 10)}`;
+
+    await prisma.attendance.create({
+      data: {
+        userId: user.id,
+        userCode: user.userCode,
+        fullName: `${user.firstName} ${user.lastName}`,
+        departmentId: user.departmentId,
+        designationId: user.designationId,
+        attendanceDate: new Date(),
+        eventType: "CHECK_OUT",
+        eventTime: new Date(
+          `${new Date().toISOString().slice(0, 10)}T23:59:59`
+        ),
+        remarks: "Auto checkout - Employee forgot to check out",
+        sourceKey
+      }
+    });
+
+    console.log(
+      `Auto checkout created for ${user.userCode}`
+    );
+  }
+
+};
+
+
 module.exports = {
   createManyAttendance,
   createComplaint,
@@ -625,5 +710,7 @@ module.exports = {
   updateComplaintStatus,
   applyAttendanceCorrection,
   updateOrCreateAttendance,
-  updateAttendanceFromComplaint
+  updateAttendanceFromComplaint,
+  insertManualAttendance,
+  autoCheckoutEmployees
 };
