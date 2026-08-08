@@ -50,14 +50,69 @@ const updateDepartment = async (id, payload) => {
   return departmentsRepository.updateDepartment(department.id, payload);
 };
 
-const deleteDepartment = async (id) => {
-  const department = await getDepartment(id);
 
-  if (department.employees.length > 0 || department.admins.length > 0) {
-    throw new ApiError(409, "Cannot delete department because it has assigned employees or administrators");
+const deleteDepartment = async (id) => {
+  const department = await repository.findDepartmentById(id);
+
+  if (!department) {
+    throw new ApiError(404, "Department not found");
   }
 
-  return departmentsRepository.deleteDepartment(department.id);
+  const userCount = await repository.countUsersByDepartment(id);
+
+  if (userCount > 1) {
+    throw new ApiError(
+      400,
+      "Department cannot be deleted because multiple users are assigned to it"
+    );
+  }
+
+  return repository.deleteDepartment(id);
+};
+
+const getDepartmentUsers = async (departmentId) => {
+  const department = await prisma.department.findUnique({
+    where: {
+      id: Number(departmentId)
+    },
+    include: {
+      users: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          employmentStatus: true,
+          role: {
+            select: {
+              id: true,
+              roleName: true
+            }
+          }
+        },
+        orderBy: [
+          {
+            firstName: "asc"
+          },
+          {
+            lastName: "asc"
+          }
+        ]
+      }
+    }
+  });
+
+  if (!department) {
+    throw new ApiError(404, "Department not found");
+  }
+
+  return {
+    id: department.id,
+    departmentName: department.departmentName,
+    description: department.description,
+    users: department.users,
+    userCount: department.users.length
+  };
 };
 
 const listDepartmentDesignations = async (id) => {
@@ -77,5 +132,6 @@ module.exports = {
   createDepartment,
   updateDepartment,
   deleteDepartment,
-  listDepartmentDesignations
+  listDepartmentDesignations,
+  getDepartmentUsers
 };

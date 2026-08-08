@@ -42,7 +42,9 @@ const mapPerson = (user) => ({
 const mapDepartment = (department) => {
   const admins = [];
   const employees = [];
-  const people = Array.isArray(department.users) ? department.users : [];
+  const people = Array.isArray(department.users)
+    ? department.users
+    : [];
 
   people.forEach((user) => {
     const role = toRoleKey(user.role);
@@ -52,7 +54,10 @@ const mapDepartment = (department) => {
       return;
     }
 
-    if (role === ROLE_KEYS.ADMIN || role === ROLE_KEYS.SUPER_ADMIN) {
+    if (
+      role === ROLE_KEYS.ADMIN ||
+      role === ROLE_KEYS.SUPER_ADMIN
+    ) {
       admins.push(mapPerson(user));
     }
   });
@@ -62,7 +67,8 @@ const mapDepartment = (department) => {
   return {
     ...departmentData,
     admins,
-    employees
+    employees,
+    userCount: people.length
   };
 };
 
@@ -128,12 +134,116 @@ const updateDepartment = async (id, data) => {
 };
 
 const deleteDepartment = async (id) => {
+  const departmentId = Number(id);
+
+  if (!Number.isInteger(departmentId)) {
+    throw new ApiError(400, "Invalid department ID");
+  }
+
+  const userCount = await prisma.user.count({
+    where: {
+      departmentId: departmentId,
+    },
+  });
+
+  console.log(
+    `Department ${departmentId} has ${userCount} assigned user(s)`
+  );
+
+  if (userCount > 0) {
+    throw new ApiError(
+      400,
+      `Cannot delete department because ${userCount} user(s) are assigned to it.`
+    );
+  }
+
   return prisma.department.delete({
     where: {
-      id: Number(id)
-    }
+      id: departmentId,
+    },
   });
 };
+
+const getDepartmentUsers = async (departmentId) => {
+  return prisma.user.findMany({
+    where: {
+      departmentId: Number(departmentId)
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      employmentStatus: true,
+      role: {
+        select: {
+          id: true,
+          roleName: true
+        }
+      },
+      department: {
+        select: {
+          id: true,
+          departmentName: true
+        }
+      },
+      designation: {
+        select: {
+          id: true,
+          designationName: true
+        }
+      }
+    },
+    orderBy: [
+      {
+        firstName: "asc"
+      },
+      {
+        lastName: "asc"
+      }
+    ]
+  });
+};
+
+
+const countUsersByDepartment = async (departmentId) => {
+  const count = await prisma.user.count({
+    where: {
+      departmentId: Number(departmentId),
+    },
+  });
+
+  console.log(
+    `Users assigned to department ${departmentId}:`,
+    count
+  );
+
+  return count;
+};
+
+const getDepartments = async () => {
+  const departments = await prisma.department.findMany({
+    orderBy: {
+      departmentName: "asc"
+    }
+  });
+
+  return Promise.all(
+    departments.map(async (department) => {
+      const userCount = await prisma.user.count({
+        where: {
+          departmentId: department.id
+        }
+      });
+
+      return {
+        ...department,
+        userCount
+      };
+    })
+  );
+};
+
 
 const listDepartmentDesignations = async (departmentId) => {
   return prisma.designation.findMany({
@@ -158,5 +268,8 @@ module.exports = {
   createDepartment,
   updateDepartment,
   deleteDepartment,
-  listDepartmentDesignations
+  listDepartmentDesignations,
+  countUsersByDepartment,
+  getDepartments,
+  getDepartmentUsers
 };

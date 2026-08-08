@@ -1,37 +1,91 @@
 <script setup lang="ts">
+import leaveService from "~/services/leave.service";
+
 definePageMeta({
-  layout: "dashboard"
+  layout: "dashboard",
 });
 
 const router = useRouter();
-const { hasPermission } = useAuthUser();
-const canApplyLeave = computed(() => hasPermission("CREATE_LEAVE"));
 
-const form = reactive({
+const { authUser, hasPermission } = useAuthUser();
+
+const loading = ref(false);
+const errorMessage = ref("");
+const successMessage = ref("");
+
+const form = ref({
   type: "",
   startDate: "",
   endDate: "",
-  reason: ""
+  reason: "",
 });
 
-const submitLeave = () => {
+const canApplyLeave = computed(() => {
+  return (
+    hasPermission("CREATE_LEAVE") &&
+    form.value.type !== "" &&
+    form.value.startDate !== "" &&
+    form.value.endDate !== ""
+  );
+});
+
+const totalDays = computed(() => {
+  if (!form.value.startDate || !form.value.endDate) {
+    return 0;
+  }
+
+  const start = new Date(`${form.value.startDate}T00:00:00`);
+  const end = new Date(`${form.value.endDate}T00:00:00`);
+
+  const difference = end.getTime() - start.getTime();
+  const days = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+
+  return days > 0 ? days : 0;
+});
+
+const submitLeave = async () => {
+  errorMessage.value = "";
+  successMessage.value = "";
+
   if (!canApplyLeave.value) {
+    errorMessage.value = "Please fill in all required fields.";
     return;
   }
 
-  console.log(form);
-
-  // TODO
-  // await leaveService.createLeave(form)
-
-  router.push("/dashboard/leaves");
-};
-
-onMounted(() => {
-  if (!canApplyLeave.value) {
-    router.replace("/dashboard/leaves");
+  if (totalDays.value <= 0) {
+    errorMessage.value = "End date must be on or after the start date.";
+    return;
   }
-});
+
+  loading.value = true;
+
+  try {
+    const response = await leaveService.createLeaveRequest({
+      type: form.value.type,
+      startDate: form.value.startDate,
+      endDate: form.value.endDate,
+      totalDays: totalDays.value,
+      reason: form.value.reason.trim() || null,
+    });
+
+    console.log("Leave created:", response);
+
+    successMessage.value = "Leave request submitted successfully.";
+
+    setTimeout(() => {
+      router.push("/dashboard/leaves");
+    }, 800);
+  } catch (error: any) {
+    console.error("Failed to submit leave:", error);
+
+    errorMessage.value =
+      error?.data?.message ||
+      error?.response?.data?.message ||
+      "Unable to submit leave request.";
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -45,10 +99,25 @@ onMounted(() => {
 
       <button
         class="back-btn"
+        type="button"
         @click="router.push('/dashboard/leaves')"
       >
         Back
       </button>
+    </div>
+
+    <div
+      v-if="errorMessage"
+      class="notice error"
+    >
+      {{ errorMessage }}
+    </div>
+
+    <div
+      v-if="successMessage"
+      class="notice success"
+    >
+      {{ successMessage }}
     </div>
 
     <div class="form-card">
@@ -88,6 +157,13 @@ onMounted(() => {
 
       </div>
 
+      <div
+        v-if="totalDays > 0"
+        class="days-preview"
+      >
+        Total Days: <strong>{{ totalDays }}</strong>
+      </div>
+
       <div class="form-group">
         <label>Reason</label>
 
@@ -99,8 +175,11 @@ onMounted(() => {
       </div>
 
       <div class="actions">
+
         <button
           class="cancel-btn"
+          type="button"
+          :disabled="loading"
           @click="router.push('/dashboard/leaves')"
         >
           Cancel
@@ -108,11 +187,13 @@ onMounted(() => {
 
         <button
           class="submit-btn"
-          :disabled="!canApplyLeave"
+          type="button"
+          :disabled="!canApplyLeave || loading"
           @click="submitLeave"
         >
-          Apply Leave
+          {{ loading ? "Submitting..." : "Apply Leave" }}
         </button>
+
       </div>
 
     </div>

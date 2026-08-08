@@ -1,0 +1,90 @@
+import authService from "~/services/auth.service";
+
+const getLeaveRequests = async () => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(`${config.public.apiBase}/leaves`, {
+    method: "GET",
+    headers: authService.getAuthHeaders(),
+  });
+};
+
+const getLeaveRequest = async (id) => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(`${config.public.apiBase}/leaves/${id}`, {
+    method: "GET",
+    headers: authService.getAuthHeaders(),
+  });
+};
+
+const createLeaveRequest = async (data) => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(`${config.public.apiBase}/leaves`, {
+    method: "POST",
+    headers: {
+      ...authService.getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: data,
+  });
+};
+
+const approveLeave = async (id, decisionNote = "") => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(
+    `${config.public.apiBase}/leaves/${id}/approve`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authService.getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: {
+        decisionNote,
+      },
+    }
+  );
+};
+
+const rejectLeave = async (id, decisionNote = "") => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(
+    `${config.public.apiBase}/leaves/${id}/reject`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authService.getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: {
+        decisionNote,
+      },
+    }
+  );
+};
+
+
+const cancelLeave = async (id) => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(
+    `${config.public.apiBase}/leaves/${id}/cancel`,
+    {
+      method: "PATCH",
+      headers: authService.getAuthHeaders(),
+    }
+  );
+};
+
+export default {
+  getLeaveRequests,
+  getLeaveRequest,
+  createLeaveRequest,
+  approveLeave,
+  rejectLeave,
+  cancelLeave,
+};

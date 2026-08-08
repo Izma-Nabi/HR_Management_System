@@ -2,68 +2,6 @@ const { prisma } = require("../../../../database/prisma");
 const { ROLE_KEYS, roleNameCandidates, toRoleKey } = require("../../utils/roles");
 const { generateNextAdminCode } = require("../../utils/admin-code");
 
-const ROLE_PERMISSION_FALLBACKS = {
-  [ROLE_KEYS.SUPER_ADMIN]: [
-    "CREATE_ADMIN",
-    "VIEW_ADMINS",
-    "UPDATE_ADMIN",
-    "DELETE_ADMIN",
-    "CREATE_DEPARTMENT",
-    "VIEW_DEPARTMENTS",
-    "UPDATE_DEPARTMENT",
-    "DELETE_DEPARTMENT",
-    "CREATE_EMPLOYEE",
-    "VIEW_EMPLOYEES",
-    "UPDATE_EMPLOYEE",
-    "DELETE_EMPLOYEE",
-    "UPDATE_USER",
-    "VIEW_ROLES",
-    "CREATE_ROLE",
-    "UPDATE_ROLE",
-    "DELETE_ROLE",
-    "VIEW_DESIGNATIONS",
-    "CREATE_DESIGNATION",
-    "UPDATE_DESIGNATION",
-    "DELETE_DESIGNATION",
-    "IMPORT_ATTENDANCE",
-    "VIEW_SYSTEM_SUMMARY",
-    "VIEW_TEAM_ATTENDANCE",
-    "VIEW_OWN_ATTENDANCE",
-    "VIEW_REPORTS",
-    "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVES",
-    "APPROVE_LEAVE",
-    "REJECT_LEAVE",
-    "VIEW_ATTENDANCE_COMPLAINTS",
-    "MANAGE_ATTENDANCE",
-  ],
-  [ROLE_KEYS.ADMIN]: [
-    "CREATE_LEAVE",
-    "CREATE_EMPLOYEE",
-    "VIEW_EMPLOYEES",
-    "UPDATE_EMPLOYEE",
-    "DELETE_EMPLOYEE",
-    "UPDATE_USER",
-    "IMPORT_ATTENDANCE",
-    "VIEW_SYSTEM_SUMMARY",
-    "VIEW_REPORTS",
-    "VIEW_OWN_LEAVES",
-    "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVES",
-    "APPROVE_LEAVE",
-    "REJECT_LEAVE",
-    "CANCEL_LEAVE",
-    "VIEW_ATTENDANCE_COMPLAINTS",
-    "MANAGE_ATTENDANCE",
-  ],
-  [ROLE_KEYS.EMPLOYEE]: [
-    "CREATE_LEAVE",
-    "VIEW_OWN_ATTENDANCE",
-    "VIEW_OWN_LEAVES",
-    "CANCEL_LEAVE"
-  ]
-};
-
 const safeUserSelect = {
   id: true,
   userCode: true,
@@ -144,7 +82,7 @@ const permissionsFromRole = (role) => {
     return [];
   }
 
-  const permissions = new Set(ROLE_PERMISSION_FALLBACKS[roleKey] || []);
+  const permissions = new Set();
   const rolePermissions = role?.rolePermissions || [];
 
   for (const rolePermission of rolePermissions) {

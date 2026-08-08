@@ -17,7 +17,6 @@ const authHeaders = () => {
   };
 };
 
-
 type FieldError = {
   field: string;
   message: string;
@@ -77,9 +76,11 @@ const defaultForm = (): UserForm => ({
 });
 
 const form = reactive(defaultForm());
+
 const roles = ref<Role[]>([]);
 const designations = ref<Designation[]>([]);
 const departments = ref<Department[]>([]);
+
 const loading = ref(false);
 const pageLoading = ref(true);
 const successMessage = ref("");
@@ -90,38 +91,114 @@ const photoInputKey = ref(0);
 const visibleRoles = computed(() => roles.value);
 
 const fieldErrorMap = computed(() => {
-  return fieldErrors.value.reduce<Record<string, string>>((errors, error) => {
-    errors[error.field] = error.message;
-    return errors;
-  }, {});
+  return fieldErrors.value.reduce<Record<string, string>>(
+    (errors, error) => {
+      errors[error.field] = error.message;
+      return errors;
+    },
+    {}
+  );
 });
 
-const loadDepartments = async (headers: Record<string, string>) => {
+const isAdminRole = computed(() => {
+  const selectedRole = visibleRoles.value.find(
+    (role) => Number(role.id) === Number(form.roleId)
+  );
+
+  return selectedRole?.roleName?.trim().toUpperCase() === "ADMIN";
+});
+
+const noDepartment = computed(() => {
+  return departments.value.find(
+    (department) =>
+      department.departmentName?.trim().toUpperCase() === "NO-DEPT"
+  );
+});
+
+const loadDepartments = async (
+  headers: Record<string, string>
+) => {
   departments.value = await departmentService.getDepartments();
 };
 
-const loadRoles = async (headers: Record<string, string>) => {
-   roles.value = await roleService.getRoles();
+const loadRoles = async (
+  headers: Record<string, string>
+) => {
+  roles.value = await roleService.getRoles();
 };
 
-const loadDesignations = async (departmentId: number) => {
+const loadDesignations = async (
+  departmentId: number
+) => {
   try {
-    const response = await departmentService.getDepartmentDesignations(departmentId);
+    const response =
+      await departmentService.getDepartmentDesignations(
+        departmentId
+      );
 
-    console.log("Designation API response:", response);
+    console.log(
+      "Designation API response:",
+      response
+    );
 
     designations.value = response;
 
   } catch (error: any) {
-    console.log("Designation API failed:", error);
+    console.log(
+      "Designation API failed:",
+      error
+    );
+
     throw error;
   }
 };
 
 watch(
+  () => form.roleId,
+  async () => {
+    if (isAdminRole.value) {
+      console.log("ADMIN role selected");
+
+      designations.value = [];
+
+      form.designationId = null;
+
+      if (noDepartment.value) {
+        form.departmentId = noDepartment.value.id;
+
+        console.log(
+          "NO-DEPT automatically selected:",
+          noDepartment.value.id
+        );
+      } else {
+        form.departmentId = null;
+
+        console.warn(
+          "NO-DEPT department was not found"
+        );
+      }
+
+      return;
+    }
+    form.departmentId = null;
+    form.designationId = null;
+    designations.value = [];
+  }
+);
+
+
+watch(
   () => form.departmentId,
   async (departmentId) => {
-    console.log("Selected department:", departmentId);
+    console.log(
+      "Selected department:",
+      departmentId
+    );
+    if (isAdminRole.value) {
+      form.designationId = null;
+      designations.value = [];
+      return;
+    }
 
     form.designationId = null;
     designations.value = [];
@@ -131,27 +208,49 @@ watch(
     }
 
     try {
-      console.log("Calling designation API...");
-      await loadDesignations(departmentId);
-      console.log("Designation loaded:", designations.value);
+      console.log(
+        "Calling designation API..."
+      );
+
+      await loadDesignations(
+        departmentId
+      );
+
+      console.log(
+        "Designation loaded:",
+        designations.value
+      );
+
     } catch (error: any) {
-      console.log("Designation error:", error);
+      console.log(
+        "Designation error:",
+        error
+      );
+
       errorMessage.value =
-        error?.data?.message || "Unable to load designations";
+        error?.data?.message ||
+        "Unable to load designations";
     }
   }
 );
-
 onMounted(async () => {
   if (!canCreateUser.value) {
-    await navigateTo("/dashboard", { replace: true });
+    await navigateTo(
+      "/dashboard",
+      { replace: true }
+    );
+
     return;
   }
 
   const headers = authHeaders();
 
   if (!headers) {
-    await navigateTo("/login", { replace: true });
+    await navigateTo(
+      "/login",
+      { replace: true }
+    );
+
     return;
   }
 
@@ -161,225 +260,517 @@ onMounted(async () => {
       loadRoles(headers)
     ]);
 
-    if (!form.roleId && visibleRoles.value.length === 1) {
-      form.roleId = visibleRoles.value[0].id;
+    if (
+      !form.roleId &&
+      visibleRoles.value.length === 1
+    ) {
+      form.roleId =
+        visibleRoles.value[0].id;
     }
+
   } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to load form data";
+    errorMessage.value =
+      error?.data?.message ||
+      "Unable to load form data";
+
   } finally {
     pageLoading.value = false;
   }
 });
 
 const resetForm = () => {
-  Object.assign(form, defaultForm());
+  Object.assign(
+    form,
+    defaultForm()
+  );
 
-  if (visibleRoles.value.length === 1) {
-    form.roleId = visibleRoles.value[0].id;
+  if (
+    visibleRoles.value.length === 1
+  ) {
+    form.roleId =
+      visibleRoles.value[0].id;
   }
 
   designations.value = [];
+
   fieldErrors.value = [];
+
   errorMessage.value = "";
+
   successMessage.value = "";
+
   photoInputKey.value += 1;
 };
 
-const selectPhoto = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  form.photo = input.files?.[0] || null;
+const selectPhoto = (
+  event: Event
+) => {
+  const input =
+    event.target as HTMLInputElement;
+
+  form.photo =
+    input.files?.[0] || null;
 };
 
 const saveUser = async () => {
   const headers = authHeaders();
 
   if (!headers) {
-    await navigateTo("/login", { replace: true });
+    await navigateTo(
+      "/login",
+      { replace: true }
+    );
+
     return;
   }
 
   loading.value = true;
+
   successMessage.value = "";
+
   errorMessage.value = "";
+
   fieldErrors.value = [];
 
   try {
+
+    if (isAdminRole.value) {
+      if (!noDepartment.value) {
+        throw new Error(
+          "NO-DEPT department was not found"
+        );
+      }
+
+      form.departmentId =
+        noDepartment.value.id;
+
+      form.designationId = null;
+    }
+
+
     const body = new FormData();
 
-    body.append("firstName", form.firstName);
-    body.append("lastName", form.lastName);
-    body.append("email", form.email);
-    body.append("password", form.password);
-    body.append("phone", form.phone);
-    body.append("address", form.address);
-    body.append("roleId", form.roleId ? String(form.roleId) : "");
-    body.append("departmentId", form.departmentId ? String(form.departmentId) : "");
-    body.append("designationId", form.designationId ? String(form.designationId) : "");
-    body.append("joiningDate", form.joiningDate);
-
-    if (form.photo) {
-      body.append("photo", form.photo);
-    }
-
-    const response = await $fetch<{ message: string }>(
-      `${config.public.apiBase}/users`,
-      {
-        method: "POST",
-        headers,
-        body
-      }
+    body.append(
+      "firstName",
+      form.firstName
     );
 
-    successMessage.value = response.message || "User created successfully";
-    resetForm();
-  } catch (error: any) {
-    errorMessage.value = error?.data?.message || "Unable to create user";
-    fieldErrors.value = Array.isArray(error?.data?.errors)
-      ? error.data.errors
-      : [];
+    body.append(
+      "lastName",
+      form.lastName
+    );
 
-    if (error?.statusCode === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      await navigateTo("/login", { replace: true });
+    body.append(
+      "email",
+      form.email
+    );
+
+    body.append(
+      "password",
+      form.password
+    );
+
+    body.append(
+      "phone",
+      form.phone
+    );
+
+    body.append(
+      "address",
+      form.address
+    );
+
+    body.append(
+      "roleId",
+      form.roleId
+        ? String(form.roleId)
+        : ""
+    );
+
+    body.append(
+      "departmentId",
+      form.departmentId
+        ? String(form.departmentId)
+        : ""
+    );
+
+    body.append(
+      "designationId",
+      form.designationId
+        ? String(form.designationId)
+        : ""
+    );
+
+    body.append(
+      "joiningDate",
+      form.joiningDate
+    );
+
+
+    if (form.photo) {
+      body.append(
+        "photo",
+        form.photo
+      );
     }
+
+
+    const response =
+      await $fetch<{ message: string }>(
+        `${config.public.apiBase}/users`,
+        {
+          method: "POST",
+          headers,
+          body
+        }
+      );
+
+
+    successMessage.value =
+      response.message ||
+      "User created successfully";
+
+    resetForm();
+
+  } catch (error: any) {
+    errorMessage.value =
+      error?.data?.message ||
+      error?.message ||
+      "Unable to create user";
+
+    fieldErrors.value =
+      Array.isArray(
+        error?.data?.errors
+      )
+        ? error.data.errors
+        : [];
+
+
+    if (
+      error?.statusCode === 401
+    ) {
+      localStorage.removeItem(
+        "token"
+      );
+
+      localStorage.removeItem(
+        "user"
+      );
+
+      await navigateTo(
+        "/login",
+        { replace: true }
+      );
+    }
+
   } finally {
     loading.value = false;
   }
 };
 </script>
 
-<template>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1>Create User</h1>
-        <p>Create a user account.</p>
-      </div>
 
-      <NuxtLink to="/dashboard/users" class="back-link">
-        Back
-      </NuxtLink>
+<template>
+  <NuxtLink to="/dashboard/users" class="back-link">
+    Back
+  </NuxtLink>
+
+  <p v-if="errorMessage" class="notice error">
+    {{ errorMessage }}
+  </p>
+
+  <p v-if="pageLoading" class="loading">
+    Loading form...
+  </p>
+
+  <form
+    v-else
+    class="form"
+    autocomplete="off"
+    @submit.prevent="saveUser"
+  >
+    <div class="grid">
+
+      <!-- First Name -->
+      <label class="form-group">
+        <span>First Name</span>
+
+        <input
+          v-model="form.firstName"
+          type="text"
+          placeholder="First name"
+          autocomplete="given-name"
+          required
+        >
+
+        <small v-if="fieldErrorMap.firstName">
+          {{ fieldErrorMap.firstName }}
+        </small>
+      </label>
+
+
+      <!-- Last Name -->
+      <label class="form-group">
+        <span>Last Name</span>
+
+        <input
+          v-model="form.lastName"
+          type="text"
+          placeholder="Last name"
+          autocomplete="family-name"
+          required
+        >
+
+        <small v-if="fieldErrorMap.lastName">
+          {{ fieldErrorMap.lastName }}
+        </small>
+      </label>
+
+
+      <!-- Email -->
+      <label class="form-group">
+        <span>Email</span>
+
+        <input
+          v-model="form.email"
+          type="email"
+          placeholder="user@company.com"
+          autocomplete="email"
+          required
+        >
+
+        <small v-if="fieldErrorMap.email">
+          {{ fieldErrorMap.email }}
+        </small>
+      </label>
+
+
+      <!-- Password -->
+      <label class="form-group">
+        <span>Password</span>
+
+        <input
+          v-model="form.password"
+          type="password"
+          placeholder="Minimum 8 characters"
+          autocomplete="new-password"
+          required
+        >
+
+        <small v-if="fieldErrorMap.password">
+          {{ fieldErrorMap.password }}
+        </small>
+      </label>
+
+
+      <!-- Role -->
+      <label class="form-group">
+        <span>Role</span>
+
+        <select
+          v-model.number="form.roleId"
+          required
+        >
+          <option
+            :value="null"
+            disabled
+          >
+            Select Role
+          </option>
+
+          <option
+            v-for="role in visibleRoles"
+            :key="role.id"
+            :value="role.id"
+          >
+            {{ role.roleName }}
+          </option>
+        </select>
+
+        <small v-if="fieldErrorMap.roleId">
+          {{ fieldErrorMap.roleId }}
+        </small>
+      </label>
+
+
+      <!-- Department -->
+      <label class="form-group">
+        <span>Department</span>
+
+        <select
+          v-model.number="form.departmentId"
+          :disabled="isAdminRole"
+          :required="!isAdminRole"
+        >
+          <option
+            :value="null"
+            disabled
+          >
+            Select Department
+          </option>
+
+          <option
+            v-for="department in departments"
+            :key="department.id"
+            :value="department.id"
+          >
+            {{ department.departmentName }}
+          </option>
+        </select>
+
+        <small
+          v-if="isAdminRole"
+          class="field-hint"
+        >
+          Admin users are automatically assigned to NO-DEPT.
+        </small>
+
+        <small v-if="fieldErrorMap.departmentId">
+          {{ fieldErrorMap.departmentId }}
+        </small>
+      </label>
+
+
+      <!-- Designation -->
+      <label class="form-group">
+        <span>Designation</span>
+
+        <select
+          v-model.number="form.designationId"
+          :disabled="isAdminRole || !form.departmentId"
+          :required="!isAdminRole"
+        >
+          <option
+            :value="null"
+            disabled
+          >
+            Select Designation
+          </option>
+
+          <option
+            v-for="designation in designations"
+            :key="designation.id"
+            :value="designation.id"
+          >
+            {{ designation.designationName }}
+          </option>
+        </select>
+
+        <small
+          v-if="isAdminRole"
+          class="field-hint"
+        >
+          Admin users do not have a designation.
+        </small>
+
+        <small v-if="fieldErrorMap.designationId">
+          {{ fieldErrorMap.designationId }}
+        </small>
+      </label>
+
+
+      <!-- Joining Date -->
+      <label class="form-group">
+        <span>Joining Date</span>
+
+        <input
+          v-model="form.joiningDate"
+          type="date"
+          :min="today"
+        >
+
+        <small v-if="fieldErrorMap.joiningDate">
+          {{ fieldErrorMap.joiningDate }}
+        </small>
+      </label>
+
+
+      <!-- Phone -->
+      <label class="form-group">
+        <span>Phone</span>
+
+        <input
+          v-model="form.phone"
+          type="tel"
+          placeholder="03xxxxxxxxx"
+          autocomplete="tel"
+        >
+
+        <small v-if="fieldErrorMap.phone">
+          {{ fieldErrorMap.phone }}
+        </small>
+      </label>
+
+
+      <!-- Photo -->
+      <label class="form-group">
+        <span>Photo</span>
+
+        <input
+          :key="photoInputKey"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          @change="selectPhoto"
+        >
+
+        <small v-if="fieldErrorMap.photo">
+          {{ fieldErrorMap.photo }}
+        </small>
+      </label>
+
+
+      <!-- Address -->
+      <label class="form-group full">
+        <span>Address</span>
+
+        <textarea
+          v-model="form.address"
+          rows="4"
+          placeholder="Address"
+        ></textarea>
+
+        <small v-if="fieldErrorMap.address">
+          {{ fieldErrorMap.address }}
+        </small>
+      </label>
+
     </div>
 
-    <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
-    <p v-if="pageLoading" class="loading">Loading form...</p>
 
-    <form v-else class="form" autocomplete="off" @submit.prevent="saveUser">
-      <div class="grid">
-        <label class="form-group">
-          <span>First Name</span>
-          <input v-model="form.firstName" type="text" placeholder="First name" autocomplete="given-name" required>
-          <small v-if="fieldErrorMap.firstName">{{ fieldErrorMap.firstName }}</small>
-        </label>
+    <!-- Success Message -->
+    <p
+      v-if="successMessage"
+      class="notice success"
+    >
+      {{ successMessage }}
+    </p>
 
-        <label class="form-group">
-          <span>Last Name</span>
-          <input v-model="form.lastName" type="text" placeholder="Last name" autocomplete="family-name" required>
-          <small v-if="fieldErrorMap.lastName">{{ fieldErrorMap.lastName }}</small>
-        </label>
 
-        <label class="form-group">
-          <span>Email</span>
-          <input v-model="form.email" type="email" placeholder="user@company.com" autocomplete="email" required>
-          <small v-if="fieldErrorMap.email">{{ fieldErrorMap.email }}</small>
-        </label>
+    <!-- Buttons -->
+    <div class="buttons">
 
-        <label class="form-group">
-          <span>Password</span>
-          <input v-model="form.password" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" required>
-          <small v-if="fieldErrorMap.password">{{ fieldErrorMap.password }}</small>
-        </label>
+      <button
+        class="secondary-button"
+        type="button"
+        @click="resetForm"
+      >
+        Clear
+      </button>
 
-        <label class="form-group">
-          <span>Department</span>
-          <select v-model.number="form.departmentId" required>
-            <option :value="null" disabled>Select Department</option>
-            <option
-              v-for="department in departments"
-              :key="department.id"
-              :value="department.id"
-            >
-              {{ department.departmentName }}
-            </option>
-          </select>
-          <small v-if="fieldErrorMap.departmentId">{{ fieldErrorMap.departmentId }}</small>
-        </label>
+      <button
+        class="primary-button"
+        type="submit"
+        :disabled="loading"
+      >
+        {{ loading ? "Creating..." : "Save" }}
+      </button>
 
-        <label class="form-group">
-          <span>Designation</span>
-          <select v-model.number="form.designationId" :disabled="!form.departmentId" required>
-            <option :value="null" disabled>Select Designation</option>
-            <option
-              v-for="designation in designations"
-              :key="designation.id"
-              :value="designation.id"
-            >
-              {{ designation.designationName }}
-            </option>
-          </select>
-          <small v-if="fieldErrorMap.designationId">{{ fieldErrorMap.designationId }}</small>
-        </label>
+    </div>
 
-        <label class="form-group">
-          <span>Role</span>
-          <select v-model.number="form.roleId" required>
-            <option :value="null" disabled>Select Role</option>
-            <option
-              v-for="role in visibleRoles"
-              :key="role.id"
-              :value="role.id"
-            >
-              {{ role.roleName }}
-            </option>
-          </select>
-          <small v-if="fieldErrorMap.roleId">{{ fieldErrorMap.roleId }}</small>
-        </label>
-
-        <label class="form-group">
-          <span>Joining Date</span>
-          <input v-model="form.joiningDate" type="date" :min="today">
-          <small v-if="fieldErrorMap.joiningDate">{{ fieldErrorMap.joiningDate }}</small>
-        </label>
-
-        <label class="form-group">
-          <span>Phone</span>
-          <input v-model="form.phone" type="tel" placeholder="03xxxxxxxxx" autocomplete="tel">
-          <small v-if="fieldErrorMap.phone">{{ fieldErrorMap.phone }}</small>
-        </label>
-
-        <label class="form-group">
-          <span>Photo</span>
-          <input
-            :key="photoInputKey"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            @change="selectPhoto"
-          >
-          <small v-if="fieldErrorMap.photo">{{ fieldErrorMap.photo }}</small>
-        </label>
-
-        <label class="form-group full">
-          <span>Address</span>
-          <textarea v-model="form.address" rows="4" placeholder="Address"></textarea>
-          <small v-if="fieldErrorMap.address">{{ fieldErrorMap.address }}</small>
-        </label>
-      </div>
-
-      <p v-if="successMessage" class="notice success">{{ successMessage }}</p>
-
-      <div class="buttons">
-        <button class="secondary-button" type="button" @click="resetForm">
-          Clear
-        </button>
-
-        <button class="primary-button" type="submit" :disabled="loading">
-          {{ loading ? "Creating..." : "Save" }}
-        </button>
-      </div>
-    </form>
-  </div>
+  </form>
 </template>
+
+
 
 <style scoped>
 .page {

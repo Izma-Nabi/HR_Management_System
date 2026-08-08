@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import authService from "~/services/auth.service";
 import departmentService from "~/services/department.service";
+
 type Person = {
   id: number;
   firstName: string;
@@ -16,19 +17,22 @@ type Department = {
   description: string | null;
   employees: Person[];
   admins: Person[];
+  userCount: number;
 };
 
 definePageMeta({
-  layout: "dashboard"
+  layout: "dashboard",
 });
 
-const config = useRuntimeConfig();
 const { hasPermission } = useAuthUser();
 
 const departments = ref<Department[]>([]);
 const loading = ref(true);
-const search = ref("");
 const errorMessage = ref("");
+
+const search = ref("");
+const userSearch = ref("");
+
 const canViewDepartments = computed(() => hasPermission("VIEW_DEPARTMENTS"));
 const canCreateDepartment = computed(() => hasPermission("CREATE_DEPARTMENT"));
 const canUpdateDepartment = computed(() => hasPermission("UPDATE_DEPARTMENT"));
@@ -46,7 +50,7 @@ const loadDepartments = async () => {
   errorMessage.value = "";
 
   try {
-   departments.value = await departmentService.getDepartments();
+    departments.value = await departmentService.getDepartments();
   } catch (error: any) {
     errorMessage.value = error?.data?.message || "Unable to load departments";
   } finally {
@@ -54,22 +58,35 @@ const loadDepartments = async () => {
   }
 };
 
-onMounted(async () => {
-  if (!canViewDepartments.value) {
-    await navigateTo("/dashboard", { replace: true });
-    return;
+const matchesUserSearch = (person: Person) => {
+  const query = userSearch.value.trim().toLowerCase();
+
+  if (!query) {
+    return true;
   }
 
-  await loadDepartments();
-});
+  const fullName = `${person.firstName || ""} ${person.lastName || ""}`
+    .trim()
+    .toLowerCase();
 
-const filteredDepartments = computed(() => {
-  const keyword = search.value.toLowerCase();
+  return fullName.includes(query);
+};
 
-  return departments.value.filter((department) => {
-    return department.departmentName.toLowerCase().includes(keyword);
-  });
-});
+const getFilteredEmployees = (department: Department) => {
+  return (department.employees || [])
+    .filter(matchesUserSearch)
+    .slice(0, 3);
+};
+
+const getFilteredAdmins = (department: Department) => {
+  return (department.admins || [])
+    .filter(matchesUserSearch)
+    .slice(0, 3);
+};
+
+const viewDepartmentUsers = async (departmentId: number) => {
+  await navigateTo(`/dashboard/departments/${departmentId}/users`);
+};
 
 const deleteDepartment = async (id: number) => {
   const confirmed = window.confirm("Delete this department?");
@@ -97,19 +114,56 @@ const initials = (first: string, last: string | null) => {
   const b = last?.charAt(0) || "";
   return (a + b).toUpperCase();
 };
+
+const filteredDepartments = computed(() => {
+  const keyword = search.value.trim().toLowerCase();
+
+  return departments.value.filter((department) =>
+    department.departmentName.toLowerCase().includes(keyword)
+  );
+});
+
+onMounted(async () => {
+  if (!canViewDepartments.value) {
+    await navigateTo("/dashboard", { replace: true });
+    return;
+  }
+
+  await loadDepartments();
+});
 </script>
 
 <template>
   <div class="page">
+    <!-- ==================== -->
+    <!-- Page Header -->
+    <!-- ==================== -->
     <div class="page-header">
       <div>
         <p class="eyebrow">Organization</p>
         <h1>Departments</h1>
-        <p class="subtitle">{{ departments.length }} department{{ departments.length === 1 ? "" : "s" }} in total</p>
+        <p class="subtitle">
+          {{ departments.length }}
+          department{{ departments.length === 1 ? "" : "s" }}
+          in total
+        </p>
       </div>
 
-      <NuxtLink v-if="canCreateDepartment" to="/dashboard/departments/add" class="add-btn">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <NuxtLink
+        v-if="canCreateDepartment"
+        to="/dashboard/departments/add"
+        class="add-btn"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="17"
+          height="17"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
@@ -117,23 +171,77 @@ const initials = (first: string, last: string | null) => {
       </NuxtLink>
     </div>
 
-    <div class="toolbar">
-      <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="7" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
-      <input v-model="search" type="text" placeholder="Search department...">
+    <!-- ==================== -->
+    <!-- Search: Department + Users -->
+    <!-- ==================== -->
+    <div class="search-row">
+      <div class="toolbar">
+        <svg
+          class="search-icon"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search department..."
+        />
+      </div>
+
+      <div class="toolbar">
+        <svg
+          class="search-icon"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+
+        <input
+          v-model="userSearch"
+          type="text"
+          placeholder="Search users by name..."
+        />
+      </div>
     </div>
 
+    <!-- ==================== -->
+    <!-- Error -->
+    <!-- ==================== -->
     <transition name="fade">
-      <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="notice error">
+        {{ errorMessage }}
+      </p>
     </transition>
 
+    <!-- ==================== -->
+    <!-- Loading -->
+    <!-- ==================== -->
     <div v-if="loading" class="loading">
       <span class="spinner"></span>
       Loading departments...
     </div>
 
+    <!-- ==================== -->
+    <!-- Departments -->
+    <!-- ==================== -->
     <div v-else class="department-list">
       <article
         v-for="(department, index) in filteredDepartments"
@@ -141,10 +249,20 @@ const initials = (first: string, last: string | null) => {
         class="card"
         :style="{ '--i': index }"
       >
+        <!-- Department Header -->
         <div class="card-header">
           <div class="card-title">
             <span class="dept-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M3 21V7l9-4 9 4v14" />
                 <path d="M9 21v-6h6v6" />
                 <path d="M9 12h.01M15 12h.01M9 9h.01M15 9h.01" />
@@ -157,38 +275,98 @@ const initials = (first: string, last: string | null) => {
             </div>
           </div>
 
+          <!-- Edit / Delete -->
           <div class="card-actions">
-            <NuxtLink v-if="canUpdateDepartment" class="edit" :to="`/dashboard/departments/edit/${department.id}`">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <NuxtLink
+              v-if="canUpdateDepartment"
+              class="edit"
+              :to="`/dashboard/departments/edit/${department.id}`"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M12 20h9" />
                 <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
               Edit
             </NuxtLink>
-            <button v-if="canDeleteDepartment" class="delete" type="button" @click="deleteDepartment(department.id)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+
+            <button
+              v-if="canDeleteDepartment"
+              class="delete"
+              type="button"
+              :disabled="department.userCount > 0"
+              :title="
+                department.userCount > 0
+                  ? `Cannot delete: ${department.userCount} user(s) assigned`
+                  : 'Delete department'
+              "
+              @click="deleteDepartment(department.id)"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <path
+                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                />
               </svg>
               Delete
             </button>
           </div>
         </div>
 
+        <!-- Employees + Admins -->
         <div class="section-grid">
+          <!-- Employees -->
           <section class="section">
-            <h3>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-              </svg>
-              Employees
-              <span class="count-pill">{{ department.employees.length }}</span>
-            </h3>
+            <div class="section-heading">
+              <h3>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                Employees
+                <span class="count-pill">{{ department.employees.length }}</span>
+              </h3>
+            </div>
 
-            <div v-if="department.employees.length" class="people">
-              <div v-for="employee in department.employees" :key="employee.id" class="person">
-                <span class="avatar">{{ initials(employee.firstName, employee.lastName) }}</span>
+            <div
+              v-if="getFilteredEmployees(department).length"
+              class="people"
+            >
+              <div
+                v-for="employee in getFilteredEmployees(department)"
+                :key="employee.id"
+                class="person"
+              >
+                <span class="avatar">
+                  {{ initials(employee.firstName, employee.lastName) }}
+                </span>
+
                 <div class="person-info">
                   <strong>{{ employee.firstName }} {{ employee.lastName }}</strong>
                   <span>{{ employee.user.email }}</span>
@@ -196,21 +374,45 @@ const initials = (first: string, last: string | null) => {
               </div>
             </div>
 
-            <p v-else class="empty-line">No employees assigned.</p>
+            <p v-else class="empty-line">
+              {{ userSearch ? "No employees found." : "No employees assigned." }}
+            </p>
           </section>
 
+          <!-- Administrators -->
           <section class="section">
-            <h3>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3z" />
-              </svg>
-              Administrators
-              <span class="count-pill">{{ department.admins.length }}</span>
-            </h3>
+            <div class="section-heading">
+              <h3>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3z" />
+                </svg>
+                Administrators
+                <span class="count-pill">{{ department.admins.length }}</span>
+              </h3>
+            </div>
 
-            <div v-if="department.admins.length" class="people">
-              <div v-for="admin in department.admins" :key="admin.id" class="person">
-                <span class="avatar avatar--admin">{{ initials(admin.firstName, admin.lastName) }}</span>
+            <div
+              v-if="getFilteredAdmins(department).length"
+              class="people"
+            >
+              <div
+                v-for="admin in getFilteredAdmins(department)"
+                :key="admin.id"
+                class="person"
+              >
+                <span class="avatar avatar--admin">
+                  {{ initials(admin.firstName, admin.lastName) }}
+                </span>
+
                 <div class="person-info">
                   <strong>{{ admin.firstName }} {{ admin.lastName }}</strong>
                   <span>{{ admin.user.email }}</span>
@@ -218,17 +420,47 @@ const initials = (first: string, last: string | null) => {
               </div>
             </div>
 
-            <p v-else class="empty-line">No administrators assigned.</p>
+            <p v-else class="empty-line">
+              {{ userSearch ? "No administrators found." : "No administrators assigned." }}
+            </p>
           </section>
+        </div>
+
+        <!-- Card Footer -->
+        <div
+          v-if="department.userCount > 6"
+          class="card-footer"
+        >
+          <button
+            class="view-more-btn"
+            type="button"
+            @click="viewDepartmentUsers(department.id)"
+          >
+            View More
+          </button>
         </div>
       </article>
     </div>
 
-    <div v-if="!loading && filteredDepartments.length === 0" class="empty">
-      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- No Departments -->
+    <div
+      v-if="!loading && filteredDepartments.length === 0"
+      class="empty"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="34"
+        height="34"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <path d="M3 21V7l9-4 9 4v14" />
         <path d="M9 21v-6h6v6" />
       </svg>
+
       <p>No departments found.</p>
     </div>
   </div>
@@ -239,6 +471,9 @@ const initials = (first: string, last: string | null) => {
   max-width: 1100px;
 }
 
+/* ==================== */
+/* Header */
+/* ==================== */
 .page-header {
   display: flex;
   align-items: flex-end;
@@ -295,10 +530,18 @@ const initials = (first: string, last: string | null) => {
   transform: translateY(0);
 }
 
+/* ==================== */
+/* Search Row */
+/* ==================== */
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
 .toolbar {
   position: relative;
-  margin-bottom: 22px;
-  max-width: 360px;
 }
 
 .search-icon {
@@ -328,6 +571,15 @@ const initials = (first: string, last: string | null) => {
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 
+@media (max-width: 700px) {
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==================== */
+/* Department List */
+/* ==================== */
 .department-list {
   display: grid;
   gap: 18px;
@@ -399,6 +651,36 @@ const initials = (first: string, last: string | null) => {
   flex-shrink: 0;
 }
 
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f1f6;
+}
+
+.view-more-btn {
+  border: 1px solid #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-more-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.view-more-btn:active {
+  transform: scale(0.97);
+}
+
 .edit,
 .delete {
   display: inline-flex;
@@ -436,17 +718,34 @@ const initials = (first: string, last: string | null) => {
   transform: translateY(-1px);
 }
 
+.delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.delete:disabled:hover {
+  background: #94a3b8;
+}
+
+/* ==================== */
+/* Sections */
+/* ==================== */
 .section-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
 
+.section-heading {
+  margin-bottom: 12px;
+}
+
 .section h3 {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0 0 12px;
+  margin: 0;
   color: #4b5265;
   font-size: 13.5px;
   font-weight: 700;
@@ -529,6 +828,9 @@ const initials = (first: string, last: string | null) => {
   font-size: 13px;
 }
 
+/* ==================== */
+/* Loading / Empty / Notice */
+/* ==================== */
 .loading,
 .empty,
 .notice {
@@ -576,6 +878,9 @@ const initials = (first: string, last: string | null) => {
   border-color: #f4c7c7;
 }
 
+/* ==================== */
+/* Transitions / Animations */
+/* ==================== */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -603,6 +908,9 @@ const initials = (first: string, last: string | null) => {
   }
 }
 
+/* ==================== */
+/* Responsive */
+/* ==================== */
 @media (max-width: 760px) {
   .page-header {
     align-items: stretch;

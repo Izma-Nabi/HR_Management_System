@@ -23,6 +23,17 @@ const parseUserId = (id) => {
   return userId;
 };
 
+const ensureNoDepartment = async () => {
+  const department = await repository.findDepartmentByName("NO-DEPT");
+
+  if (!department) {
+    throw new ApiError(500, "NO-DEPT department not found");
+  }
+
+  return department;
+};
+
+
 const buildFullName = ({ firstName, lastName }) => {
   return `${firstName || ""} ${lastName || ""}`.trim();
 };
@@ -75,6 +86,7 @@ const ensureDepartmentExists = async (departmentId) => {
 
   return department;
 };
+
 
 const findDesignationFromPayload = async (payload, departmentId) => {
   const designationId = payload.designationId ?? null;
@@ -159,17 +171,19 @@ const createAdmin = async (payload) => {
     throw new ApiError(500, "Admin role not found");
   }
 
-  await ensureDepartmentExists(payload.departmentId);
-  const designation = await ensureDesignationBelongsToDepartment(payload, payload.departmentId);
+  const noDepartment = await ensureNoDepartment();
 
   const passwordHash = await hashPassword(payload.password);
 
   return repository.createAdmin({
     ...payload,
-    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
-    designationId: designation.id,
+    departmentId: noDepartment.id,
+    designationId: null,
+    employmentStatus: normalizeEmploymentStatus(
+      payload.employmentStatus
+    ),
     passwordHash,
-    roleId: role.id
+    roleId: role.id,
   });
 };
 
@@ -201,38 +215,41 @@ const updateAdmin = async (id, payload) => {
     }
   }
 
-  if (payload.departmentId !== undefined && payload.departmentId !== null) {
-    await ensureDepartmentExists(payload.departmentId);
-  }
+  const noDepartment = await ensureNoDepartment();
 
   const data = { ...payload };
+
   delete data.password;
   delete data.designation;
+  delete data.departmentId;
 
-  if (payload.designationId !== undefined || payload.designation !== undefined) {
-    const departmentId = payload.departmentId !== undefined
-      ? payload.departmentId
-      : admin.departmentId;
-    const designation = await ensureDesignationBelongsToDepartment(
-      payload,
-      departmentId,
-      { required: payload.designationId !== null && payload.designation !== null }
-    );
-
-    data.designationId = designation?.id || null;
-  } else if (payload.departmentId !== undefined) {
-    data.designationId = null;
-  }
+  data.departmentId = noDepartment.id;
+  data.designationId = null;
 
   if (data.employmentStatus !== undefined) {
-    data.employmentStatus = normalizeEmploymentStatus(data.employmentStatus);
+    data.employmentStatus = normalizeEmploymentStatus(
+      data.employmentStatus
+    );
   }
 
-  const firstName = data.firstName !== undefined ? data.firstName : admin.firstName;
-  const lastName = data.lastName !== undefined ? data.lastName : admin.lastName;
+  const firstName =
+    data.firstName !== undefined
+      ? data.firstName
+      : admin.firstName;
 
-  if (data.firstName !== undefined || data.lastName !== undefined) {
-    data.fullName = buildFullName({ firstName, lastName });
+  const lastName =
+    data.lastName !== undefined
+      ? data.lastName
+      : admin.lastName;
+
+  if (
+    data.firstName !== undefined ||
+    data.lastName !== undefined
+  ) {
+    data.fullName = buildFullName({
+      firstName,
+      lastName,
+    });
   }
 
   if (payload.password) {
@@ -253,11 +270,13 @@ const updateUser = async (id, payload) => {
     }
   }
 
-  if (payload.departmentId !== undefined && payload.departmentId !== null) {
-    await ensureDepartmentExists(payload.departmentId);
-  }
-
   const data = { ...payload };
+
+  let roleId = user.roleId;
+  let roleKey = toRoleKey({
+    id: user.roleId,
+    roleName: user.role,
+  });
 
   if (payload.roleId !== undefined) {
     const role = await repository.findRoleById(payload.roleId);
@@ -266,6 +285,8 @@ const updateUser = async (id, payload) => {
       throw new ApiError(400, "Role not found");
     }
 
+    roleId = role.id;
+    roleKey = toRoleKey(role);
     data.roleId = role.id;
   } else if (payload.role !== undefined) {
     const role = await repository.findRoleByName(payload.role);
@@ -274,24 +295,49 @@ const updateUser = async (id, payload) => {
       throw new ApiError(400, "Role not found");
     }
 
+    roleId = role.id;
+    roleKey = toRoleKey(role);
     data.roleId = role.id;
   }
 
-  const hasDesignationInput = payload.designationId !== undefined || payload.designation !== undefined;
+  if (roleKey === ROLE_KEYS.ADMIN) {
+    const noDepartment = await ensureNoDepartment();
 
-  if (hasDesignationInput) {
-    const departmentId = payload.departmentId !== undefined
-      ? payload.departmentId
-      : user.departmentId;
-    const designation = await ensureDesignationBelongsToDepartment(
-      payload,
-      departmentId,
-      { required: payload.designationId !== null && payload.designation !== null }
-    );
-
-    data.designationId = designation?.id || null;
-  } else if (payload.departmentId !== undefined) {
+    data.departmentId = noDepartment.id;
     data.designationId = null;
+  } else {
+    if (
+      payload.departmentId !== undefined &&
+      payload.departmentId !== null
+    ) {
+      await ensureDepartmentExists(payload.departmentId);
+    }
+
+    const hasDesignationInput =
+      payload.designationId !== undefined ||
+      payload.designation !== undefined;
+
+    if (hasDesignationInput) {
+      const departmentId =
+        payload.departmentId !== undefined
+          ? payload.departmentId
+          : user.departmentId;
+
+      const designation =
+        await ensureDesignationBelongsToDepartment(
+          payload,
+          departmentId,
+          {
+            required:
+              payload.designationId !== null &&
+              payload.designation !== null,
+          }
+        );
+
+      data.designationId = designation?.id || null;
+    } else if (payload.departmentId !== undefined) {
+      data.designationId = null;
+    }
   }
 
   delete data.password;
@@ -300,7 +346,8 @@ const updateUser = async (id, payload) => {
   delete data.managedDepartmentIds;
 
   if (data.employmentStatus !== undefined) {
-    data.employmentStatus = normalizeEmploymentStatus(data.employmentStatus);
+    data.employmentStatus =
+      normalizeEmploymentStatus(data.employmentStatus);
   }
 
   if (payload.password) {
@@ -362,20 +409,44 @@ const createUser = async (actor, payload) => {
     throw new ApiError(409, "Email already exists");
   }
 
-  await ensureDepartmentExists(payload.departmentId);
-  const designation = await ensureDesignationBelongsToDepartment(payload, payload.departmentId);
+  let departmentId = payload.departmentId;
+  let designationId = null;
+
+  if (roleKey === ROLE_KEYS.ADMIN) {
+    const noDepartment = await ensureNoDepartment();
+
+    departmentId = noDepartment.id;
+    designationId = null;
+  } else {
+    await ensureDepartmentExists(departmentId);
+
+    const designation = await ensureDesignationBelongsToDepartment(
+      payload,
+      departmentId
+    );
+
+    designationId = designation.id;
+  }
+
   const passwordHash = await hashPassword(payload.password);
-  const codeType = [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.ADMIN].includes(roleKey)
+
+  const codeType = [
+    ROLE_KEYS.SUPER_ADMIN,
+    ROLE_KEYS.ADMIN,
+  ].includes(roleKey)
     ? "ADMIN"
     : "EMPLOYEE";
 
   return repository.createUser({
     ...payload,
-    employmentStatus: normalizeEmploymentStatus(payload.employmentStatus),
-    designationId: designation.id,
+    departmentId,
+    employmentStatus: normalizeEmploymentStatus(
+      payload.employmentStatus
+    ),
+    designationId,
     passwordHash,
     roleId: role.id,
-    codeType
+    codeType,
   });
 };
 

@@ -54,8 +54,24 @@ const deleteDepartment = async (id) => {
 };
 
 const getDepartmentDesignations = async (departmentId) => {
+  const config = useRuntimeConfig();
+
   const response = await $fetch(
-    departmentsUrl(`/${departmentId}/designations`),
+    `${config.public.apiBase}/departments/${departmentId}/designations`,
+    {
+      method: "GET",
+      headers: authService.getAuthHeaders()
+    }
+  );
+
+  return response.data;
+};
+
+const getDepartmentUsers = async (departmentId) => {
+  const config = useRuntimeConfig();
+
+  const response = await $fetch(
+    `${config.public.apiBase}/departments/${departmentId}/users`,
     {
       method: "GET",
       headers: authService.getAuthHeaders()
@@ -72,5 +88,6 @@ export default {
   createDepartment,
   updateDepartment,
   deleteDepartment,
-  getDepartmentDesignations
+  getDepartmentDesignations,
+  getDepartmentUsers
 };

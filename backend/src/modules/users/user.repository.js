@@ -293,6 +293,26 @@ const findAdminById = async (id, dbClient = prisma) => {
   return mapAdmin(user);
 };
 
+
+const findDepartmentByName = async (departmentName, dbClient = prisma) => {
+  if (!departmentName) {
+    return null;
+  }
+
+  return dbClient.department.findFirst({
+    where: {
+      departmentName: {
+        equals: String(departmentName).trim(),
+      },
+    },
+    select: {
+      id: true,
+      departmentName: true,
+    },
+  });
+};
+
+
 const findUserById = async (id, dbClient = prisma) => {
   const user = await dbClient.user.findUnique({
     where: {
@@ -634,6 +654,7 @@ module.exports = {
   findDesignationByName,
   findDesignationByNameAndDepartment,
   findDepartmentById,
+  findDepartmentByName,
   findAdminById,
   findUserById,
   listAdmins,
@@ -646,5 +667,5 @@ module.exports = {
   createEmployee,
   mapUser,
   mapEmployeeUser,
-  toSafeUser
+  toSafeUser,
 };

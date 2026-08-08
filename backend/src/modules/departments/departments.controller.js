@@ -38,11 +38,30 @@ const listDepartmentDesignations = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Designations fetched successfully", result);
 });
 
+const getDepartmentUsers = async (req, res, next) => {
+  try {
+    const department = await departmentsService.getDepartmentUsers(
+      req.params.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Department users fetched successfully",
+      data: department
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   listDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
   deleteDepartment,
-  listDepartmentDesignations
+  listDepartmentDesignations,
+  getDepartmentUsers
 };

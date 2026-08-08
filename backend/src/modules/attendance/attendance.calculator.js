@@ -370,7 +370,6 @@ const calculateTodayAttendance = (
 ) => {
 
   if (!records || !records.length) {
-
     return {
       checkIn: null,
       checkOut: null,
@@ -378,9 +377,7 @@ const calculateTodayAttendance = (
       lateMinutes: 0,
       overtimeMinutes: 0
     };
-
   }
-
 
   const firstCheckIn =
     records.find(
@@ -388,65 +385,29 @@ const calculateTodayAttendance = (
         record.eventType === "CHECK_IN"
     );
 
-
   const checkOutEvents =
     records.filter(
       record =>
         record.eventType === "CHECK_OUT"
     );
 
-
   const lastCheckOut =
     checkOutEvents.length
       ? checkOutEvents[checkOutEvents.length - 1]
       : null;
 
-
-
   let workingMinutes = 0;
-
-
   if(firstCheckIn && lastCheckOut){
-
-    const start =
-      new Date(firstCheckIn.eventTime);
-
-
-    const end =
-      new Date(lastCheckOut.eventTime);
-
-
-    workingMinutes =
-      Math.floor(
-        (end - start) / 60000
-      );
-
+    const start =  new Date(firstCheckIn.eventTime);
+    const end =  new Date(lastCheckOut.eventTime);
+    workingMinutes =  Math.floor( (end - start) / 60000 );
   }
 
-
-
   let lateMinutes = 0;
-
-
   if(firstCheckIn){
-
-
-    const checkIn =
-      new Date(firstCheckIn.eventTime);
-
-
-    const actualMinutes =
-      checkIn.getHours() * 60 +
-      checkIn.getMinutes();
-
-
-
-    const officeStart =
-      timeToMinutes(
-        rules.office.startTime
-      );
-
-
+    const checkIn =  new Date(firstCheckIn.eventTime);
+    const actualMinutes =checkIn.getHours() * 60 + checkIn.getMinutes();
+    const officeStart =timeToMinutes(rules.office.startTime );
 
     lateMinutes =
       Math.max(
@@ -455,14 +416,9 @@ const calculateTodayAttendance = (
         officeStart -
         rules.office.graceMinutes
       );
-
   }
 
-
-
-  const overtimeMinutes =
-    Math.max(
-      0,
+  const overtimeMinutes = Math.max( 0,
       workingMinutes -
       rules.office.workingMinutes
     );

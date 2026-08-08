@@ -32,6 +32,20 @@ router.get(
   departmentsController.listDepartments
 );
 
+router.get(
+  "/:id/users",
+  requireAnyPermission(
+    "VIEW_DEPARTMENTS",
+    "VIEW_DESIGNATIONS",
+    "CREATE_ADMIN",
+    "UPDATE_ADMIN",
+    "CREATE_EMPLOYEE",
+    "UPDATE_EMPLOYEE",
+    "UPDATE_USER"
+  ),
+  departmentsController.getDepartmentUsers
+);
+
 router.post(
   "/",
   requirePermission("CREATE_DEPARTMENT"),
