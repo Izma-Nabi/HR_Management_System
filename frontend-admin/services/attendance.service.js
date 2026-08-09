@@ -16,6 +16,22 @@ const getMyCurrentWeek = async (startDate) => {
   return response.data;
 };
 
+const getAllUsersWeek = async (startDate) => {
+  const config = useRuntimeConfig();
+  const response = await $fetch(
+    `${config.public.apiBase}/attendance/all/week`,
+    {
+      method: "GET",
+      headers: authService.getAuthHeaders(),
+      query: {
+        startDate
+      }
+    }
+  );
+
+  return response.data;
+};
+
 const getMyDayDetails = async (attendanceDate) => {
   const config = useRuntimeConfig();
   const response = await $fetch(
@@ -105,6 +121,7 @@ const insertManualAttendance = async (payload) => {
 export default {
   createComplaint,
   getMyCurrentWeek,
+  getAllUsersWeek,
   getMyDayDetails,
   getAttendanceComplaints,
   reviewAttendanceComplaint,

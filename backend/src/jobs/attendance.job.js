@@ -1,8 +1,12 @@
 const cron = require("node-cron");
 
 const attendanceService = require("../modules/attendance/attendance.service");
+const attendanceCalculator = require("../modules/attendance/attendance.calculator");
+
+const PAKISTAN_TIME_ZONE = "Asia/Karachi";
 
 let syncRunning = false;
+let summaryRunning = false;
 
 const syncAttendanceFromSheet = async () => {
   if (syncRunning) {
@@ -17,9 +21,11 @@ const syncAttendanceFromSheet = async () => {
   try {
     const result = await attendanceService.importAttendance();
 
-    console.log(
-      `Attendance synced. Total sheet rows: ${result.totalRows}, inserted: ${result.insertedRows}, matched existing: ${result.matchedRows}, skipped: ${result.skippedRows}`
-    );
+    if (result.insertedRows > 0 || result.matchedRows > 0) {
+      console.log(
+        `Attendance synced. Total sheet rows: ${result.totalRows}, inserted: ${result.insertedRows}, matched existing: ${result.matchedRows}, already synced: ${result.skippedRows}`
+      );
+    }
 
     return result;
   } catch (error) {
@@ -49,6 +55,37 @@ const autoCheckoutEmployees = async () => {
   }
 };
 
+const finalizeDailyAttendanceSummaries = async () => {
+  if (summaryRunning) {
+    console.log(
+      "Daily attendance summary skipped because a previous run is still active."
+    );
+    return null;
+  }
+
+  summaryRunning = true;
+
+  try {
+    const result =
+      await attendanceCalculator.generateDailyAttendanceSummaries();
+
+    console.log(
+      `Attendance summaries completed for ${result.attendanceDate}. Users processed: ${result.processedUsers}.`
+    );
+
+    return result;
+  } catch (error) {
+    console.error(
+      "Daily attendance summary failed:",
+      error.message
+    );
+
+    return null;
+  } finally {
+    summaryRunning = false;
+  }
+};
+
 const startAttendanceScheduler = () => {
   console.log(
     "Attendance scheduler started. Syncing Google Sheet every 30 seconds."
@@ -57,17 +94,27 @@ const startAttendanceScheduler = () => {
   // Existing Google Sheet sync
   cron.schedule(
     "*/30 * * * * *",
-    syncAttendanceFromSheet
+    syncAttendanceFromSheet,
+    { timezone: PAKISTAN_TIME_ZONE }
   );
 
   // Auto checkout every day at 11:59 PM
   cron.schedule(
     "59 23 * * *",
-    autoCheckoutEmployees
+    autoCheckoutEmployees,
+    { timezone: PAKISTAN_TIME_ZONE }
+  );
+
+  // Finalize the previous day after auto checkout has completed.
+  cron.schedule(
+    "0 0 * * *",
+    finalizeDailyAttendanceSummaries,
+    { timezone: PAKISTAN_TIME_ZONE }
   );
 };
 
 module.exports = {
+  finalizeDailyAttendanceSummaries,
   startAttendanceScheduler,
   syncAttendanceFromSheet,
 };

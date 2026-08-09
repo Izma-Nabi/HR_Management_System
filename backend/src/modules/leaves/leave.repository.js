@@ -12,8 +12,51 @@ const getMyLeaves = (userId) => {
       userId
     },
     include: {
-      approvals: true,
-      history: true
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          userCode: true,
+          role: {
+            select: {
+              id: true,
+              roleName: true
+            }
+          },
+          department: {
+            select: {
+              id: true,
+              departmentName: true
+            }
+          }
+        }
+      },
+      approvals: {
+        include: {
+          approver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          }
+        },
+        orderBy: {
+          approvalLevel: "asc"
+        }
+      },
+      currentApprover: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      },
+      approvalHistory: true
     },
     orderBy: {
       createdAt: "desc"
@@ -29,8 +72,17 @@ const getTeamLeaves = (departmentId) => {
       }
     },
     include: {
-      user: true,
-      approvals: true
+      user: {
+        include: {
+          role: true,
+          department: true
+        }
+      },
+      approvals: {
+        include: {
+          approver: true
+        }
+      }
     },
     orderBy: {
       createdAt: "desc"
@@ -45,7 +97,7 @@ const getLeaveById = (id) => {
     },
     include: {
       approvals: true,
-      history: true,
+      approvalHistory: true,
       user: true
     }
   });

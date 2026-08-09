@@ -41,7 +41,39 @@ const requireAnyPermission = (...requiredPermissions) => {
 
 const requirePermission = (permission) => requireAnyPermission(permission);
 
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new ApiError(401, "Authentication is required"));
+  }
+
+  if (!isSuperAdminUser(req.user)) {
+    return next(new ApiError(403, "Super Admin access is required"));
+  }
+
+  return next();
+};
+
+const requireAnyRole = (...requiredRoles) => {
+  const roles = requiredRoles.map(normalizeRole).filter(Boolean);
+
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new ApiError(401, "Authentication is required"));
+    }
+
+    const role = normalizeRole(req.user.role || req.user.roleName);
+
+    if (!roles.includes(role)) {
+      return next(new ApiError(403, "You do not have permission to access this resource"));
+    }
+
+    return next();
+  };
+};
+
 module.exports = {
   requirePermission,
-  requireAnyPermission
+  requireAnyPermission,
+  requireSuperAdmin,
+  requireAnyRole
 };

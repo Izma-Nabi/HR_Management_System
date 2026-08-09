@@ -7,6 +7,7 @@
   ],
   "description": "Root-level database and global configuration tooling for Bookme.pk.",
   "scripts": {
+    "postinstall": "npm run prisma:generate",
     "prisma:generate": "node -r ./global/env ./node_modules/prisma/build/index.js generate --schema ./database/schema.prisma",
     "prisma:migrate": "node -r ./global/env ./node_modules/prisma/build/index.js migrate dev --schema ./database/schema.prisma",
     "prisma:studio": "node -r ./global/env ./node_modules/prisma/build/index.js studio --schema ./database/schema.prisma",

@@ -3,7 +3,6 @@ import LeaveSummaryCards from "~/components/leaves/LeaveSummaryCards.vue";
 import LeaveToolbar from "~/components/leaves/LeaveToolbar.vue";
 import LeaveRequestList from "~/components/leaves/LeaveRequestList.vue";
 import LeaveReviewPanel from "~/components/leaves/LeaveReviewPanel.vue";
-import ApplyLeaveModal from "~/components/leaves/ApplyLeaveModal.vue";
 import leaveService from "~/services/leave.service";
 
 definePageMeta({
@@ -17,10 +16,10 @@ const {
   hasAnyPermission
 } = useAuthUser();
 
-const showApplyModal = ref(false);
-
 const loading = ref(false);
 const errorMessage = ref("");
+const successMessage = ref("");
+const processingDecision = ref<"APPROVED" | "REJECTED" | null>(null);
 
 const search = ref("");
 const statusFilter = ref<LeaveStatus | "ALL">("PENDING");
@@ -79,15 +78,12 @@ const isEmployee = computed(() => {
   return roleKey.value === "EMPLOYEE";
 });
 
-const canApprove = computed(() => {
-  return hasAnyPermission(
-    "APPROVE_LEAVE",
-    "REJECT_LEAVE"
-  );
-});
+const canApprove = computed(() => hasPermission("APPROVE_LEAVE"));
+
+const canReject = computed(() => hasPermission("REJECT_LEAVE"));
 
 const canCreateLeave = computed(() => {
-  return hasPermission("CREATE_LEAVE");
+  return ["ADMIN", "EMPLOYEE"].includes(roleKey.value);
 });
 
 const canFilter = computed(() => {
@@ -114,7 +110,9 @@ const loadLeaves = async () => {
   errorMessage.value = "";
 
   try {
-    const response = await leaveService.getLeaveRequests();
+    const response = isEmployee.value
+      ? await leaveService.getMyLeaveRequests()
+      : await leaveService.getLeaveRequests();
 
     const rawLeaves = response?.data || [];
 
@@ -184,8 +182,6 @@ const loadLeaves = async () => {
       };
     });
 
-    console.log("LOADED LEAVES:", leaveRequests.value);
-
     if (
       selectedRequestId.value === null &&
       leaveRequests.value.length > 0
@@ -205,12 +201,6 @@ const loadLeaves = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const handleLeaveSubmitted = async () => {
-  showApplyModal.value = false;
-
-  await loadLeaves();
 };
 
 const selectedRequest = computed(() => {
@@ -333,43 +323,8 @@ const formatDate = (date: string) => {
   );
 };
 
-const applyLeave = async (leave: {
-  type: string;
-  startDate: string;
-  endDate: string;
-  reason: string;
-}) => {
-  try {
-    loading.value = true;
-    errorMessage.value = "";
-    await leaveService.createLeave({
-      type: leave.type,
-      startDate: leave.startDate,
-      endDate: leave.endDate,
-      reason: leave.reason
-    });
-
-    showApplyModal.value = false;
-
-    await loadLeaves();
-  } catch (error: any) {
-    console.error(
-      "Failed to submit leave:",
-      error
-    );
-
-    errorMessage.value =
-      error?.data?.message ||
-      error?.response?.data?.message ||
-      error?.message ||
-      "Unable to submit leave request.";
-  } finally {
-    loading.value = false;
-  }
-};
-
 const updateDecision = async (status: "APPROVED" | "REJECTED") => {
-  if (!selectedRequest.value) {
+  if (processingDecision.value || !selectedRequest.value) {
     return;
   }
 
@@ -377,25 +332,32 @@ const updateDecision = async (status: "APPROVED" | "REJECTED") => {
     return;
   }
 
-  const requestId = selectedRequest.value.id;
+  const hasDecisionPermission =
+    status === "APPROVED" ? canApprove.value : canReject.value;
+
+  if (!hasDecisionPermission) {
+    errorMessage.value = `You do not have permission to ${status.toLowerCase()} leave requests.`;
+    return;
+  }
 
   try {
     loading.value = true;
     errorMessage.value = "";
+    successMessage.value = "";
+    processingDecision.value = status;
 
     const note = decisionNote.value.trim();
 
     if (status === "APPROVED") {
-      await leaveService.approveLeave(requestId, note);
+      await leaveService.approveLeave(selectedRequest.value.id, note);
     } else {
-      await leaveService.rejectLeave(requestId, note);
+      await leaveService.rejectLeave(selectedRequest.value.id, note);
     }
 
     decisionNote.value = "";
 
     await loadLeaves();
-
-    selectedRequestId.value = requestId;
+    successMessage.value = `Leave request ${status.toLowerCase()} successfully.`;
 
   } catch (error: any) {
     console.error(`Failed to ${status.toLowerCase()} leave:`, error);
@@ -406,6 +368,7 @@ const updateDecision = async (status: "APPROVED" | "REJECTED") => {
       `Unable to ${status === "APPROVED" ? "approve" : "reject"} leave request.`;
   } finally {
     loading.value = false;
+    processingDecision.value = null;
   }
 };
 
@@ -466,6 +429,14 @@ onMounted(() => {
     :summary="summary"
   />
 
+  <p v-if="errorMessage" class="feedback feedback-error" role="alert">
+    {{ errorMessage }}
+  </p>
+
+  <p v-if="successMessage" class="feedback feedback-success" role="status">
+    {{ successMessage }}
+  </p>
+
   <LeaveToolbar
     :search="search"
     :status-filter="statusFilter"
@@ -491,16 +462,13 @@ onMounted(() => {
       :decision-note="decisionNote"
       :format-date="formatDate"
       :can-approve="canApprove"
+      :can-reject="canReject"
+      :processing-decision="processingDecision"
       @update:decision-note="decisionNote = $event"
       @update-decision="updateDecision"
     />
   </div>
 
-  <ApplyLeaveModal
-    v-if="showApplyModal"
-    @close="showApplyModal = false"
-    @submit="handleLeaveSubmitted"
-  />
 </template>
 
 <style scoped>
@@ -534,6 +502,26 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) 390px;
   gap: 18px;
   align-items: start;
+}
+
+.feedback {
+  margin: 0 0 18px;
+  padding: 11px 14px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.feedback-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.feedback-success {
+  color: #166534;
+  background: #ecfdf3;
+  border-color: #86efac;
 }
 
 @media (max-width:1050px){

@@ -7,7 +7,7 @@ definePageMeta({
 
 const router = useRouter();
 
-const { authUser, hasPermission } = useAuthUser();
+const { roleKey } = useAuthUser();
 
 const loading = ref(false);
 const errorMessage = ref("");
@@ -22,11 +22,17 @@ const form = ref({
 
 const canApplyLeave = computed(() => {
   return (
-    hasPermission("CREATE_LEAVE") &&
+    ["ADMIN", "EMPLOYEE"].includes(roleKey.value) &&
     form.value.type !== "" &&
     form.value.startDate !== "" &&
     form.value.endDate !== ""
   );
+});
+
+onMounted(() => {
+  if (!["ADMIN", "EMPLOYEE"].includes(roleKey.value)) {
+    router.replace("/dashboard/leaves");
+  }
 });
 
 const totalDays = computed(() => {

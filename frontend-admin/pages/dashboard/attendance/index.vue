@@ -2,6 +2,7 @@
 import AttendanceComplaintModal from "~/components/attendance/AttendanceComplaintModal.vue";
 import AttendanceDayDetails from "~/components/attendance/AttendanceDayDetails.vue";
 import AttendanceWeekList from "~/components/attendance/AttendanceWeekList.vue";
+import AllUsersAttendanceWeek from "~/components/attendance/AllUsersAttendanceWeek.vue";
 import attendanceService from "~/services/attendance.service";
 
 type AttendanceDay = {
@@ -49,11 +50,22 @@ type DayDetails = {
   records: RawAttendanceRecord[];
 };
 
+type AttendanceUser = {
+  id: number;
+  userCode: string | null;
+  fullName: string;
+  department: string | null;
+  designation: string | null;
+  days: AttendanceDay[];
+};
+
 type ComplaintType = "CHECK_IN" | "CHECK_OUT" | "BOTH" | "STATUS" | "OTHER";
 
 definePageMeta({
   layout: "dashboard"
 });
+
+const { isSuperAdmin } = useAuthUser();
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -64,6 +76,8 @@ const selectedWeekIndex = ref(0);
 const weekStart = ref("");
 const weekEnd = ref("");
 const days = ref<AttendanceDay[]>([]);
+const allUsers = ref<AttendanceUser[]>([]);
+const userSearch = ref("");
 const selectedDate = ref<string | null>(null);
 const dayDetails = ref<DayDetails | null>(null);
 const selectedRecord = ref<RawAttendanceRecord | null>(null);
@@ -144,6 +158,23 @@ const selectedMonthLabel = computed(() => {
   return monthOptions.find(
     (month) => month.value === selectedMonth.value
   )?.label || "";
+});
+
+const filteredUsers = computed(() => {
+  const query = userSearch.value.trim().toLowerCase();
+
+  if (!query) {
+    return allUsers.value;
+  }
+
+  return allUsers.value.filter((user) => {
+    return [
+      user.fullName,
+      user.userCode,
+      user.department,
+      user.designation
+    ].some((value) => String(value || "").toLowerCase().includes(query));
+  });
 });
 
 const canGoToPreviousWeek = computed(() => {
@@ -238,13 +269,19 @@ const loadWeek = async () => {
   successMessage.value = "";
 
   try {
-    const result = await attendanceService.getMyCurrentWeek(
-      selectedWeekStart.value
-    );
+    const result = isSuperAdmin.value
+      ? await attendanceService.getAllUsersWeek(selectedWeekStart.value)
+      : await attendanceService.getMyCurrentWeek(selectedWeekStart.value);
 
     weekStart.value = result.weekStart;
     weekEnd.value = result.weekEnd;
-    days.value = result.days;
+    days.value = isSuperAdmin.value ? [] : result.days;
+    allUsers.value = isSuperAdmin.value ? result.users : [];
+
+    if (isSuperAdmin.value) {
+      clearSelectedDay();
+      return;
+    }
 
     if (selectedDate.value) {
       const stillInWeek = result.days.some(
@@ -263,6 +300,7 @@ const loadWeek = async () => {
       error?.data?.message ||
       "Unable to load attendance week";
     days.value = [];
+    allUsers.value = [];
     selectedDate.value = null;
     dayDetails.value = null;
   } finally {
@@ -294,6 +332,10 @@ const navigateWeek = async (offset: number) => {
 };
 
 const selectDay = async (attendanceDate: string) => {
+  if (isSuperAdmin.value) {
+    return;
+  }
+
   selectedDate.value = attendanceDate;
   successMessage.value = "";
 
@@ -360,9 +402,23 @@ onMounted(loadWeek);
   <div class="attendance-page">
     <header class="page-header">
       <div>
-        <h1>My Attendance</h1>
-        <p>{{ selectedMonthLabel }} {{ selectedYear }}</p>
+        <h1>{{ isSuperAdmin ? "All User Attendance" : "My Attendance" }}</h1>
+        <p>
+          {{ selectedMonthLabel }} {{ selectedYear }}
+          <template v-if="isSuperAdmin && !loadingWeek">
+            - {{ allUsers.length }} employees
+          </template>
+        </p>
       </div>
+
+      <label v-if="isSuperAdmin" class="user-search">
+        <span class="sr-only">Search employees</span>
+        <input
+          v-model="userSearch"
+          type="search"
+          placeholder="Search employee, code or team"
+        >
+      </label>
     </header>
 
     <section class="attendance-controls" aria-label="Attendance period">
@@ -449,6 +505,11 @@ onMounted(loadWeek);
       Loading attendance week...
     </div>
 
+    <AllUsersAttendanceWeek
+      v-else-if="isSuperAdmin && !pageError"
+      :users="filteredUsers"
+    />
+
     <AttendanceWeekList
       v-else-if="!pageError"
       :days="days"
@@ -461,7 +522,7 @@ onMounted(loadWeek);
     </p>
 
     <AttendanceDayDetails
-      v-if="selectedDate && !detailError"
+      v-if="!isSuperAdmin && selectedDate && !detailError"
       :attendance-date="selectedDate"
       :records="dayDetails?.records || []"
       :loading="loadingDay"
@@ -470,7 +531,7 @@ onMounted(loadWeek);
     />
 
     <AttendanceComplaintModal
-      v-if="selectedRecord && selectedDate"
+      v-if="!isSuperAdmin && selectedRecord && selectedDate"
       :key="`${selectedDate}-${selectedRecord.id}`"
       :attendance-date="selectedDate"
       :record="selectedRecord"
@@ -505,6 +566,38 @@ onMounted(loadWeek);
   margin: 0;
   color: #64748b;
   font-size: 14px;
+}
+
+.user-search {
+  width: min(100%, 320px);
+}
+
+.user-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  color: #1d2b3f;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.user-search input:focus {
+  border-color: #16827f;
+  box-shadow: 0 0 0 3px rgb(22 130 127 / 13%);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .attendance-controls {
@@ -664,6 +757,10 @@ onMounted(loadWeek);
 
   .page-header h1 {
     font-size: 26px;
+  }
+
+  .user-search {
+    width: 100%;
   }
 
   .refresh-button {

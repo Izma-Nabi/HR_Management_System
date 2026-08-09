@@ -171,6 +171,36 @@ const findDailyAttendanceForWeek = async (userId, startDate, endDate) => {
   `;
 };
 
+const findAllUsersAttendanceForWeek = async (startDate, endDate) => {
+  return prisma.$queryRaw`
+    SELECT
+      users.id AS userId,
+      users.userCode AS userCode,
+      TRIM(CONCAT_WS(' ', users.firstName, users.lastName)) AS fullName,
+      departments.department_name AS department,
+      designations.designation_name AS designation,
+      summaries.id AS dailyAttendanceId,
+      DATE_FORMAT(summaries.attendance_date, '%Y-%m-%d') AS attendanceDate,
+      TIME_FORMAT(summaries.first_check_in, '%H:%i:%s') AS firstCheckIn,
+      TIME_FORMAT(summaries.last_check_out, '%H:%i:%s') AS finalCheckOut,
+      summaries.working_minutes AS workedMinutes,
+      summaries.late_minutes AS lateMinutes,
+      summaries.early_leave_minutes AS earlyLeaveMinutes,
+      summaries.overtime_minutes AS overtimeMinutes,
+      CAST(summaries.attendance_status AS CHAR) AS status
+    FROM users
+    LEFT JOIN departments
+      ON departments.id = users.department_id
+    LEFT JOIN designations
+      ON designations.id = users.designation_id
+    LEFT JOIN attendance_summary AS summaries
+      ON summaries.user_id = users.id
+      AND summaries.attendance_date BETWEEN ${startDate} AND ${endDate}
+    WHERE users.employmentStatus = 'ACTIVE'
+    ORDER BY users.firstName ASC, users.lastName ASC, summaries.attendance_date ASC
+  `;
+};
+
 const findDailyAttendanceByDate = async (userId, attendanceDate) => {
   const rows = await prisma.$queryRaw`
     SELECT
@@ -698,6 +728,7 @@ module.exports = {
   findDailyAttendanceByDate,
   findDailyAttendanceById,
   findDailyAttendanceForWeek,
+  findAllUsersAttendanceForWeek,
   findLatestComplaintsForRawAttendance,
   findPendingComplaint,
   findRawAttendanceById,

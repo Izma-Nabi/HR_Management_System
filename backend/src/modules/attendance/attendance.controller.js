@@ -28,6 +28,19 @@ const getMyCurrentWeek = asyncHandler(async (req, res) => {
   );
 });
 
+const getAllUsersWeek = asyncHandler(async (req, res) => {
+  const result = await attendanceService.getAllUsersWeek(
+    req.query.startDate
+  );
+
+  return sendSuccess(
+    res,
+    200,
+    "All user attendance fetched successfully",
+    result
+  );
+});
+
 const getMyDayDetails = asyncHandler(async (req, res) => {
   const result = await attendanceService.getMyDayDetails(
     req.user.id,
@@ -137,6 +150,7 @@ const insertManualAttendance = asyncHandler(async (req, res) => {
 module.exports = {
   createComplaint,
   getMyCurrentWeek,
+  getAllUsersWeek,
   getMyDayDetails,
   importAttendance,
   getMyTodayAttendance,

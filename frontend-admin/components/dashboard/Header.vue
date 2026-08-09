@@ -1,21 +1,22 @@
 <template>
   <header class="header">
-    <h2>{{ dashboardTitle }}</h2>
-
-    <div class="right">
-      <button class="icon-btn bell" type="button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5Z" />
-          <path d="M9.5 17a2.5 2.5 0 0 0 5 0" />
+    <div class="header-leading">
+      <button class="menu-btn" type="button" aria-label="Open navigation" @click="emit('toggleMenu')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
-        <span class="dot"></span>
       </button>
 
-      <div class="divider"></div>
+      <div>
+        <span class="header-eyebrow">Workspace</span>
+        <h2>{{ pageTitle }}</h2>
+      </div>
+    </div>
 
+    <div class="right">
       <div class="profile">
         <div class="avatar-wrap">
-          <img :src="avatarUrl" :alt="displayName" />
+          <span class="avatar-initials" aria-hidden="true">{{ initials }}</span>
           <span class="status-ring"></span>
         </div>
 
@@ -41,6 +42,8 @@
 import authService from "~/services/auth.service";
 
 const { authUser, role } = useAuthUser();
+const route = useRoute();
+const emit = defineEmits(["toggleMenu"]);
 
 const humanizeRole = (value) => {
   return String(value || "")
@@ -59,14 +62,29 @@ const roleLabel = computed(() => {
   return authUser.value?.roleName || humanizeRole(role.value) || "User";
 });
 
-const dashboardTitle = computed(() => {
-  return roleLabel.value === "User"
-    ? "Dashboard"
-    : `${roleLabel.value} Dashboard`;
+const pageTitle = computed(() => {
+  const path = route.path;
+
+  if (path === "/dashboard") return "Overview";
+  if (path.includes("attendance-complaints")) return "Attendance complaints";
+  if (path.includes("attendance")) return "Attendance";
+  if (path.includes("departments")) return "Departments";
+  if (path.includes("designations")) return "Designations";
+  if (path.includes("roles")) return "Roles & permissions";
+  if (path.includes("leaves")) return "Leave management";
+  if (path.includes("employees")) return "My attendance";
+  if (path.includes("users")) return "People";
+
+  return "Workspace";
 });
 
-const avatarUrl = computed(() => {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName.value)}&background=4F46E5&color=fff`;
+const initials = computed(() => {
+  return displayName.value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "U";
 });
 
 const logout = () => {
@@ -285,6 +303,149 @@ const logout = () => {
   .dot,
   .bell:hover svg {
     animation: none;
+  }
+}
+</style>
+
+<style scoped>
+.header {
+  left: var(--sidebar-collapsed-width);
+  height: var(--header-height);
+  padding: 0 clamp(20px, 3vw, 44px);
+  background: rgba(243, 242, 236, 0.83);
+  border-bottom: 1px solid rgba(200, 211, 205, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.header-leading,
+.menu-btn {
+  display: flex;
+  align-items: center;
+}
+
+.header-leading {
+  gap: 13px;
+}
+
+.header-eyebrow {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--ink-500);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  color: var(--ink-950);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 760;
+}
+
+.menu-btn {
+  display: none;
+  width: 42px;
+  height: 42px;
+  justify-content: center;
+  color: var(--ink-700);
+  background: rgba(255, 254, 250, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.right {
+  gap: 12px;
+}
+
+.profile {
+  padding: 5px 10px 5px 5px;
+}
+
+.profile:hover {
+  background: rgba(255, 254, 250, 0.72);
+}
+
+.avatar-wrap,
+.avatar-initials {
+  width: 40px;
+  height: 40px;
+}
+
+.avatar-initials {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, var(--brand), #164c4b);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.profile h4 {
+  color: var(--ink-950);
+  font-size: 13px;
+}
+
+.profile p {
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.logout-btn {
+  min-height: 40px;
+  padding: 9px 13px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(189, 63, 63, 0.14);
+  box-shadow: none;
+}
+
+.logout-btn:hover {
+  background: #f8deda;
+  box-shadow: none;
+}
+
+@media (max-width: 980px) {
+  .header {
+    left: 0;
+  }
+
+  .menu-btn {
+    display: flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-details,
+  .logout-btn span,
+  .header-eyebrow {
+    display: none;
+  }
+
+  .logout-btn {
+    width: 40px;
+    padding: 0;
+  }
+
+  .profile {
+    padding-right: 3px;
+  }
+
+  .header h2 {
+    max-width: 150px;
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>

@@ -11,42 +11,42 @@ const props = defineProps({
 const cards = computed(() => [
   {
     key: "total",
-    label: "Total",
+    label: "Total workforce",
     value: props.summary.total ?? 0,
-    accent: "#4f46e5",
-    bg: "#eef2ff",
+    accent: "#0f766e",
+    bg: "#dff2ed",
     icon: "clipboard"
   },
   {
     key: "present",
     label: "Present",
     value: props.summary.present ?? 0,
-    accent: "#16a34a",
-    bg: "#ecfdf3",
+    accent: "#237a51",
+    bg: "#e2f3e8",
     icon: "check"
   },
   {
     key: "absent",
     label: "Absent",
     value: props.summary.absent ?? 0,
-    accent: "#dc2626",
-    bg: "#fef2f2",
+    accent: "#bd3f3f",
+    bg: "#fce8e5",
     icon: "close"
   },
   {
     key: "late",
     label: "Late",
     value: props.summary.late ?? 0,
-    accent: "#ca8a04",
-    bg: "#fefce8",
+    accent: "#a76518",
+    bg: "#fff0d7",
     icon: "clock"
   },
   {
     key: "leave",
     label: "Leave",
     value: props.summary.leave ?? 0,
-    accent: "#2563eb",
-    bg: "#eff6ff",
+    accent: "#2c678d",
+    bg: "#e3eff6",
     icon: "palm"
   }
 ]);
@@ -224,6 +224,92 @@ const cards = computed(() => [
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+</style>
+
+<style scoped>
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  overflow: visible;
+}
+
+.summary-card {
+  min-width: 0;
+  padding: 17px;
+  text-align: left;
+  background: var(--surface);
+  border-color: var(--line);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.summary-card::before {
+  background: linear-gradient(145deg, transparent 35%, var(--bg));
+  opacity: 0.56;
+}
+
+.summary-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 12px 28px rgba(16, 37, 43, 0.08);
+  transform: translateY(-2px);
+}
+
+.icon-wrap {
+  width: 38px;
+  height: 38px;
+  margin: 0 0 18px;
+  border-radius: 11px;
+}
+
+.icon-wrap svg {
+  width: 19px;
+  height: 19px;
+}
+
+.summary-card:hover .icon-wrap {
+  transform: none;
+}
+
+.label {
+  color: var(--ink-500);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.value {
+  margin-top: 4px;
+  color: var(--ink-950);
+  font-family: var(--font-display);
+  font-size: 29px;
+}
+
+.bar {
+  width: 22px;
+  margin: 12px 0 0;
+}
+
+.summary-card:hover .bar {
+  width: 42px;
+}
+
+@media (max-width: 1180px) {
+  .summary-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-card:first-child {
+    grid-column: 1 / -1;
   }
 }
 </style>

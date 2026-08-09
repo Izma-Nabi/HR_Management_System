@@ -284,6 +284,7 @@ model LeaveRequest {
   currentRefersTo      Int?                @map("current_refers_to") @db.UnsignedInt
   currentApprover      User?               @relation("CurrentLeaveApprover", fields: [currentRefersTo], references: [id], onDelete: SetNull)
   approvals            LeaveApproval[]
+  approvalHistory      LeaveApprovalHistory[]
   createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -310,6 +311,23 @@ model LeaveApproval {
   @@index([refersTo])
   @@index([status])
   @@map("leave_approvals")
+}
+
+model LeaveApprovalHistory {
+  id             Int          @id @default(autoincrement()) @db.UnsignedInt
+  leaveRequestId Int          @map("leave_request_id") @db.UnsignedInt
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  refersTo       Int          @map("refers_to") @db.UnsignedInt
+  approver       User         @relation("LeaveHistoryRefersTo", fields: [refersTo], references: [id], onDelete: Cascade)
+  approvalLevel  Int          @map("approval_level")
+  action         LeaveAction
+  remarks        String?      @db.Text
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([leaveRequestId])
+  @@index([refersTo])
+  @@index([action])
+  @@map("leave_approval_history")
 }
 
 

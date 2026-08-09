@@ -1,8 +1,15 @@
 <script setup>
-const { hasAnyPermission } = useAuthUser();
+const { roleKey, hasAnyPermission } = useAuthUser();
+const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false
+  }
+});
+const emit = defineEmits(["close"]);
 
 const canManageUsers = computed(() =>
-  hasAnyPermission(
+  roleKey.value !== "EMPLOYEE" && hasAnyPermission(
     "VIEW_ADMINS",
     "VIEW_EMPLOYEES",
     "CREATE_ADMIN",
@@ -51,15 +58,26 @@ const canViewLeaves = computed(() =>
   )
 );
 
+const canViewAttendance = computed(() =>
+  hasAnyPermission(
+    "VIEW_OWN_ATTENDANCE",
+    "VIEW_TEAM_ATTENDANCE",
+    "VIEW_REPORTS",
+    "VIEW_SYSTEM_SUMMARY"
+  )
+);
+
 const canViewAttendanceComplaints = computed(() =>
   hasAnyPermission(
-    "VIEW_ATTENDANCE_COMPLAINTS"
+    "VIEW_ATTENDANCE_COMPLAINTS",
+    "VIEW_TEAM_ATTENDANCE",
+    "VIEW_REPORTS"
   )
 );
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ 'sidebar--open': props.open }">
     <div class="logo">
       <span class="logo-mark">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -70,12 +88,24 @@ const canViewAttendanceComplaints = computed(() =>
         <h2>AMS</h2>
         <span>Attendance System</span>
       </div>
+
+      <button class="sidebar-close" type="button" aria-label="Close navigation" @click="emit('close')">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      </button>
     </div>
 
     <p class="nav-eyebrow">Menu</p>
 
-    <nav>
-      <NuxtLink to="/dashboard" class="nav-item" style="--i: 0">
+    <nav @click="emit('close')">
+      <NuxtLink
+        to="/dashboard"
+        class="nav-item"
+        style="--i: 0"
+        active-class=""
+        exact-active-class="router-link-active"
+      >
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="9" rx="1.5" />
@@ -166,7 +196,7 @@ const canViewAttendanceComplaints = computed(() =>
         <span class="nav-label">Leave Requests</span>
       </NuxtLink>
 
-      <NuxtLink to="/dashboard/attendance" class="nav-item" style="--i: 6">
+      <NuxtLink v-if="canViewAttendance" to="/dashboard/attendance" class="nav-item" style="--i: 6">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="9" />
@@ -203,31 +233,21 @@ const canViewAttendanceComplaints = computed(() =>
           Attendance Complaints
         </span>
       </NuxtLink>
-
-
-      <NuxtLink to="/dashboard/reports" class="nav-item" style="--i: 7">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 3v18h18" />
-            <rect x="7" y="12" width="3" height="6" rx="0.5" />
-            <rect x="12.5" y="8" width="3" height="10" rx="0.5" />
-            <rect x="18" y="5" width="3" height="13" rx="0.5" />
-          </svg>
-        </span>
-        <span class="nav-label">Reports</span>
-      </NuxtLink>
-
-      <NuxtLink to="/dashboard/settings" class="nav-item" style="--i: 8">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </span>
-        <span class="nav-label">Settings</span>
-      </NuxtLink>
     </nav>
+
+    <div class="sidebar-foot">
+      <span class="sidebar-foot-dot"></span>
+      <span>System operational</span>
+    </div>
   </aside>
+
+  <button
+    v-if="props.open"
+    class="sidebar-backdrop"
+    type="button"
+    aria-label="Close navigation"
+    @click="emit('close')"
+  ></button>
 </template>
 
 <style scoped>
@@ -427,6 +447,230 @@ nav {
   }
   .nav-item:hover {
     transform: none;
+  }
+}
+</style>
+
+<style scoped>
+.sidebar {
+  width: var(--sidebar-collapsed-width);
+  padding: 22px 14px;
+  color: rgba(255, 255, 255, 0.78);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(41, 147, 133, 0.2), transparent 18rem),
+    linear-gradient(180deg, #102e34 0%, #0c252b 100%);
+  border-right: 0;
+  box-shadow: 18px 0 50px rgba(16, 37, 43, 0.08);
+  overflow-x: hidden;
+  transition: width 240ms var(--ease-out), transform 260ms var(--ease-out);
+}
+
+.sidebar:hover,
+.sidebar:focus-within {
+  width: var(--sidebar-width);
+}
+
+.logo {
+  min-height: 48px;
+  margin-bottom: 30px;
+  padding: 0 9px;
+}
+
+.logo-mark {
+  width: 42px;
+  height: 42px;
+  color: #17333a;
+  background: linear-gradient(145deg, #f2c56d, #d7952b);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  animation: none;
+}
+
+.logo-text h2 {
+  color: #fffefa;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.logo-text span {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 11px;
+}
+
+.logo-text,
+.nav-label,
+.sidebar-foot > span:last-child {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-6px);
+  white-space: nowrap;
+  transition:
+    opacity 150ms ease,
+    transform 200ms var(--ease-out),
+    visibility 0s linear 200ms;
+}
+
+.sidebar:hover .logo-text,
+.sidebar:focus-within .logo-text,
+.sidebar:hover .nav-label,
+.sidebar:focus-within .nav-label,
+.sidebar:hover .sidebar-foot > span:last-child,
+.sidebar:focus-within .sidebar-foot > span:last-child {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 70ms, 70ms, 0s;
+}
+
+.nav-eyebrow {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.38);
+  opacity: 0;
+  transition: height 200ms var(--ease-out), margin 200ms var(--ease-out), opacity 150ms ease;
+}
+
+.sidebar:hover .nav-eyebrow,
+.sidebar:focus-within .nav-eyebrow {
+  height: 14px;
+  margin: 0 0 10px 12px;
+  opacity: 1;
+}
+
+nav {
+  gap: 5px;
+}
+
+.nav-item {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 18px;
+  color: rgba(255, 255, 255, 0.68);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 650;
+  box-sizing: border-box;
+}
+
+.nav-item::before,
+.nav-item::after {
+  display: none;
+}
+
+.nav-icon {
+  width: 22px;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(2px);
+}
+
+.nav-item:hover .nav-icon {
+  color: #f2c56d;
+  transform: none;
+}
+
+.router-link-active,
+.router-link-active:hover {
+  color: #14343a;
+  background: #e5f3ef;
+  border-color: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  transform: none;
+}
+
+.router-link-active .nav-icon,
+.router-link-active:hover .nav-icon {
+  color: var(--brand);
+  transform: none;
+}
+
+.sidebar-close {
+  display: none;
+  width: 38px;
+  height: 38px;
+  margin-left: auto;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+}
+
+.sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 26px 8px 0;
+  padding: 14px 12px;
+  color: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.sidebar:not(:hover):not(:focus-within) .sidebar-foot {
+  justify-content: center;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.sidebar-foot-dot {
+  width: 7px;
+  height: 7px;
+  background: #63d5a1;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(99, 213, 161, 0.12);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: none;
+  background: rgba(9, 30, 35, 0.48);
+  border: 0;
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 980px) {
+  .sidebar {
+    z-index: 110;
+    width: min(86vw, 300px);
+    transform: translateX(-105%);
+    transition: transform 260ms var(--ease-out);
+  }
+
+  .sidebar--open {
+    transform: translateX(0);
+  }
+
+  .logo-text,
+  .nav-label,
+  .sidebar-foot > span:last-child {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .nav-eyebrow {
+    height: 14px;
+    margin: 0 0 10px 12px;
+    opacity: 1;
+  }
+
+  .sidebar-close {
+    display: grid;
+  }
+
+  .sidebar-backdrop {
+    display: block;
   }
 }
 </style>

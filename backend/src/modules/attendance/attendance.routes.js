@@ -6,7 +6,8 @@ const attendanceController = require("./attendance.controller");
 
 const authMiddleware = require("../../middlewares/auth.middleware");
 const {
-  requirePermission
+  requirePermission,
+  requireSuperAdmin
 } = require("../../middlewares/permission.middleware");
 
 
@@ -18,9 +19,22 @@ router.post(
 );
 
 router.get(
+  "/my/week",
+  authMiddleware,
+  attendanceController.getMyCurrentWeek
+);
+
+router.get(
   "/my/day/:date",
   authMiddleware,
   attendanceController.getMyDayDetails
+);
+
+router.get(
+  "/all/week",
+  authMiddleware,
+  requireSuperAdmin,
+  attendanceController.getAllUsersWeek
 );
 
 

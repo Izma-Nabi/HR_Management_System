@@ -1,7 +1,10 @@
 const router = require("express").Router();
 
 const auth = require("../../middlewares/auth.middleware");
-const { requirePermission } = require("../../middlewares/permission.middleware");
+const {
+  requirePermission,
+  requireAnyRole
+} = require("../../middlewares/permission.middleware");
 
 const leaveController = require("./leave.controller");
 
@@ -19,6 +22,7 @@ router.get(
 router.post(
   "/",
   auth,
+  requireAnyRole("ADMIN", "EMPLOYEE"),
   requirePermission("CREATE_LEAVE"),
   leaveController.createLeave
 );

@@ -546,6 +546,100 @@ const getMyCurrentWeek = async (userId, startDate) => {
   };
 };
 
+const getAllUsersWeek = async (startDate) => {
+  const week = requestedWeek(startDate);
+  let rows;
+
+  try {
+    rows = await attendanceRepository.findAllUsersAttendanceForWeek(
+      week.startDate,
+      week.endDate
+    );
+  } catch (error) {
+    if (isMissingDailyAttendanceTable(error)) {
+      throw dailyAttendanceUnavailableError();
+    }
+
+    throw error;
+  }
+
+  const usersById = new Map();
+
+  for (const row of rows) {
+    const userId = databaseInteger(row.userId);
+
+    if (!usersById.has(userId)) {
+      usersById.set(userId, {
+        id: userId,
+        userCode: row.userCode || null,
+        fullName: row.fullName,
+        department: row.department || null,
+        designation: row.designation || null,
+        summariesByDate: new Map()
+      });
+    }
+
+    if (row.attendanceDate) {
+      usersById.get(userId).summariesByDate.set(row.attendanceDate, row);
+    }
+  }
+
+  const users = Array.from(usersById.values()).map((user) => {
+    const days = week.dates.map((attendanceDate) => {
+      const summary = user.summariesByDate.get(attendanceDate);
+      const dayName = dayNameFromDate(attendanceDate);
+      let status = summary?.status || "NO_RECORD";
+
+      if (!summary && attendanceDate > week.today) {
+        status = "UPCOMING";
+      } else if (!summary && ["Saturday", "Sunday"].includes(dayName)) {
+        status = "WEEKEND";
+      }
+
+      return {
+        dailyAttendanceId: summary
+          ? databaseInteger(summary.dailyAttendanceId)
+          : null,
+        attendanceDate,
+        dayName,
+        firstCheckIn: summary?.firstCheckIn || null,
+        finalCheckOut: summary?.finalCheckOut || null,
+        workedMinutes: summary
+          ? databaseInteger(summary.workedMinutes)
+          : null,
+        lateMinutes: summary
+          ? databaseInteger(summary.lateMinutes)
+          : null,
+        earlyLeaveMinutes: summary
+          ? databaseInteger(summary.earlyLeaveMinutes)
+          : null,
+        overtimeMinutes: summary
+          ? databaseInteger(summary.overtimeMinutes)
+          : null,
+        status
+      };
+    });
+
+    return {
+      id: user.id,
+      userCode: user.userCode,
+      fullName: user.fullName,
+      department: user.department,
+      designation: user.designation,
+      days
+    };
+  });
+
+  return {
+    weekStart: week.startDate,
+    weekEnd: week.endDate,
+    today: week.today,
+    isCurrentWeek: week.startDate === currentWeek().startDate,
+    userCount: users.length,
+    users
+  };
+};
+
 const getMyDayDetails = async (userId, attendanceDate) => {
   let dailyAttendance;
 
@@ -874,6 +968,7 @@ const autoCheckoutEmployees = async () => {
 module.exports = {
   createAttendanceComplaint,
   getMyCurrentWeek,
+  getAllUsersWeek,
   getMyDayDetails,
   importAttendance,
   getAttendanceComplaints,

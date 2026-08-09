@@ -1,6 +1,44 @@
 const { prisma } = require("../../../../database/prisma");
 const attendanceRules = require("../../config/attendance.config");
 
+const PAKISTAN_TIME_ZONE = "Asia/Karachi";
+
+const dateStringInPakistan = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PAKISTAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const previousPakistanDate = (date = new Date()) => {
+  const today = new Date(`${dateStringInPakistan(date)}T00:00:00.000Z`);
+
+  today.setUTCDate(today.getUTCDate() - 1);
+
+  return today.toISOString().slice(0, 10);
+};
+
+const attendanceDateValue = (date) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
+    throw new Error("Attendance date must use YYYY-MM-DD format.");
+  }
+
+  const value = new Date(`${date}T00:00:00.000Z`);
+
+  if (Number.isNaN(value.getTime()) || value.toISOString().slice(0, 10) !== date) {
+    throw new Error("Attendance date is invalid.");
+  }
+
+  return value;
+};
+
 const formatHHMM = (minutes) => {
 
   const h = Math.floor(minutes / 60);
@@ -32,10 +70,17 @@ const timeToMinutes = (time) => {
 
 // Convert Date object to minutes
 const dateToMinutes = (date) => {
-  return (
-    date.getHours() * 60 +
-    date.getMinutes()
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PAKISTAN_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
   );
+
+  return Number(values.hour) * 60 + Number(values.minute);
 };
 
 
@@ -128,9 +173,11 @@ const getAttendanceEvents = async (
 
 const calculateDailySummary = async (
   userId,
-  attendanceDate
+  attendanceDate,
+  providedEvents = null
 ) => {
   const events =
+    providedEvents ||
     await getAttendanceEvents(
       userId,
       attendanceDate
@@ -325,6 +372,171 @@ const generateAttendanceSummary = async (
 
 
   return saveAttendanceSummary(summary);
+};
+
+const generateDailyAttendanceSummaries = async (
+  date = previousPakistanDate()
+) => {
+  const attendanceDate = attendanceDateValue(date);
+  const users = await prisma.user.findMany({
+    where: {
+      employmentStatus: "ACTIVE",
+      OR: [
+        { status: "ACTIVE" },
+        { status: null }
+      ]
+    },
+    select: {
+      id: true,
+      departmentId: true,
+      designationId: true
+    }
+  });
+
+  if (!users.length) {
+    return {
+      attendanceDate: date,
+      processedUsers: 0,
+      preservedReviewedUsers: 0,
+      statusCounts: {}
+    };
+  }
+
+  const userIds = users.map((user) => user.id);
+  const [approvedLeaves, events, reviewedSummaries] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: {
+        userId: { in: userIds },
+        status: "APPROVED",
+        startDate: { lte: attendanceDate },
+        endDate: { gte: attendanceDate }
+      },
+      select: { userId: true }
+    }),
+    prisma.attendance.findMany({
+      where: {
+        userId: { in: userIds },
+        attendanceDate
+      },
+      orderBy: [
+        { userId: "asc" },
+        { eventTime: "asc" }
+      ]
+    }),
+    prisma.attendanceSummary.findMany({
+      where: {
+        userId: { in: userIds },
+        attendanceDate,
+        complaints: {
+          some: { status: "APPROVED" }
+        }
+      },
+      select: { userId: true }
+    })
+  ]);
+  const usersOnLeave = new Set(
+    approvedLeaves.map((leave) => leave.userId)
+  );
+  const eventsByUser = new Map();
+  const reviewedUserIds = new Set(
+    reviewedSummaries.map((summary) => summary.userId)
+  );
+
+  for (const event of events) {
+    const userEvents = eventsByUser.get(event.userId) || [];
+
+    userEvents.push(event);
+    eventsByUser.set(event.userId, userEvents);
+  }
+
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "UTC"
+  }).format(attendanceDate).toUpperCase();
+  const isWorkingDay = attendanceRules.weekly.workingDays.includes(weekday);
+  const summaries = await Promise.all(
+    users.map(async (user) => {
+      const calculatedSummary = await calculateDailySummary(
+        user.id,
+        attendanceDate,
+        eventsByUser.get(user.id) || []
+      );
+
+      if (calculatedSummary) {
+        return {
+          ...calculatedSummary,
+          departmentId: user.departmentId,
+          designationId: user.designationId
+        };
+      }
+
+      const attendanceStatus = usersOnLeave.has(user.id)
+        ? "ON_LEAVE"
+        : isWorkingDay
+          ? "ABSENT"
+          : "WEEK_OFF";
+      const expectedMinutes = attendanceStatus === "ABSENT"
+        ? attendanceRules.office.workingMinutes
+        : 0;
+
+      return {
+        userId: user.id,
+        departmentId: user.departmentId,
+        designationId: user.designationId,
+        attendanceDate,
+        firstCheckIn: null,
+        lastCheckOut: null,
+        workingMinutes: 0,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        overtimeMinutes: 0,
+        expectedMinutes,
+        attendanceStatus,
+        remarks:
+          attendanceStatus === "ON_LEAVE"
+            ? "Approved leave"
+            : attendanceStatus === "WEEK_OFF"
+              ? "Scheduled week off"
+              : "No attendance events recorded",
+        calculatedAt: new Date()
+      };
+    })
+  );
+
+  const summariesToPersist = summaries.filter(
+    (summary) => !reviewedUserIds.has(summary.userId)
+  );
+
+  if (summariesToPersist.length) {
+    await prisma.$transaction(
+      summariesToPersist.map((summary) =>
+        prisma.attendanceSummary.upsert({
+          where: {
+            userId_attendanceDate: {
+              userId: summary.userId,
+              attendanceDate: summary.attendanceDate
+            }
+          },
+          update: summary,
+          create: summary
+        })
+      )
+    );
+  }
+
+  const statusCounts = summariesToPersist.reduce((counts, summary) => {
+    counts[summary.attendanceStatus] =
+      (counts[summary.attendanceStatus] || 0) + 1;
+
+    return counts;
+  }, {});
+
+  return {
+    attendanceDate: date,
+    processedUsers: summariesToPersist.length,
+    preservedReviewedUsers: reviewedUserIds.size,
+    statusCounts
+  };
 };
 
 
@@ -725,6 +937,8 @@ const calculateEmployeeLiveAttendance = (records) => {
 };
 
 module.exports = {
+  generateAttendanceSummary,
+  generateDailyAttendanceSummaries,
   calculateTodayAttendance,
   calculateWeeklyMinutes,
   calculateWorkingMinutes,

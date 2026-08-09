@@ -33,7 +33,11 @@ export const useAuthUser = () => {
   const permissionSet = computed(() =>
     new Set(permissions.value.map(normalizePermission))
   );
-  const role = computed(() => authUser.value?.role || null);
+  const role = computed(() => {
+    const storedRole = authUser.value?.role;
+
+    return storedRole?.roleName || storedRole || authUser.value?.roleName || null;
+  });
   const roleKey = computed(() => normalizeRole(role.value));
   const isSuperAdmin = computed(() => roleKey.value === "SUPER_ADMIN");
 

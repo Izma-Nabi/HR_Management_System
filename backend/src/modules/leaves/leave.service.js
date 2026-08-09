@@ -1,4 +1,5 @@
 const { prisma } = require("../../../../database/prisma");
+const leaveRepository = require("./leave.repository");
 /*
 |--------------------------------------------------------------------------
 | CREATE LEAVE
@@ -52,6 +53,14 @@ const createLeave = async (
   });
 
   return leaveRequest;
+};
+
+const getMyLeaves = async (userId) => {
+  return leaveRepository.getMyLeaves(userId);
+};
+
+const getTeamLeaves = async (departmentId) => {
+  return leaveRepository.getTeamLeaves(departmentId);
 };
 
 
@@ -559,6 +568,8 @@ const cancelLeave = async (leaveId, user) => {
 
 module.exports = {
   createLeave,
+  getMyLeaves,
+  getTeamLeaves,
   getLeaveRequests,
   getLeaveRequest,
   approveLeave,

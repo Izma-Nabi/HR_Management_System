@@ -35,16 +35,20 @@ const {
   selectedRequest,
   decisionNote,
   formatDate,
-  canApprove
+  canApprove,
+  canReject,
+  processingDecision
 } = defineProps<{
   selectedRequest: LeaveRequest | null;
   decisionNote: string;
   formatDate: (date: string) => string;
   canApprove: boolean;
+  canReject: boolean;
+  processingDecision: "APPROVED" | "REJECTED" | null;
 }>();
 
 const emit = defineEmits<{
-  (e: "update:props.decisionNote", value: string): void;
+  (e: "update:decisionNote", value: string): void;
   (e: "updateDecision", status: "APPROVED" | "REJECTED"): void;
 }>();
 </script>
@@ -122,7 +126,7 @@ const emit = defineEmits<{
 
       <!-- Only Admin / Super Admin can approve -->
       <section
-        v-if="canApprove && selectedRequest.status === 'PENDING'"
+        v-if="(canApprove || canReject) && selectedRequest.status === 'PENDING'"
         class="decision-box"
       >
         <label for="decision-note">
@@ -144,17 +148,23 @@ const emit = defineEmits<{
 
         <div class="decision-actions">
           <button
+            v-if="canReject"
+            type="button"
             class="reject-btn"
+            :disabled="processingDecision !== null"
             @click="emit('updateDecision', 'REJECTED')"
           >
-            Reject
+            {{ processingDecision === "REJECTED" ? "Rejecting..." : "Reject" }}
           </button>
 
           <button
+            v-if="canApprove"
+            type="button"
             class="approve-btn"
+            :disabled="processingDecision !== null"
             @click="emit('updateDecision', 'APPROVED')"
           >
-            Approve
+            {{ processingDecision === "APPROVED" ? "Approving..." : "Approve" }}
           </button>
         </div>
       </section>
@@ -291,6 +301,12 @@ const emit = defineEmits<{
   border-radius: 8px;
   font-weight: 900;
   cursor: pointer;
+}
+
+.approve-btn:disabled,
+.reject-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .approve-btn {

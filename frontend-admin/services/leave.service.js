@@ -9,6 +9,15 @@ const getLeaveRequests = async () => {
   });
 };
 
+const getMyLeaveRequests = async () => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(`${config.public.apiBase}/leaves/my`, {
+    method: "GET",
+    headers: authService.getAuthHeaders(),
+  });
+};
+
 const getLeaveRequest = async (id) => {
   const config = useRuntimeConfig();
 
@@ -82,6 +91,7 @@ const cancelLeave = async (id) => {
 
 export default {
   getLeaveRequests,
+  getMyLeaveRequests,
   getLeaveRequest,
   createLeaveRequest,
   approveLeave,
