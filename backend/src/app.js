@@ -13,6 +13,7 @@ const attendanceRoutes = require("./modules/attendance/attendance.routes");
 const leaveRoutes = require("./modules/leaves/leave.routes");
 const roleRoutes = require("./modules/roles/role.routes");
 const designationRoutes = require("./modules/designations/designation.routes");
+const { testPrismaConnection } = require("../../database/prisma");
 
 const {
   notFoundHandler,
@@ -76,15 +77,22 @@ app.get("/", (req, res) => {
 });
 
 // Health route for quick server checks.
-app.get("/health", (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: "Combined backend is running",
-    data: {
-      service: "admin-employee-backend",
-      status: "ok"
-    }
-  });
+app.get("/health", async (req, res, next) => {
+  try {
+    await testPrismaConnection();
+
+    return res.status(200).json({
+      success: true,
+      message: "Combined backend is running",
+      data: {
+        service: "admin-employee-backend",
+        status: "ok",
+        database: "connected"
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 // Auth routes.

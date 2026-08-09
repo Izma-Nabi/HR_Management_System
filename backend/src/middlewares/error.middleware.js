@@ -1,6 +1,9 @@
 const fs = require("fs");
 const env = require("../../../global/env");
 const { ApiError, sendError } = require("../utils/apiResponse");
+const {
+  isTransientDatabaseError
+} = require("../../../database/prisma");
 
 // Handles unknown routes like /wrong/path.
 const notFoundHandler = (req, res, next) => {
@@ -10,6 +13,17 @@ const notFoundHandler = (req, res, next) => {
 // Converts database errors into friendly API errors.
 // Service-level duplicate checks already exist, but this catches race conditions.
 const normalizeDatabaseError = (error) => {
+  if (isTransientDatabaseError(error)) {
+    const unavailableError = new ApiError(
+      503,
+      "Database is temporarily unavailable. Please try again shortly."
+    );
+
+    unavailableError.databaseErrorCode = error.code;
+
+    return unavailableError;
+  }
+
   // Prisma uses P2002 for unique constraint violations.
   // Example: duplicate email or duplicate employeeCode.
   if (error && error.code === "P2002") {
@@ -67,6 +81,12 @@ const errorHandler = (err, req, res, next) => {
   // In production, the API response still stays safe and generic.
   if (env.nodeEnv !== "production" && !isOperational) {
     console.error(normalizedError);
+  }
+
+  if (normalizedError.databaseErrorCode) {
+    console.error(
+      `Database temporarily unavailable (${normalizedError.databaseErrorCode}).`
+    );
   }
 
   return sendError(res, statusCode, message, errors);
