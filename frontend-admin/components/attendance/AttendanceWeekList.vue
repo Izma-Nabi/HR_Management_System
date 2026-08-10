@@ -253,9 +253,9 @@ const statusClass = (status: string) => {
 }
 
 .status--present {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .status--late,

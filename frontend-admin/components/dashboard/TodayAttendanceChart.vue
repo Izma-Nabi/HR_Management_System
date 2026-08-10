@@ -32,7 +32,7 @@ const leavePercent = computed(() =>
 
 const chartStyle = computed(() => ({
   background: `conic-gradient(
-    #16a34a 0% ${presentPercent.value}%,
+    #2563eb 0% ${presentPercent.value}%,
     #f59e0b ${presentPercent.value}% ${presentPercent.value + latePercent.value}%,
     #ef4444 ${presentPercent.value + latePercent.value}% ${
       presentPercent.value + latePercent.value + absentPercent.value
@@ -140,7 +140,7 @@ const chartStyle = computed(() => ({
   display: inline-block;
 }
 .present {
-  background: #16a34a;
+  background: #2563eb;
 }
 
 .absent {

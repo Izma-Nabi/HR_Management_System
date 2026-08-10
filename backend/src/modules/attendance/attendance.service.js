@@ -3,6 +3,7 @@ const { ApiError } = require("../../utils/apiResponse");
 const XLSX = require("xlsx");
 const axios = require("axios");
 const attendanceRepository = require("./attendance.repository");
+const attendanceCalculator = require("./attendance.calculator");
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1uNA77aFV8J1Mj8uKKKc0gnOQIXaD0WZ7uYgCWdNQE7w/export?format=xlsx";
 const PAKISTAN_TIME_ZONE = "Asia/Karachi";
@@ -477,14 +478,16 @@ const importAttendance = async () => {
 
 const getMyCurrentWeek = async (userId, startDate) => {
   const week = requestedWeek(startDate);
+
   let summaries;
 
   try {
-    summaries = await attendanceRepository.findDailyAttendanceForWeek(
-      userId,
-      week.startDate,
-      week.endDate
-    );
+    summaries =
+      await attendanceRepository.findDailyAttendanceForWeek(
+        userId,
+        week.startDate,
+        week.endDate
+      );
   } catch (error) {
     if (isMissingDailyAttendanceTable(error)) {
       throw dailyAttendanceUnavailableError();
@@ -494,41 +497,95 @@ const getMyCurrentWeek = async (userId, startDate) => {
   }
 
   const summaryByDate = new Map(
-    summaries.map((summary) => [summary.attendanceDate, summary])
+    summaries.map((summary) => [
+      summary.attendanceDate,
+      summary
+    ])
   );
 
   const days = week.dates.map((attendanceDate) => {
-    const summary = summaryByDate.get(attendanceDate);
     const dayName = dayNameFromDate(attendanceDate);
-    let status = summary?.status || "NO_RECORD";
 
-    if (!summary && attendanceDate > week.today) {
+    /*
+     * TODAY:
+     * Do NOT display attendanceSummary values.
+     *
+     * Today's attendance is only shown when the user
+     * clicks the day and opens the live details.
+     */
+    const isToday =
+      attendanceDate === week.today;
+
+    const summary = isToday
+      ? null
+      : summaryByDate.get(attendanceDate);
+
+    let status =
+      summary?.status || "NO_RECORD";
+
+    if (
+      !summary &&
+      attendanceDate > week.today
+    ) {
       status = "UPCOMING";
-    } else if (!summary && ["Saturday", "Sunday"].includes(dayName)) {
+    } else if (
+      !summary &&
+      ["Saturday", "Sunday"].includes(dayName)
+    ) {
       status = "WEEKEND";
     }
 
     return {
-      dailyAttendanceId: summary ? databaseInteger(summary.id) : null,
+      dailyAttendanceId: summary
+        ? databaseInteger(summary.id)
+        : null,
+
       attendanceDate,
+
       dayName,
-      firstCheckIn: summary?.firstCheckIn || null,
-      finalCheckOut: summary?.finalCheckOut || null,
-      workedMinutes: summary
-        ? databaseInteger(summary.workedMinutes)
-        : null,
-      lateMinutes: summary
-        ? databaseInteger(summary.lateMinutes)
-        : null,
-      earlyLeaveMinutes: summary
-        ? databaseInteger(summary.earlyLeaveMinutes)
-        : null,
-      overtimeMinutes: summary
-        ? databaseInteger(summary.overtimeMinutes)
-        : null,
+
+      firstCheckIn:
+        summary?.firstCheckIn || null,
+
+      finalCheckOut:
+        summary?.finalCheckOut || null,
+
+      workedMinutes:
+        summary
+          ? databaseInteger(
+              summary.workedMinutes
+            )
+          : null,
+
+      lateMinutes:
+        summary
+          ? databaseInteger(
+              summary.lateMinutes
+            )
+          : null,
+
+      earlyLeaveMinutes:
+        summary
+          ? databaseInteger(
+              summary.earlyLeaveMinutes
+            )
+          : null,
+
+      overtimeMinutes:
+        summary
+          ? databaseInteger(
+              summary.overtimeMinutes
+            )
+          : null,
+
       status,
-      source: summary?.source || null,
-      adjustmentReason: summary?.adjustmentReason || null,
+
+      source:
+        summary?.source || null,
+
+      adjustmentReason:
+        summary?.adjustmentReason || null,
+
       canComplain: Boolean(
         summary &&
         isDateInCurrentWeek(attendanceDate) &&
@@ -541,7 +598,8 @@ const getMyCurrentWeek = async (userId, startDate) => {
     weekStart: week.startDate,
     weekEnd: week.endDate,
     today: week.today,
-    isCurrentWeek: week.startDate === currentWeek().startDate,
+    isCurrentWeek:
+      week.startDate === currentWeek().startDate,
     days
   };
 };
@@ -644,10 +702,11 @@ const getMyDayDetails = async (userId, attendanceDate) => {
   let dailyAttendance;
 
   try {
-    dailyAttendance = await attendanceRepository.findDailyAttendanceByDate(
-      userId,
-      attendanceDate
-    );
+    dailyAttendance =
+      await attendanceRepository.findDailyAttendanceByDate(
+        userId,
+        attendanceDate
+      );
   } catch (error) {
     if (isMissingDailyAttendanceTable(error)) {
       throw dailyAttendanceUnavailableError();
@@ -656,41 +715,82 @@ const getMyDayDetails = async (userId, attendanceDate) => {
     throw error;
   }
 
-  const rawRecords = await attendanceRepository.findRawAttendanceForDay(
-    userId,
-    attendanceDate
-  );
-  const complaints = await attendanceRepository.findLatestComplaintsForRawAttendance(
-    userId,
-    rawRecords.map((record) => databaseInteger(record.id))
-  );
+  const week = currentWeek();
+
+  const isToday =
+    attendanceDate === week.today;
+
+  const rawRecords =
+    await attendanceRepository.findRawAttendanceForDay(
+      userId,
+      attendanceDate
+    );
+
+  const complaints =
+    await attendanceRepository.findLatestComplaintsForRawAttendance(
+      userId,
+      rawRecords.map((record) =>
+        databaseInteger(record.id)
+      )
+    );
+
   const latestComplaintByRawId = new Map();
 
   for (const complaint of complaints) {
-    if (!latestComplaintByRawId.has(complaint.rawAttendanceId)) {
-      latestComplaintByRawId.set(complaint.rawAttendanceId, complaint);
+    if (
+      !latestComplaintByRawId.has(
+        complaint.rawAttendanceId
+      )
+    ) {
+      latestComplaintByRawId.set(
+        complaint.rawAttendanceId,
+        complaint
+      );
     }
   }
 
-  const week = currentWeek();
+  /*
+   * Today's attendance is LIVE.
+   * It comes directly from attendance events.
+   */
+  const liveAttendance =
+    isToday
+      ? attendanceCalculator.calculateEmployeeLiveAttendance(
+          rawRecords
+        )
+      : null;
 
   return {
     attendanceDate,
-    dailyAttendanceId: dailyAttendance
-      ? databaseInteger(dailyAttendance.id)
-      : null,
+
+    dailyAttendanceId:
+      dailyAttendance
+        ? databaseInteger(
+            dailyAttendance.id
+          )
+        : null,
+
     canComplain: Boolean(
       dailyAttendance &&
       isDateInCurrentWeek(attendanceDate) &&
       attendanceDate <= week.today
     ),
+
+    liveAttendance,
+
     records: rawRecords.map((record) => ({
       ...record,
+
       id: databaseInteger(record.id),
-      userId: databaseInteger(record.userId),
-      complaint: latestComplaintByRawId.get(
-        databaseInteger(record.id)
-      ) || null
+
+      userId: databaseInteger(
+        record.userId
+      ),
+
+      complaint:
+        latestComplaintByRawId.get(
+          databaseInteger(record.id)
+        ) || null
     }))
   };
 };

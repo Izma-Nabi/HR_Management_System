@@ -311,8 +311,8 @@ const emit = defineEmits<{
 
 .approve-btn {
   color: white;
-  background: #15803d;
-  border: 1px solid #15803d;
+  background: #2563eb;
+  border: 1px solid #2563eb;
 }
 
 .reject-btn {
@@ -338,9 +338,9 @@ const emit = defineEmits<{
 }
 
 .status-pill.approved {
-  color: #166534;
-  background: #ecfdf3;
-  border: 1px solid #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
 }
 
 .status-pill.rejected {

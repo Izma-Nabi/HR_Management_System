@@ -523,8 +523,8 @@ onMounted(loadComplaint);
 }
 
 .success-box {
-  background: #dcfce7;
-  color: #166534;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .card {

@@ -644,8 +644,8 @@ onUnmounted(() => {
 }
 
 .icon-emerald {
-  background: #ecfdf5;
-  color: #059669;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .icon-amber {
@@ -749,8 +749,8 @@ onUnmounted(() => {
 }
 
 .badge-in {
-  background: #ecfdf5;
-  color: #059669;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .badge-out {

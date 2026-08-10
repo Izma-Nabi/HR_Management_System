@@ -891,8 +891,8 @@ small {
 }
 
 .notice.success {
-  color: #0f6b3d;
-  background: #ecfdf3;
+  color: #1d4ed8;
+  background: #eff6ff;
   border: 1px solid #b7ebc9;
 }
 

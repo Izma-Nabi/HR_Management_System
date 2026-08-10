@@ -69,7 +69,7 @@ defineProps<{
 }
 
 .summary-card.approved {
-  border-left-color: #15803d;
+  border-left-color: #2563eb;
 }
 
 .summary-card.rejected {

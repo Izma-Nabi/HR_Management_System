@@ -392,8 +392,8 @@ tbody tr:last-child td {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  color: #0f6b3d;
-  background: #ecfdf3;
+  color: #1d4ed8;
+  background: #eff6ff;
   border: 1px solid #b7ebc9;
   border-radius: 999px;
   font-size: 12px;

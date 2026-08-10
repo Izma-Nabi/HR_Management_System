@@ -738,9 +738,9 @@ onMounted(loadWeek);
 }
 
 .notice--success {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .loading-state {

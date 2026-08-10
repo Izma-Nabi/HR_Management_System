@@ -13,16 +13,16 @@ const cards = computed(() => [
     key: "total",
     label: "Total workforce",
     value: props.summary.total ?? 0,
-    accent: "#0f766e",
-    bg: "#dff2ed",
+    accent: "#2563eb",
+    bg: "#dbeafe",
     icon: "clipboard"
   },
   {
     key: "present",
     label: "Present",
     value: props.summary.present ?? 0,
-    accent: "#237a51",
-    bg: "#e2f3e8",
+    accent: "#2563eb",
+    bg: "#dbeafe",
     icon: "check"
   },
   {

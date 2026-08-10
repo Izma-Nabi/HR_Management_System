@@ -272,8 +272,8 @@ onUnmounted(() => {
   padding: clamp(24px, 4vw, 38px);
   color: rgba(255, 255, 255, 0.74);
   background:
-    radial-gradient(circle at 90% 10%, rgba(242, 197, 109, 0.24), transparent 18rem),
-    linear-gradient(125deg, #143a40, #0c5e59);
+    radial-gradient(circle at 90% 10%, rgba(96, 165, 250, 0.24), transparent 18rem),
+    linear-gradient(125deg, #1e3a8a, #2563eb);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
@@ -303,9 +303,9 @@ onUnmounted(() => {
 .live-dot {
   width: 8px;
   height: 8px;
-  background: #78e0ad;
+  background: #60a5fa;
   border-radius: 50%;
-  box-shadow: 0 0 0 5px rgba(120, 224, 173, 0.12);
+  box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.12);
 }
 
 .overview-hero h1 {

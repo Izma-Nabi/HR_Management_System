@@ -369,7 +369,7 @@ tbody tr:last-child td {
 }
 
 .count-chip.perms {
-  background: #ecfdf5;
+  background: #eff6ff;
   color: #047857;
 }
 

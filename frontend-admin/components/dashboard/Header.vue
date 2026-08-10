@@ -244,7 +244,7 @@ const logout = () => {
   right: 1px;
   width: 11px;
   height: 11px;
-  background: #22c55e;
+  background: #3b82f6;
   border: 2px solid #ffffff;
   border-radius: 50%;
 }

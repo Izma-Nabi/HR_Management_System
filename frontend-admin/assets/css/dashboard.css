@@ -12,15 +12,15 @@
   --surface-muted: #f7f7f2;
   --line: #dce3de;
   --line-strong: #c8d3cd;
-  --brand: #0f766e;
-  --brand-dark: #0a5d57;
-  --brand-soft: #dff2ed;
+  --brand: #2563eb;
+  --brand-dark: #1d4ed8;
+  --brand-soft: #dbeafe;
   --accent: #d7952b;
   --accent-soft: #fff0cf;
   --danger: #bd3f3f;
   --danger-soft: #fce8e5;
-  --success: #237a51;
-  --success-soft: #e2f3e8;
+  --success: #2563eb;
+  --success-soft: #dbeafe;
   --warning: #a76518;
   --warning-soft: #fff0d7;
   --info: #2c678d;
@@ -58,7 +58,7 @@ body {
   color: var(--ink-900);
   background:
     radial-gradient(circle at 82% 3%, rgba(215, 149, 43, 0.09), transparent 23rem),
-    radial-gradient(circle at 18% 90%, rgba(15, 118, 110, 0.07), transparent 28rem),
+    radial-gradient(circle at 18% 90%, rgba(37, 99, 235, 0.07), transparent 28rem),
     var(--canvas);
   font-family: var(--font-body);
   font-size: 15px;

@@ -267,9 +267,9 @@ tbody tr:hover {
 
 .event-type--check-in,
 .event-type--break-end {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .event-type--break-start {
@@ -308,9 +308,9 @@ tbody tr:hover {
 }
 
 .complaint-status--approved {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .complaint-status--rejected {

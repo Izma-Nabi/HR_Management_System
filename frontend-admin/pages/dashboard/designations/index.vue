@@ -399,7 +399,7 @@ button:disabled { cursor:not-allowed; opacity:0.62; }
 .loading, .empty, .notice { padding:14px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; font-weight:700; }
 .notice { margin-bottom:14px; }
 .notice.error { color:#9f1d1d; background:#fff0f0; border-color:#f4c7c7; }
-.notice.success { color:#0f6b3d; background:#ecfdf3; border-color:#b7ebc9; }
+.notice.success { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe; }
 
 @media (max-width: 860px) {
   .toolbar, .add-form { grid-template-columns:1fr; }

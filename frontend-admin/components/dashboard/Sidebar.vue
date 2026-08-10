@@ -280,9 +280,9 @@ const canViewAttendanceComplaints = computed(() =>
   height: 40px;
   flex-shrink: 0;
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #4338ca 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
   border-radius: 11px;
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.32);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
   animation: markPulse 3.2s ease-in-out infinite;
 }
 
@@ -354,7 +354,7 @@ nav {
   width: 3px;
   height: 0;
   transform: translateY(-50%);
-  background: #4f46e5;
+  background: #2563eb;
   border-radius: 0 3px 3px 0;
   transition: height 0.25s ease;
 }
@@ -387,14 +387,14 @@ nav {
 }
 
 .nav-item:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
 .router-link-active {
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.28);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
 }
 
 .router-link-active::before {
@@ -457,8 +457,8 @@ nav {
   padding: 22px 14px;
   color: rgba(255, 255, 255, 0.78);
   background:
-    radial-gradient(circle at 20% 0%, rgba(41, 147, 133, 0.2), transparent 18rem),
-    linear-gradient(180deg, #102e34 0%, #0c252b 100%);
+    radial-gradient(circle at 20% 0%, rgba(59, 130, 246, 0.2), transparent 18rem),
+    linear-gradient(180deg, #0f2a4a 0%, #0b1f3a 100%);
   border-right: 0;
   box-shadow: 18px 0 50px rgba(16, 37, 43, 0.08);
   overflow-x: hidden;
@@ -479,8 +479,8 @@ nav {
 .logo-mark {
   width: 42px;
   height: 42px;
-  color: #17333a;
-  background: linear-gradient(145deg, #f2c56d, #d7952b);
+  color: #eff6ff;
+  background: linear-gradient(145deg, #60a5fa, #2563eb);
   border-radius: 14px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
   animation: none;
@@ -573,7 +573,7 @@ nav {
 }
 
 .nav-item:hover .nav-icon {
-  color: #f2c56d;
+  color: #60a5fa;
   transform: none;
 }
 
@@ -624,9 +624,9 @@ nav {
 .sidebar-foot-dot {
   width: 7px;
   height: 7px;
-  background: #63d5a1;
+  background: #60a5fa;
   border-radius: 50%;
-  box-shadow: 0 0 0 4px rgba(99, 213, 161, 0.12);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
 }
 
 .sidebar-backdrop {

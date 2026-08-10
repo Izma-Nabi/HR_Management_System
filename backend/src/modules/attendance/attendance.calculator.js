@@ -26,19 +26,34 @@ const previousPakistanDate = (date = new Date()) => {
 };
 
 const attendanceDateValue = (date) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
+  // Already a Date object
+  if (date instanceof Date) {
+    if (Number.isNaN(date.getTime())) {
+      throw new Error("Attendance date is invalid.");
+    }
+
+    return date;
+  }
+
+  const dateString = String(date || "");
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     throw new Error("Attendance date must use YYYY-MM-DD format.");
   }
 
-  const value = new Date(`${date}T00:00:00.000Z`);
+  const value = new Date(
+    `${dateString}T00:00:00.000Z`
+  );
 
-  if (Number.isNaN(value.getTime()) || value.toISOString().slice(0, 10) !== date) {
+  if (
+    Number.isNaN(value.getTime()) ||
+    value.toISOString().slice(0, 10) !== dateString
+  ) {
     throw new Error("Attendance date is invalid.");
   }
 
   return value;
 };
-
 const formatHHMM = (minutes) => {
 
   const h = Math.floor(minutes / 60);
@@ -158,10 +173,13 @@ const getAttendanceEvents = async (
   userId,
   attendanceDate
 ) => {
+  const normalizedDate =
+    attendanceDateValue(attendanceDate);
+
   return prisma.attendance.findMany({
     where: {
       userId,
-      attendanceDate
+      attendanceDate: normalizedDate
     },
 
     orderBy: {
@@ -307,69 +325,77 @@ const calculateDailySummary = async (
 
 
 
-  return {
-    userId,
+ return {
+  userId,
 
-    attendanceDate,
+  attendanceDate: attendanceDateValue(attendanceDate),
 
-    firstCheckIn:
-      firstCheckIn?.eventTime || null,
+  firstCheckIn:
+    firstCheckIn?.eventTime || null,
 
-    lastCheckOut:
-      lastCheckOut?.eventTime || null,
+  lastCheckOut:
+    lastCheckOut?.eventTime || null,
 
-    workingMinutes,
+  workingMinutes,
 
-    lateMinutes,
+  lateMinutes,
 
-    earlyLeaveMinutes,
+  earlyLeaveMinutes,
 
-    overtimeMinutes,
+  overtimeMinutes,
 
-    expectedMinutes,
+  expectedMinutes,
 
-    attendanceStatus,
+  attendanceStatus,
 
-    calculatedAt: new Date()
-  };
+  calculatedAt: new Date()
 };
-
+};
 
 
 const saveAttendanceSummary = async (summary) => {
+  const attendanceDate = attendanceDateValue(
+    summary.attendanceDate
+  );
+
+  const normalizedSummary = {
+    ...summary,
+    attendanceDate
+  };
+
   return prisma.attendanceSummary.upsert({
     where: {
       userId_attendanceDate: {
-        userId: summary.userId,
-
-        attendanceDate:
-          summary.attendanceDate
+        userId: normalizedSummary.userId,
+        attendanceDate
       }
     },
 
-    update: summary,
+    update: normalizedSummary,
 
-    create: summary
+    create: normalizedSummary
   });
 };
-
-
 
 const generateAttendanceSummary = async (
   userId,
   attendanceDate
 ) => {
+  const today = dateStringInPakistan();
+
+  if (attendanceDate === today) {
+    return null;
+  }
+
   const summary =
     await calculateDailySummary(
       userId,
       attendanceDate
     );
 
-
   if (!summary) {
     return null;
   }
-
 
   return saveAttendanceSummary(summary);
 };
@@ -378,6 +404,7 @@ const generateDailyAttendanceSummaries = async (
   date = previousPakistanDate()
 ) => {
   const attendanceDate = attendanceDateValue(date);
+
   const users = await prisma.user.findMany({
     where: {
       employmentStatus: "ACTIVE",
@@ -403,143 +430,237 @@ const generateDailyAttendanceSummaries = async (
   }
 
   const userIds = users.map((user) => user.id);
-  const [approvedLeaves, events, reviewedSummaries] = await Promise.all([
+
+  const [
+    approvedLeaves,
+    events,
+    reviewedSummaries
+  ] = await Promise.all([
     prisma.leaveRequest.findMany({
       where: {
-        userId: { in: userIds },
+        userId: {
+          in: userIds
+        },
         status: "APPROVED",
-        startDate: { lte: attendanceDate },
-        endDate: { gte: attendanceDate }
+        startDate: {
+          lte: attendanceDate
+        },
+        endDate: {
+          gte: attendanceDate
+        }
       },
-      select: { userId: true }
+      select: {
+        userId: true
+      }
     }),
+
     prisma.attendance.findMany({
       where: {
-        userId: { in: userIds },
+        userId: {
+          in: userIds
+        },
         attendanceDate
       },
       orderBy: [
-        { userId: "asc" },
-        { eventTime: "asc" }
+        {
+          userId: "asc"
+        },
+        {
+          eventTime: "asc"
+        }
       ]
     }),
+
     prisma.attendanceSummary.findMany({
       where: {
-        userId: { in: userIds },
+        userId: {
+          in: userIds
+        },
         attendanceDate,
         complaints: {
-          some: { status: "APPROVED" }
+          some: {
+            status: "APPROVED"
+          }
         }
       },
-      select: { userId: true }
+      select: {
+        userId: true
+      }
     })
   ]);
+
   const usersOnLeave = new Set(
-    approvedLeaves.map((leave) => leave.userId)
+    approvedLeaves.map(
+      (leave) => leave.userId
+    )
   );
-  const eventsByUser = new Map();
+
   const reviewedUserIds = new Set(
-    reviewedSummaries.map((summary) => summary.userId)
+    reviewedSummaries.map(
+      (summary) => summary.userId
+    )
   );
+
+  const eventsByUser = new Map();
 
   for (const event of events) {
-    const userEvents = eventsByUser.get(event.userId) || [];
+    const userEvents =
+      eventsByUser.get(event.userId) || [];
 
     userEvents.push(event);
-    eventsByUser.set(event.userId, userEvents);
+
+    eventsByUser.set(
+      event.userId,
+      userEvents
+    );
   }
 
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    timeZone: "UTC"
-  }).format(attendanceDate).toUpperCase();
-  const isWorkingDay = attendanceRules.weekly.workingDays.includes(weekday);
+  const weekday = new Intl.DateTimeFormat(
+    "en-US",
+    {
+      weekday: "long",
+      timeZone: "UTC"
+    }
+  )
+    .format(attendanceDate)
+    .toUpperCase();
+
+  const isWorkingDay =
+    attendanceRules.weekly.workingDays.includes(
+      weekday
+    );
+
   const summaries = await Promise.all(
     users.map(async (user) => {
-      const calculatedSummary = await calculateDailySummary(
-        user.id,
-        attendanceDate,
-        eventsByUser.get(user.id) || []
-      );
+      const userEvents =
+        eventsByUser.get(user.id) || [];
+
+      const calculatedSummary =
+        await calculateDailySummary(
+          user.id,
+          attendanceDate,
+          userEvents
+        );
 
       if (calculatedSummary) {
         return {
           ...calculatedSummary,
-          departmentId: user.departmentId,
-          designationId: user.designationId
+
+          departmentId:
+            user.departmentId,
+
+          designationId:
+            user.designationId
         };
       }
 
-      const attendanceStatus = usersOnLeave.has(user.id)
-        ? "ON_LEAVE"
-        : isWorkingDay
-          ? "ABSENT"
-          : "WEEK_OFF";
-      const expectedMinutes = attendanceStatus === "ABSENT"
-        ? attendanceRules.office.workingMinutes
-        : 0;
+      const attendanceStatus =
+        usersOnLeave.has(user.id)
+          ? "ON_LEAVE"
+          : isWorkingDay
+            ? "ABSENT"
+            : "WEEK_OFF";
+
+      const expectedMinutes =
+        attendanceStatus === "ABSENT"
+          ? attendanceRules.office.workingMinutes
+          : 0;
 
       return {
         userId: user.id,
-        departmentId: user.departmentId,
-        designationId: user.designationId,
+
+        departmentId:
+          user.departmentId,
+
+        designationId:
+          user.designationId,
+
         attendanceDate,
+
         firstCheckIn: null,
+
         lastCheckOut: null,
+
         workingMinutes: 0,
+
         lateMinutes: 0,
+
         earlyLeaveMinutes: 0,
+
         overtimeMinutes: 0,
+
         expectedMinutes,
+
         attendanceStatus,
+
         remarks:
           attendanceStatus === "ON_LEAVE"
             ? "Approved leave"
             : attendanceStatus === "WEEK_OFF"
               ? "Scheduled week off"
               : "No attendance events recorded",
+
         calculatedAt: new Date()
       };
     })
   );
 
-  const summariesToPersist = summaries.filter(
-    (summary) => !reviewedUserIds.has(summary.userId)
-  );
+  const summariesToPersist =
+    summaries.filter(
+      (summary) =>
+        !reviewedUserIds.has(
+          summary.userId
+        )
+    );
 
   if (summariesToPersist.length) {
     await prisma.$transaction(
-      summariesToPersist.map((summary) =>
-        prisma.attendanceSummary.upsert({
-          where: {
-            userId_attendanceDate: {
-              userId: summary.userId,
-              attendanceDate: summary.attendanceDate
-            }
-          },
-          update: summary,
-          create: summary
-        })
+      summariesToPersist.map(
+        (summary) =>
+          prisma.attendanceSummary.upsert({
+            where: {
+              userId_attendanceDate: {
+                userId:
+                  summary.userId,
+
+                attendanceDate:
+                  summary.attendanceDate
+              }
+            },
+
+            update: summary,
+
+            create: summary
+          })
       )
     );
   }
 
-  const statusCounts = summariesToPersist.reduce((counts, summary) => {
-    counts[summary.attendanceStatus] =
-      (counts[summary.attendanceStatus] || 0) + 1;
+  const statusCounts =
+    summariesToPersist.reduce(
+      (counts, summary) => {
+        counts[summary.attendanceStatus] =
+          (counts[
+            summary.attendanceStatus
+          ] || 0) + 1;
 
-    return counts;
-  }, {});
+        return counts;
+      },
+      {}
+    );
 
   return {
     attendanceDate: date,
-    processedUsers: summariesToPersist.length,
-    preservedReviewedUsers: reviewedUserIds.size,
+
+    processedUsers:
+      summariesToPersist.length,
+
+    preservedReviewedUsers:
+      reviewedUserIds.size,
+
     statusCounts
   };
 };
-
-
 
 const calculateLateMinutes = (
   checkIn,
@@ -733,7 +854,6 @@ const calculateCurrentWorkingMinutes = (
 };
 
 const calculateEmployeeLiveAttendance = (records) => {
-
   if (!records || !records.length) {
     return {
       checkIn: null,
@@ -749,114 +869,157 @@ const calculateEmployeeLiveAttendance = (records) => {
   }
 
   const sortedRecords = [...records].sort(
-    (a,b) =>
+    (a, b) =>
       new Date(a.eventTime) - new Date(b.eventTime)
   );
 
   /*
-    First check-in only for late calculation
-  */
+   * First CHECK_IN
+   */
   const firstCheckIn =
     sortedRecords.find(
-      (r) =>
-        r.eventType === "CHECK_IN"
+      (record) =>
+        record.eventType === "CHECK_IN"
     );
 
   /*
-    Last checkout
-  */
+   * Last CHECK_OUT
+   */
   const lastCheckOut =
     [...sortedRecords]
       .reverse()
       .find(
-        (r) =>
-          r.eventType === "CHECK_OUT"
+        (record) =>
+          record.eventType === "CHECK_OUT"
       );
 
   let totalSeconds = 0;
   let overtimeSeconds = 0;
+
   let activeCheckIn = null;
 
-  // Office end (6 PM) as an actual Date on this attendance day, so we
-  // can measure overlap of each session with the post-6PM window.
-  const officeEndDate = new Date(
-    `${records[0].attendanceDate}T00:00:00`
-  );
+  /*
+   * Office end time.
+   *
+   * Build this using the actual attendance date.
+   */
+  const attendanceDate =
+    records[0].attendanceDate;
+
+  const officeEndDate =
+    new Date(
+      `${attendanceDate}T00:00:00`
+    );
 
   officeEndDate.setMinutes(
     officeEndDate.getMinutes() +
     attendanceRules.office.endMinutes
   );
 
-  // How much of a [start, end] session falls after office end (6 PM),
-  // regardless of how many total hours were worked that day.
-  const overlapWithOvertime = (start, end) => {
+  /*
+   * Calculate overtime that falls after
+   * official office closing time.
+   */
+  const overlapWithOvertime = (
+    start,
+    end
+  ) => {
     const overtimeStart =
-      start > officeEndDate ? start : officeEndDate;
+      start > officeEndDate
+        ? start
+        : officeEndDate;
 
-    return Math.max(0, (end - overtimeStart) / 1000);
+    return Math.max(
+      0,
+      (end - overtimeStart) / 1000
+    );
   };
 
   /*
-    Calculate all working sessions
-
-    IN  -> OUT
-    IN  -> OUT
-    IN  -> NOW
-  */
+   * Process all attendance sessions.
+   *
+   * CHECK_IN -> CHECK_OUT
+   * CHECK_IN -> CHECK_OUT
+   * CHECK_IN -> NOW
+   */
   for (const record of sortedRecords) {
 
-    if (record.eventType === "CHECK_IN") {
-      activeCheckIn = record.eventTime;
+    if (
+      record.eventType === "CHECK_IN"
+    ) {
+      /*
+       * IMPORTANT:
+       * Store the complete eventTime.
+       *
+       * Do NOT prepend attendanceDate again.
+       */
+      activeCheckIn =
+        new Date(record.eventTime);
     }
 
     if (
       record.eventType === "CHECK_OUT" &&
       activeCheckIn
     ) {
-
       const start =
-        new Date(
-          `${records[0].attendanceDate}T${activeCheckIn}`
-        );
+        activeCheckIn;
 
       const end =
-        new Date(
-          `${records[0].attendanceDate}T${record.eventTime}`
-        );
+        new Date(record.eventTime);
 
-      totalSeconds +=
-        Math.max(
-          0,
-          (end - start) / 1000
-        );
+      /*
+       * Ignore invalid dates instead of
+       * allowing NaN to enter the response.
+       */
+      if (
+        !Number.isNaN(start.getTime()) &&
+        !Number.isNaN(end.getTime())
+      ) {
+        totalSeconds +=
+          Math.max(
+            0,
+            (end - start) / 1000
+          );
 
-      overtimeSeconds += overlapWithOvertime(start, end);
+        overtimeSeconds +=
+          overlapWithOvertime(
+            start,
+            end
+          );
+      }
 
       activeCheckIn = null;
     }
   }
 
   /*
-    Still working after last check-in
-  */
+   * Employee is currently working.
+   *
+   * Calculate from CHECK_IN until NOW.
+   */
   if (activeCheckIn) {
-
     const start =
-      new Date(
-        `${records[0].attendanceDate}T${activeCheckIn}`
-      );
+      activeCheckIn;
 
     const now =
       new Date();
 
-    totalSeconds +=
-      Math.max(
-        0,
-        (now - start) / 1000
-      );
+    if (
+      !Number.isNaN(start.getTime()) &&
+      !Number.isNaN(now.getTime())
+    ) {
+      totalSeconds +=
+        Math.max(
+          0,
+          (now - start) / 1000
+        );
 
-    overtimeSeconds += overlapWithOvertime(start, now);
+      overtimeSeconds +=
+        overlapWithOvertime(
+          start,
+          now
+        );
+    }
   }
 
   const workingMinutes =
@@ -865,42 +1028,59 @@ const calculateEmployeeLiveAttendance = (records) => {
     );
 
   /*
-    Late calculation ONLY FIRST CHECK-IN
-  */
+   * Late calculation.
+   *
+   * Only the first CHECK_IN matters.
+   */
   let lateMinutes = 0;
 
   if (firstCheckIn) {
-
     const checkInDate =
-    new Date(firstCheckIn.eventTime);
-
-
-    const actualMinutes =
-      checkInDate.getHours() * 60 +
-      checkInDate.getMinutes();
-
-    const allowed =
-      attendanceRules.office.startMinutes +
-      attendanceRules.office.graceMinutes;
-
-    lateMinutes =
-      Math.max(
-        0,
-        actualMinutes - allowed
+      new Date(
+        firstCheckIn.eventTime
       );
+
+    if (
+      !Number.isNaN(
+        checkInDate.getTime()
+      )
+    ) {
+      const actualMinutes =
+        dateToMinutes(
+          checkInDate
+        );
+
+      const allowed =
+        attendanceRules.office.startMinutes +
+        attendanceRules.office.graceMinutes;
+
+      lateMinutes =
+        Math.max(
+          0,
+          actualMinutes - allowed
+        );
+    }
   }
 
   /*
-    Overtime = time worked after 6 PM (office end), regardless of
-    total hours worked that day. Tracked per-session above so it
-    correctly counts time from every session that spills past 6 PM,
-    not just the most recent one.
-  */
+   * Overtime is actual working time
+   * after office closing time.
+   */
   const overtimeMinutes =
-    Math.floor(overtimeSeconds / 60);
+    Math.floor(
+      overtimeSeconds / 60
+    );
+
+  /*
+   * Status
+   */
+  let status = "COMPLETED";
+
+  if (activeCheckIn) {
+    status = "WORKING";
+  }
 
   return {
-
     checkIn:
       firstCheckIn?.eventTime || null,
 
@@ -928,12 +1108,8 @@ const calculateEmployeeLiveAttendance = (records) => {
         overtimeMinutes
       ),
 
-    status:
-      activeCheckIn
-        ? "WORKING"
-        : "COMPLETED"
+    status
   };
-
 };
 
 module.exports = {

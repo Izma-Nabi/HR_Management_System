@@ -519,9 +519,9 @@ onMounted(() => {
 }
 
 .feedback-success {
-  color: #166534;
-  background: #ecfdf3;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 @media (max-width:1050px){
