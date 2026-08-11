@@ -130,17 +130,26 @@ model Designation {
 
 model User {
   id Int @id @default(autoincrement()) @db.UnsignedInt
+
   userCode String? @unique @map("userCode") @db.VarChar(20)
+  biometricId String? @unique @map("biometric_id") @db.VarChar(50)
+
   firstName String @map("firstName") @db.VarChar(100)
-  lastName  String @map("lastName") @db.VarChar(100)
-  email        String @unique @db.VarChar(255)
+  lastName String @map("lastName") @db.VarChar(100)
+
+  email String @unique @db.VarChar(255)
   passwordHash String @map("password_hash") @db.VarChar(255)
-  phone   String? @db.VarChar(20)
+
+  phone String? @db.VarChar(20)
   address String? @db.VarChar(255)
-  photo   String? @db.VarChar(255)
+  photo String? @db.VarChar(255)
 
   designationId Int? @map("designation_id") @db.UnsignedInt
-  designation Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  designation Designation? @relation(
+    fields: [designationId],
+    references: [id],
+    onDelete: SetNull
+  )
 
   joiningDate DateTime? @map("joiningDate") @db.Date
   employmentStatus EmploymentStatus @default(ACTIVE)
@@ -165,14 +174,14 @@ model User {
   attendanceComplaints AttendanceComplaint[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   passwordResetToken PasswordResetToken?
-  
+
   @@index([roleId])
   @@index([departmentId])
   @@index([designationId])
+  @@index([biometricId])
 
   @@map("users")
 }
@@ -191,29 +200,52 @@ model Department {
 
 model Attendance {
   id Int @id @default(autoincrement()) @db.UnsignedInt
+
   userId Int @map("user_id") @db.UnsignedInt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   userCode String @map("user_code") @db.VarChar(50)
+  biometricId String @map("biometric_id") @db.VarChar(50)
   fullName String @map("full_name") @db.VarChar(100)
+
+  locationId Int? @map("location_id") @db.UnsignedInt
+
   departmentId Int? @map("department_id") @db.UnsignedInt
-  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department Department? @relation(
+    fields: [departmentId],
+    references: [id],
+    onDelete: SetNull
+  )
+
   designationId Int? @map("designation_id") @db.UnsignedInt
-  designation Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
-  attendanceDate DateTime @map("attendance_date") @db.Date
+  designation Designation? @relation(
+    fields: [designationId],
+    references: [id],
+    onDelete: SetNull
+  )
+
   eventType AttendanceEventType @map("event_type")
   eventTime DateTime @map("event_time")
   remarks String? @db.Text
   sourceKey String? @unique @map("source_key") @db.VarChar(128)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(3)
+
   complaints AttendanceComplaint[]
 
   @@index([userId])
-  @@index([attendanceDate])
+  @@index([biometricId])
+  @@index([userCode])
+  @@index([locationId])
   @@index([departmentId])
   @@index([designationId])
+  @@index([eventTime])
+  @@index([eventType])
+
   @@map("attendance")
 }
+
 
 model AttendanceSummary {
   id Int @id @default(autoincrement()) @db.UnsignedInt

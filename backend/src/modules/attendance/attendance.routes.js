@@ -1,80 +1,19 @@
-const express = require("express");
+/**
+ * ==========================================================
+ * ADD THESE TO attendance.routes.js
+ * ==========================================================
+ */
 
-const router = express.Router();
+const attendanceDeviceController = require("./attendance.device.controller");
+const deviceAuthMiddleware = require("../../middlewares/device.auth.middleware");
+const validateBody = require("../../middlewares/validate.middleware"); // adjust to your actual validate middleware
+const attendanceDeviceValidation = require("./attendance.device.validation");
 
-const attendanceController = require("./attendance.controller");
-
-const authMiddleware = require("../../middlewares/auth.middleware");
-const {
-  requirePermission,
-  requireSuperAdmin
-} = require("../../middlewares/permission.middleware");
-
-
-// Employee routes
+// Biometric device (MB460) attendance event webhook.
+// Not a normal user route — auth is via device comm key, not JWT.
 router.post(
-  "/complaints",
-  authMiddleware,
-  attendanceController.createComplaint
+  "/device/event",
+  deviceAuthMiddleware,
+  validateBody(attendanceDeviceValidation.deviceEvent),
+  attendanceDeviceController.receiveDeviceEvent
 );
-
-router.get(
-  "/my/week",
-  authMiddleware,
-  attendanceController.getMyCurrentWeek
-);
-
-router.get(
-  "/my/day/:date",
-  authMiddleware,
-  attendanceController.getMyDayDetails
-);
-
-router.get(
-  "/all/week",
-  authMiddleware,
-  requireSuperAdmin,
-  attendanceController.getAllUsersWeek
-);
-
-
-// Admin - View complaints
-router.get(
-  "/admin/complaints",
-  authMiddleware,
-  requirePermission("VIEW_ATTENDANCE_COMPLAINTS"),
-  attendanceController.getAttendanceComplaints
-);
-
-
-// Admin - Review complaint
-router.patch(
-  "/admin/complaints/:id",
-  authMiddleware,
-  requirePermission("MANAGE_ATTENDANCE"),
-  attendanceController.reviewAttendanceComplaint
-);
-
-router.patch(
-  "/admin/complaints/:id/edit",
-  authMiddleware,
-  attendanceController.editAttendanceComplaint
-);
-
-router.post(
-  "/manual",
-  authMiddleware,
-  requirePermission("MANAGE_ATTENDANCE"),
-  attendanceController.insertManualAttendance
-
-);
-
-router.post(
-  "/admin/manual",
-  authMiddleware,
-  requirePermission("MANAGE_ATTENDANCE"),
-  attendanceController.insertManualAttendance
-);
-
-
-module.exports = router;
