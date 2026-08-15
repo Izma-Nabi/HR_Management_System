@@ -1,5 +1,10 @@
 <script setup>
-const { roleKey, hasAnyPermission } = useAuthUser();
+const {
+  authUser,
+  roleKey,
+  isSuperAdmin,
+  hasAnyPermission
+} = useAuthUser();
 const props = defineProps({
   open: {
     type: Boolean,
@@ -67,13 +72,28 @@ const canViewAttendance = computed(() =>
   )
 );
 
-const canViewAttendanceComplaints = computed(() =>
-  hasAnyPermission(
-    "VIEW_ATTENDANCE_COMPLAINTS",
-    "VIEW_TEAM_ATTENDANCE",
-    "VIEW_REPORTS"
-  )
-);
+const hasAssignedDepartment = computed(() => {
+  const departmentId = Number(
+    authUser.value?.departmentId || authUser.value?.department?.id
+  );
+
+  return Number.isInteger(departmentId) && departmentId > 0;
+});
+
+const canViewAttendanceComplaints = computed(() => {
+  if (isSuperAdmin.value) {
+    return true;
+  }
+
+  return (
+    roleKey.value === "ADMIN" &&
+    hasAssignedDepartment.value &&
+    hasAnyPermission(
+      "VIEW_ATTENDANCE_COMPLAINTS",
+      "MANAGE_ATTENDANCE"
+    )
+  );
+});
 </script>
 
 <template>

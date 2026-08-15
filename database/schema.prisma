@@ -52,6 +52,20 @@ enum AttendanceComplaintStatus {
   CANCELLED
 }
 
+enum AttendanceRequestAction {
+  INSERT
+  EDIT
+}
+
+enum AttendanceLegacyStatus {
+  Present
+  Absent
+  Late
+  Leave
+
+  @@map("attendance_old_status")
+}
+
 enum LeaveRequestStatus {
   PENDING
   APPROVED
@@ -132,8 +146,7 @@ model User {
   id Int @id @default(autoincrement()) @db.UnsignedInt
 
   userCode String? @unique @map("userCode") @db.VarChar(20)
-  biometricId String? @unique @map("biometric_id") @db.VarChar(50)
-
+  biometricId String? @unique(map: "biometric_id") @map("biometric_id") @db.VarChar(50)
   firstName String @map("firstName") @db.VarChar(100)
   lastName String @map("lastName") @db.VarChar(100)
 
@@ -145,11 +158,7 @@ model User {
   photo String? @db.VarChar(255)
 
   designationId Int? @map("designation_id") @db.UnsignedInt
-  designation Designation? @relation(
-    fields: [designationId],
-    references: [id],
-    onDelete: SetNull
-  )
+  designation Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
 
   joiningDate DateTime? @map("joiningDate") @db.Date
   employmentStatus EmploymentStatus @default(ACTIVE)
@@ -162,6 +171,7 @@ model User {
   department Department? @relation(fields: [departmentId], references: [id])
 
   attendanceRecords Attendance[]
+  legacyAttendanceRecords AttendanceLegacy[]
   attendanceSummaries AttendanceSummary[]
 
   leaveRequests LeaveRequest[] @relation("LeaveRequester")
@@ -202,50 +212,55 @@ model Attendance {
   id Int @id @default(autoincrement()) @db.UnsignedInt
 
   userId Int @map("user_id") @db.UnsignedInt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attendance_user")
   userCode String @map("user_code") @db.VarChar(50)
   biometricId String @map("biometric_id") @db.VarChar(50)
   fullName String @map("full_name") @db.VarChar(100)
-
   locationId Int? @map("location_id") @db.UnsignedInt
-
   departmentId Int? @map("department_id") @db.UnsignedInt
-  department Department? @relation(
-    fields: [departmentId],
-    references: [id],
-    onDelete: SetNull
-  )
-
+  department Department? @relation(fields: [departmentId], references: [id], onUpdate: NoAction, map: "fk_attendance_department")
   designationId Int? @map("designation_id") @db.UnsignedInt
-  designation Designation? @relation(
-    fields: [designationId],
-    references: [id],
-    onDelete: SetNull
-  )
-
+  designation Designation? @relation(fields: [designationId], references: [id], onUpdate: NoAction, map: "fk_attendance_designation")
   eventType AttendanceEventType @map("event_type")
-  eventTime DateTime @map("event_time")
+  eventTime DateTime @map("event_time") @db.DateTime(0)
   remarks String? @db.Text
   sourceKey String? @unique @map("source_key") @db.VarChar(128)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(3)
-
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
   complaints AttendanceComplaint[]
 
-  @@index([userId])
-  @@index([biometricId])
-  @@index([userCode])
-  @@index([locationId])
-  @@index([departmentId])
-  @@index([designationId])
-  @@index([eventTime])
-  @@index([eventType])
-
+  @@index([userId], map: "idx_user_date")
+  @@index([userId, eventType], map: "idx_user_date_event")
+  @@index([userId], map: "idx_user_id")
+  @@index([biometricId], map: "idx_attendance_biometric_id")
+  @@index([eventTime], map: "idx_attendance_event_time")
+  @@index([eventType], map: "idx_attendance_event_type")
+  @@index([locationId], map: "idx_attendance_location_id")
+  @@index([departmentId], map: "idx_department_id")
+  @@index([designationId], map: "idx_designation_id")
   @@map("attendance")
 }
 
+model AttendanceLegacy {
+  id             Int                    @id @default(autoincrement())
+  userId         Int?                   @map("user_id") @db.UnsignedInt
+  user           User?                  @relation(fields: [userId], references: [id], onDelete: Cascade, map: "attendance_user_id_fkey")
+  userCode       String                 @map("user_code") @db.VarChar(50)
+  fullName       String                 @map("full_name") @db.VarChar(100)
+  role           String                 @db.VarChar(50)
+  department     String                 @db.VarChar(100)
+  attendanceDate DateTime               @map("attendance_date") @db.Date
+  checkIn        DateTime?              @map("check_in") @db.Time(0)
+  checkOut       DateTime?              @map("check_out") @db.Time(0)
+  status         AttendanceLegacyStatus
+  remarks        String?                @db.Text
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @map("updated_at")
+  sourceKey      String?                @unique(map: "attendance_source_key_key") @map("source_key") @db.VarChar(128)
+
+  @@index([userId, attendanceDate], map: "attendance_user_id_attendance_date_idx")
+  @@map("attendance_old")
+}
 
 model AttendanceSummary {
   id Int @id @default(autoincrement()) @db.UnsignedInt
@@ -282,11 +297,14 @@ model AttendanceComplaint {
   id                Int                       @id @default(autoincrement())
   userId            Int                       @map("user_id") @db.UnsignedInt
   user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dailyAttendanceId Int                       @map("daily_attendance_id") @db.UnsignedInt
-  dailyAttendance   AttendanceSummary         @relation(fields: [dailyAttendanceId], references: [id], onDelete: Cascade)
-  rawAttendanceId   Int                       @map("raw_attendance_id") @db.UnsignedInt
-  rawAttendance     Attendance                @relation(fields: [rawAttendanceId], references: [id], onDelete: Cascade)
+  dailyAttendanceId Int?                      @map("daily_attendance_id") @db.UnsignedInt
+  dailyAttendance   AttendanceSummary?        @relation(fields: [dailyAttendanceId], references: [id], onDelete: SetNull)
+  rawAttendanceId   Int?                      @map("raw_attendance_id") @db.UnsignedInt
+  rawAttendance     Attendance?               @relation(fields: [rawAttendanceId], references: [id], onDelete: SetNull)
   attendanceDate    DateTime                  @map("attendance_date") @db.Date
+  requestedAttendanceDate DateTime             @map("requested_attendance_date") @db.Date
+  requestAction     AttendanceRequestAction   @default(EDIT) @map("request_action")
+  requestedEventTime String                   @map("requested_event_time") @db.VarChar(5)
   complaintType     AttendanceComplaintType   @map("complaint_type")
   reason            String                    @db.Text
   status            AttendanceComplaintStatus @default(PENDING)

@@ -9,6 +9,11 @@ type AttendanceDay = {
   earlyLeaveMinutes: number | null;
   overtimeMinutes: number | null;
   status: string;
+  canComplain: boolean;
+  latestRequest: {
+    id: number;
+    status: string;
+  } | null;
 };
 
 const props = defineProps<{
@@ -18,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "select", attendanceDate: string): void;
+  (event: "request", attendanceDate: string): void;
 }>();
 
 const formatTime = (time: string | null) => {
@@ -78,18 +84,23 @@ const statusClass = (status: string) => {
       <span>Early leave</span>
       <span>Overtime</span>
       <span>Status</span>
-      <span />
+      <span>Request</span>
     </div>
 
-    <button
+    <div
       v-for="day in props.days"
       :key="day.attendanceDate"
       class="day-row"
       :class="{ 'day-row--selected': props.selectedDate === day.attendanceDate }"
-      type="button"
-      :aria-expanded="props.selectedDate === day.attendanceDate"
-      @click="emit('select', day.attendanceDate)"
     >
+      <button
+        class="day-select-button"
+        type="button"
+        :aria-label="`View ${day.dayName} attendance details`"
+        :aria-expanded="props.selectedDate === day.attendanceDate"
+        @click="emit('select', day.attendanceDate)"
+      />
+
       <span class="day-cell">
         <strong>{{ day.dayName }}</strong>
         <small>{{ formatDate(day.attendanceDate) }}</small>
@@ -125,8 +136,25 @@ const statusClass = (status: string) => {
         </span>
       </span>
 
-      <span class="row-action" aria-hidden="true" />
-    </button>
+      <span class="request-cell">
+        <button
+          v-if="day.canComplain"
+          class="request-button"
+          type="button"
+          @click="emit('request', day.attendanceDate)"
+        >
+          Request change
+        </button>
+        <small
+          v-if="day.latestRequest"
+          class="request-status"
+          :class="`request-status--${statusClass(day.latestRequest.status)}`"
+        >
+          {{ day.latestRequest.status.toLowerCase() }}
+        </small>
+        <span v-else-if="!day.canComplain" class="request-unavailable">--</span>
+      </span>
+    </div>
 
     <div v-if="props.days.length === 0" class="empty-state">
       No attendance records are available for this week.
@@ -155,7 +183,7 @@ const statusClass = (status: string) => {
     minmax(82px, 0.75fr)
     minmax(76px, 0.7fr)
     minmax(108px, 0.95fr)
-    20px;
+    minmax(118px, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -172,12 +200,12 @@ const statusClass = (status: string) => {
 }
 
 .day-row {
+  position: relative;
   width: 100%;
   min-height: 74px;
   padding: 12px 18px;
   color: #1e293b;
   background: #ffffff;
-  border: 0;
   border-bottom: 1px solid #edf2f7;
   border-radius: 0;
   text-align: left;
@@ -194,8 +222,18 @@ const statusClass = (status: string) => {
   background: #f8fafc;
 }
 
-.day-row:focus-visible {
-  position: relative;
+.day-select-button {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.day-select-button:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: -2px;
 }
@@ -289,13 +327,51 @@ const statusClass = (status: string) => {
   border-color: #cbd5e1;
 }
 
-.row-action {
-  width: 9px;
-  height: 9px;
+.request-cell {
+  position: relative;
+  z-index: 2;
+  display: grid;
   justify-self: end;
-  border-top: 2px solid #64748b;
-  border-right: 2px solid #64748b;
-  transform: rotate(45deg);
+  justify-items: end;
+  gap: 4px;
+}
+
+.request-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.request-button:hover {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.request-status,
+.request-unavailable {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.request-status--pending {
+  color: #92400e;
+}
+
+.request-status--approved {
+  color: #166534;
+}
+
+.request-status--rejected {
+  color: #991b1b;
 }
 
 .empty-state {
@@ -310,7 +386,7 @@ const statusClass = (status: string) => {
   }
 
   .day-row {
-    grid-template-columns: minmax(100px, 1fr) minmax(118px, auto) 18px;
+    grid-template-columns: minmax(100px, 1fr) minmax(118px, auto) minmax(118px, auto);
     gap: 10px 14px;
     min-height: 210px;
   }
@@ -367,7 +443,7 @@ const statusClass = (status: string) => {
     grid-row: 7;
   }
 
-  .row-action {
+  .request-cell {
     grid-column: 3;
     grid-row: 1 / span 7;
     align-self: center;
@@ -376,7 +452,7 @@ const statusClass = (status: string) => {
 
 @media (max-width: 520px) {
   .day-row {
-    grid-template-columns: 1fr 18px;
+    grid-template-columns: 1fr;
     min-height: 0;
   }
 
@@ -420,9 +496,16 @@ const statusClass = (status: string) => {
     grid-row: 8;
   }
 
-  .row-action {
-    grid-column: 2;
-    grid-row: 1 / span 8;
+  .request-cell {
+    grid-column: 1;
+    grid-row: 9;
+    justify-self: stretch;
+    justify-items: stretch;
+    margin-top: 4px;
+  }
+
+  .request-button {
+    width: 100%;
   }
 }
 </style>

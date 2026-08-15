@@ -64,7 +64,7 @@ const createComplaint = asyncHandler(async (req, res) => {
   return sendSuccess(
     res,
     201,
-    "Attendance complaint submitted successfully",
+    "Attendance change request submitted successfully",
     result
   );
 });
@@ -82,12 +82,12 @@ const getMyTodayAttendance = asyncHandler(async (req, res) => {
 });
 
 const getAttendanceComplaints = asyncHandler(async (req, res) => {
-  const result = await attendanceService.getAttendanceComplaints();
+  const result = await attendanceService.getAttendanceComplaints(req.user);
 
   return sendSuccess(
     res,
     200,
-    "Attendance complaints fetched successfully",
+    "Attendance change requests fetched successfully",
     result
   );
 });
@@ -97,13 +97,13 @@ const reviewAttendanceComplaint = asyncHandler(async (req, res) => {
   const result = await attendanceService.reviewAttendanceComplaint(
     req.params.id,
     req.body,
-    req.user.id
+    req.user
   );
 
   return sendSuccess(
     res,
     200,
-    "Attendance complaint reviewed successfully",
+    "Attendance change request reviewed successfully",
     result
   );
 });
@@ -116,7 +116,7 @@ const editAttendanceComplaint = asyncHandler(async (req, res) => {
     await attendanceService.editAttendanceComplaint(
       Number(id),
       req.body,
-      req.user.id
+      req.user
     );
 
   return sendSuccess(
@@ -135,7 +135,7 @@ const insertManualAttendance = asyncHandler(async (req, res) => {
   const result =
     await attendanceService.insertManualAttendance(
     req.body,
-    req.user.id
+    req.user
   );
 
   return sendSuccess(

@@ -4,6 +4,7 @@ const XLSX = require("xlsx");
 const axios = require("axios");
 const attendanceRepository = require("./attendance.repository");
 const attendanceCalculator = require("./attendance.calculator");
+const { isAdmin, isSuperAdmin } = require("../../utils/roles");
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1uNA77aFV8J1Mj8uKKKc0gnOQIXaD0WZ7uYgCWdNQE7w/export?format=xlsx";
 const PAKISTAN_TIME_ZONE = "Asia/Karachi";
@@ -109,6 +110,36 @@ const isDateInCurrentWeek = (date) => {
   const week = currentWeek();
 
   return date >= week.startDate && date <= week.endDate;
+};
+
+const attendanceRequestDates = () => {
+  const today = dateStringInPakistan();
+  const yesterday = dateAtUtcMidnight(today);
+
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+  return {
+    today,
+    yesterday: utcDateString(yesterday)
+  };
+};
+
+const isAttendanceRequestDate = (date) => {
+  const allowedDates = attendanceRequestDates();
+
+  return date === allowedDates.today || date === allowedDates.yesterday;
+};
+
+const isValidDateString = (date) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
+    return false;
+  }
+
+  return utcDateString(dateAtUtcMidnight(date)) === date;
+};
+
+const isValidTimeString = (time) => {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || ""));
 };
 
 const dayNameFromDate = (date) => {
@@ -444,10 +475,12 @@ const importAttendance = async () => {
       const attendanceRecord = {
         userId: user.id,
         userCode: user.userCode,
+        biometricId: user.biometricId || user.userCode,
         fullName: [user.firstName, user.lastName]
           .filter(Boolean)
           .join(" ")
           .trim() || user.userCode,
+        locationId: null,
         departmentId: user.departmentId,
         designationId: user.designationId,
         attendanceDate: parsedRow.attendanceDate,
@@ -502,6 +535,22 @@ const getMyCurrentWeek = async (userId, startDate) => {
       summary
     ])
   );
+  const complaints = await attendanceRepository.findLatestComplaintsForDates(
+    userId,
+    week.dates.map(dateAtUtcMidnight)
+  );
+  const latestComplaintByDate = new Map();
+
+  for (const complaint of complaints) {
+    const complaintDate = dateOnlyFromValue(complaint.attendanceDate);
+
+    if (!latestComplaintByDate.has(complaintDate)) {
+      latestComplaintByDate.set(complaintDate, {
+        ...complaint,
+        attendanceDate: complaintDate
+      });
+    }
+  }
 
   const days = week.dates.map((attendanceDate) => {
     const dayName = dayNameFromDate(attendanceDate);
@@ -516,9 +565,10 @@ const getMyCurrentWeek = async (userId, startDate) => {
     const isToday =
       attendanceDate === week.today;
 
-    const summary = isToday
+    const storedSummary = summaryByDate.get(attendanceDate);
+    const summary = isToday && storedSummary?.status !== "ON_LEAVE"
       ? null
-      : summaryByDate.get(attendanceDate);
+      : storedSummary;
 
     let status =
       summary?.status || "NO_RECORD";
@@ -579,18 +629,10 @@ const getMyCurrentWeek = async (userId, startDate) => {
           : null,
 
       status,
-
-      source:
-        summary?.source || null,
-
-      adjustmentReason:
-        summary?.adjustmentReason || null,
-
-      canComplain: Boolean(
-        summary &&
-        isDateInCurrentWeek(attendanceDate) &&
-        attendanceDate <= week.today
-      )
+      source: summary?.source || null,
+      adjustmentReason: summary?.adjustmentReason || null,
+      canComplain: isAttendanceRequestDate(attendanceDate),
+      latestRequest: latestComplaintByDate.get(attendanceDate) || null
     };
   });
 
@@ -759,7 +801,6 @@ const getMyDayDetails = async (userId, attendanceDate) => {
           rawRecords
         )
       : null;
-
   return {
     attendanceDate,
 
@@ -771,9 +812,7 @@ const getMyDayDetails = async (userId, attendanceDate) => {
         : null,
 
     canComplain: Boolean(
-      dailyAttendance &&
-      isDateInCurrentWeek(attendanceDate) &&
-      attendanceDate <= week.today
+      isAttendanceRequestDate(attendanceDate)
     ),
 
     liveAttendance,
@@ -796,12 +835,33 @@ const getMyDayDetails = async (userId, attendanceDate) => {
 };
 
 const createAttendanceComplaint = async (userId, input) => {
+  const attendanceDate = input.attendanceDate;
+
+  if (!isValidDateString(attendanceDate) || !isAttendanceRequestDate(attendanceDate)) {
+    throw new ApiError(
+      400,
+      "Attendance change requests can only be submitted for today or yesterday"
+    );
+  }
+
+  if (!["INSERT", "EDIT"].includes(input.requestAction)) {
+    throw new ApiError(400, "Select whether to insert or edit attendance");
+  }
+
+  if (!["CHECK_IN", "CHECK_OUT"].includes(input.eventType)) {
+    throw new ApiError(400, "Select check in or check out");
+  }
+
+  if (!isValidTimeString(input.correctedTime)) {
+    throw new ApiError(400, "Corrected time must use HH:mm format");
+  }
+
   let dailyAttendance;
 
   try {
-    dailyAttendance = await attendanceRepository.findDailyAttendanceById(
-      input.dailyAttendanceId,
-      userId
+    dailyAttendance = await attendanceRepository.findDailyAttendanceByDate(
+      userId,
+      attendanceDate
     );
   } catch (error) {
     if (isMissingDailyAttendanceTable(error)) {
@@ -811,70 +871,102 @@ const createAttendanceComplaint = async (userId, input) => {
     throw error;
   }
 
-  if (!dailyAttendance) {
-    throw new ApiError(
-      404,
-      "The selected daily attendance record was not found"
+  let rawAttendance = null;
+
+  if (input.requestAction === "EDIT") {
+    const records = await attendanceRepository.findRawAttendanceForDay(
+      userId,
+      attendanceDate
     );
-  }
-
-  const attendanceDate = dailyAttendance.attendanceDate;
-  const week = currentWeek();
-
-  if (
-    !isDateInCurrentWeek(attendanceDate) ||
-    attendanceDate > week.today
-  ) {
-    throw new ApiError(
-      400,
-      "Attendance complaints can only be submitted for the current week"
+    const matchingRecords = records.filter(
+      (record) => record.eventType === input.eventType
     );
-  }
 
-  const rawAttendance = await attendanceRepository.findRawAttendanceById(
-    input.rawAttendanceId,
-    userId,
-    attendanceDate
-  );
+    rawAttendance = input.eventType === "CHECK_OUT"
+      ? matchingRecords[matchingRecords.length - 1]
+      : matchingRecords[0];
 
-  if (!rawAttendance) {
-    throw new ApiError(
-      404,
-      "The selected check-in/check-out record was not found"
-    );
+    if (!rawAttendance) {
+      throw new ApiError(
+        404,
+        `No existing ${input.eventType === "CHECK_IN" ? "check-in" : "check-out"} was found. Select Insert attendance instead.`
+      );
+    }
   }
 
   const pendingComplaint = await attendanceRepository.findPendingComplaint(
     userId,
-    databaseInteger(rawAttendance.id),
-    input.complaintType
+    dateAtUtcMidnight(attendanceDate),
+    input.requestAction,
+    input.eventType
   );
 
   if (pendingComplaint) {
     throw new ApiError(
       409,
-      "A pending complaint of this type already exists for the selected record"
+      "A pending request of this type already exists for this day"
     );
   }
 
   const complaint = await attendanceRepository.createComplaint({
     userId,
-    dailyAttendanceId: databaseInteger(dailyAttendance.id),
-    rawAttendanceId: databaseInteger(rawAttendance.id),
+    dailyAttendanceId: dailyAttendance
+      ? databaseInteger(dailyAttendance.id)
+      : null,
+    rawAttendanceId: rawAttendance
+      ? databaseInteger(rawAttendance.id)
+      : null,
     attendanceDate: dateAtUtcMidnight(attendanceDate),
-    complaintType: input.complaintType,
+    requestedAttendanceDate: dateAtUtcMidnight(attendanceDate),
+    requestAction: input.requestAction,
+    requestedEventTime: input.correctedTime,
+    complaintType: input.eventType,
     reason: input.reason
   });
 
   return {
     ...complaint,
-    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate),
+    requestedAttendanceDate: dateOnlyFromValue(
+      complaint.requestedAttendanceDate
+    )
   };
 };
 
 
-const getAttendanceComplaints = async () => {
-  const complaints = await attendanceRepository.findAttendanceComplaints();
+const attendanceComplaintDepartmentScope = (reviewer) => {
+  const reviewerRole = reviewer?.role || reviewer?.roleName;
+
+  if (isSuperAdmin(reviewerRole)) {
+    return null;
+  }
+
+  if (!isAdmin(reviewerRole)) {
+    throw new ApiError(
+      403,
+      "Only department HR or Super Admin can review attendance complaints"
+    );
+  }
+
+  const departmentId = Number(
+    reviewer?.departmentId || reviewer?.department?.id
+  );
+
+  if (!Number.isInteger(departmentId) || departmentId <= 0) {
+    throw new ApiError(
+      403,
+      "Department HR must be assigned to a department"
+    );
+  }
+
+  return departmentId;
+};
+
+const getAttendanceComplaints = async (reviewer) => {
+  const departmentId = attendanceComplaintDepartmentScope(reviewer);
+  const complaints = await attendanceRepository.findAttendanceComplaints(
+    departmentId
+  );
 
   return complaints.map((complaint) => ({
     ...complaint,
@@ -882,7 +974,10 @@ const getAttendanceComplaints = async () => {
     userId: databaseInteger(complaint.userId),
     dailyAttendanceId: databaseInteger(complaint.dailyAttendanceId),
     rawAttendanceId: databaseInteger(complaint.rawAttendanceId),
-    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate),
+    requestedAttendanceDate: dateOnlyFromValue(
+      complaint.requestedAttendanceDate
+    )
   }));
 };
 
@@ -890,12 +985,15 @@ const getAttendanceComplaints = async () => {
 const reviewAttendanceComplaint = async (
   complaintId,
   input,
-  reviewerId
+  reviewer
 ) => {
+
+  const departmentId = attendanceComplaintDepartmentScope(reviewer);
 
   const complaint =
     await attendanceRepository.findComplaintById(
-      complaintId
+      complaintId,
+      departmentId
     );
 
   if (!complaint) {
@@ -924,31 +1022,78 @@ const reviewAttendanceComplaint = async (
   }
 
 
-  const updatedComplaint =
-    await attendanceRepository.updateComplaintStatus(
-      complaintId,
-      {
-        status: input.status,
-        reviewNote: input.reviewNote || null,
-        reviewedAt: new Date()
-      }
-    );
-
-
-  // If approved then update attendance
   if (input.status === "APPROVED") {
+    const requestedAttendanceDate = input.attendanceDate ||
+      dateOnlyFromValue(complaint.requestedAttendanceDate);
+    const requestedEventTime = input.correctedTime ||
+      complaint.requestedEventTime;
 
-    await attendanceRepository.applyAttendanceCorrection(
-      complaint
+    if (!isValidDateString(requestedAttendanceDate)) {
+      throw new ApiError(400, "Attendance date must use YYYY-MM-DD format");
+    }
+
+    if (!isValidTimeString(requestedEventTime)) {
+      throw new ApiError(400, "Attendance time must use HH:mm format");
+    }
+
+    const originalAttendanceDate = dateOnlyFromValue(
+      complaint.attendanceDate
     );
+    const result = await attendanceRepository.applyAttendanceRequest({
+      complaint,
+      attendanceDate: requestedAttendanceDate,
+      eventTime: requestedEventTime,
+      reviewNote: input.reviewNote
+    });
+    const datesToRefresh = new Set([
+      originalAttendanceDate,
+      requestedAttendanceDate
+    ]);
 
+    for (const date of datesToRefresh) {
+      const dateValue = dateAtUtcMidnight(date);
+      const summary = await attendanceCalculator.generateAttendanceSummary(
+        complaint.userId,
+        dateValue
+      );
+
+      if (!summary) {
+        await attendanceRepository.deleteAttendanceSummaryForDate(
+          complaint.userId,
+          dateValue
+        );
+      } else if (date === requestedAttendanceDate) {
+        await attendanceRepository.linkComplaintToSummary(
+          complaint.id,
+          summary.id
+        );
+      }
+    }
+
+    return {
+      ...result.complaint,
+      attendanceDate: originalAttendanceDate,
+      requestedAttendanceDate,
+      requestedEventTime
+    };
   }
+
+  const updatedComplaint = await attendanceRepository.updateComplaintStatus(
+    Number(complaintId),
+    {
+      status: "REJECTED",
+      reviewNote: input.reviewNote || null
+    }
+  );
 
 
   return {
     ...updatedComplaint,
     attendanceDate: dateOnlyFromValue(
       updatedComplaint.attendanceDate
+    ),
+    requestedAttendanceDate: dateOnlyFromValue(
+      updatedComplaint.requestedAttendanceDate
     )
   };
 };
@@ -957,12 +1102,15 @@ const reviewAttendanceComplaint = async (
 const editAttendanceComplaint = async (
   complaintId,
   input,
-  reviewerId
+  reviewer
 ) => {
+
+  const departmentId = attendanceComplaintDepartmentScope(reviewer);
 
   const complaint =
     await attendanceRepository.findComplaintById(
-      Number(complaintId)
+      Number(complaintId),
+      departmentId
     );
 
 
@@ -1002,7 +1150,7 @@ const editAttendanceComplaint = async (
           input.reviewNote ||
           "Attendance updated by admin",
         reviewedAt: new Date(),
-        reviewedBy: reviewerId
+        reviewedBy: reviewer.id
       }
     );
 
@@ -1031,7 +1179,21 @@ const calculateWorkedMinutes = (
 
 };
 
-const insertManualAttendance = async (input, reviewerId) => {
+const insertManualAttendance = async (input, reviewer) => {
+
+  const departmentId = attendanceComplaintDepartmentScope(reviewer);
+  const complaintToReview = await attendanceRepository.findComplaintById(
+    Number(input.complaintId),
+    departmentId
+  );
+
+  if (!complaintToReview) {
+    throw new ApiError(404, "Attendance complaint not found");
+  }
+
+  if (complaintToReview.status !== "PENDING") {
+    throw new ApiError(400, "This complaint has already been reviewed");
+  }
 
   const attendance =
     await attendanceRepository.insertManualAttendance({
@@ -1049,7 +1211,7 @@ const insertManualAttendance = async (input, reviewerId) => {
         status: "APPROVED",
         reviewNote: "Attendance inserted by admin",
         reviewedAt: new Date(),
-        reviewedBy: reviewerId
+        reviewedBy: reviewer.id
       }
     );
 

@@ -8,6 +8,9 @@ definePageMeta({
 type Complaint = {
   id: number;
   attendanceDate: string;
+  requestedAttendanceDate: string;
+  requestedEventTime: string;
+  requestAction: "INSERT" | "EDIT";
   complaintType: string;
   reason: string;
   status: string;
@@ -19,17 +22,17 @@ type Complaint = {
     lastName: string;
     userCode: string;
     department?: {
-      name: string;
+      departmentName: string;
     } | null;
     designation?: {
-      name: string;
+      designationName: string;
     } | null;
   };
 
   rawAttendance: {
     eventType: string;
     eventTime: string;
-  };
+  } | null;
 
   dailyAttendance: {
     firstCheckIn: string | null;
@@ -143,8 +146,8 @@ onMounted(loadComplaints);
     <div class="page-header">
 
       <div>
-        <h1>Attendance Complaints</h1>
-        <p>Review employee attendance complaints.</p>
+        <h1>Attendance Change Requests</h1>
+        <p>Review employee-requested attendance inserts and edits.</p>
       </div>
 
       <button
@@ -196,9 +199,9 @@ onMounted(loadComplaints);
 
             <th>Designation</th>
 
-            <th>Date</th>
+            <th>Requested Date</th>
 
-            <th>Complaint</th>
+            <th>Change</th>
 
             <th>Reason</th>
 
@@ -228,24 +231,26 @@ onMounted(loadComplaints);
 
             <td>
               {{
-                complaint.user.department?.name ??
+                complaint.user.department?.departmentName ??
                 "-"
               }}
             </td>
 
             <td>
               {{
-                complaint.user.designation?.name ??
+                complaint.user.designation?.designationName ??
                 "-"
               }}
             </td>
 
             <td>
-              {{ complaint.attendanceDate }}
+              {{ complaint.requestedAttendanceDate }}
+              <div>{{ complaint.requestedEventTime }}</div>
             </td>
 
             <td>
-              {{ complaint.complaintType }}
+              {{ complaint.requestAction }}<br>
+              {{ complaint.complaintType.replaceAll("_", " ") }}
             </td>
 
             <td style="max-width:260px">
@@ -296,7 +301,7 @@ onMounted(loadComplaints);
               colspan="9"
               class="empty"
             >
-              No attendance complaints found.
+              No attendance change requests found.
             </td>
           </tr>
 

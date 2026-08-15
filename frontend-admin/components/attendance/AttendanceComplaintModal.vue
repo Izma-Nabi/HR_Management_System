@@ -1,16 +1,9 @@
 <script setup lang="ts">
-type ComplaintType = "CHECK_IN" | "CHECK_OUT" | "BOTH" | "STATUS" | "OTHER";
-
-type RawAttendanceRecord = {
-  id: number;
-  eventType: string;
-  eventTime: string;
-  remarks: string | null;
-};
+type RequestAction = "INSERT" | "EDIT";
+type AttendanceEventType = "CHECK_IN" | "CHECK_OUT";
 
 const props = defineProps<{
   attendanceDate: string;
-  record: RawAttendanceRecord;
   submitting: boolean;
   error: string;
 }>();
@@ -19,40 +12,20 @@ const emit = defineEmits<{
   (
     event: "submit",
     payload: {
-      complaintType: ComplaintType;
+      attendanceDate: string;
+      requestAction: RequestAction;
+      eventType: AttendanceEventType;
+      correctedTime: string;
       reason: string;
     }
   ): void;
   (event: "close"): void;
 }>();
 
-const defaultComplaintType = (): ComplaintType => {
-  if (props.record.eventType === "CHECK_IN") {
-    return "CHECK_IN";
-  }
-
-  if (props.record.eventType === "CHECK_OUT") {
-    return "CHECK_OUT";
-  }
-
-  return "OTHER";
-};
-
-const complaintType = ref<ComplaintType | "">(
-  defaultComplaintType()
-);
+const requestAction = ref<RequestAction | "">("");
+const eventType = ref<AttendanceEventType | "">("");
+const correctedTime = ref("");
 const reason = ref("");
-
-const complaintTypes: Array<{
-  value: ComplaintType;
-  label: string;
-}> = [
-  { value: "CHECK_IN", label: "Check in" },
-  { value: "CHECK_OUT", label: "Check out" },
-  { value: "BOTH", label: "Check in and check out" },
-  { value: "STATUS", label: "Attendance status" },
-  { value: "OTHER", label: "Other" }
-];
 
 const formattedDate = computed(() => {
   return new Intl.DateTimeFormat("en-PK", {
@@ -63,27 +36,11 @@ const formattedDate = computed(() => {
   }).format(new Date(`${props.attendanceDate}T00:00:00`));
 });
 
-const formatTime = (time: string | null) => {
-  if (!time) {
-    return "--";
-  }
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return time;
-  }
-
-  return new Intl.DateTimeFormat("en-PK", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  }).format(new Date(2000, 0, 1, hours, minutes));
-};
-
 const canSubmit = computed(() => {
   return (
-    complaintType.value !== "" &&
+    requestAction.value !== "" &&
+    eventType.value !== "" &&
+    correctedTime.value !== "" &&
     reason.value.trim().length >= 10 &&
     !props.submitting
   );
@@ -96,12 +53,19 @@ const close = () => {
 };
 
 const submit = () => {
-  if (!canSubmit.value || complaintType.value === "") {
+  if (
+    !canSubmit.value ||
+    requestAction.value === "" ||
+    eventType.value === ""
+  ) {
     return;
   }
 
   emit("submit", {
-    complaintType: complaintType.value,
+    attendanceDate: props.attendanceDate,
+    requestAction: requestAction.value,
+    eventType: eventType.value,
+    correctedTime: correctedTime.value,
     reason: reason.value.trim()
   });
 };
@@ -131,8 +95,8 @@ onBeforeUnmount(() => {
     >
       <header class="modal-header">
         <div>
-          <p>Attendance correction</p>
-          <h2 id="complaint-title">Submit complaint</h2>
+          <p>Attendance change request</p>
+          <h2 id="complaint-title">What needs to change?</h2>
         </div>
         <button
           class="close-button"
@@ -147,44 +111,63 @@ onBeforeUnmount(() => {
 
       <div class="selected-record">
         <strong>{{ formattedDate }}</strong>
-        <dl>
-          <div>
-            <dt>Event</dt>
-            <dd>{{ props.record.eventType.replaceAll("_", " ") }}</dd>
-          </div>
-          <div>
-            <dt>Time</dt>
-            <dd>{{ formatTime(props.record.eventTime) }}</dd>
-          </div>
-          <div>
-            <dt>Remarks</dt>
-            <dd :title="props.record.remarks || undefined">
-              {{ props.record.remarks || "--" }}
-            </dd>
-          </div>
-        </dl>
+        <span>Select the request action, attendance type, and corrected time.</span>
       </div>
 
       <form @submit.prevent="submit">
-        <label for="complaint-type">Correction type</label>
-        <select
-          id="complaint-type"
-          v-model="complaintType"
-          :disabled="props.submitting"
-          required
-        >
-          <option value="" disabled>Select correction type</option>
-          <option
-            v-for="option in complaintTypes"
-            :key="option.value"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </option>
-        </select>
+        <div class="form-grid">
+          <div class="field field--full">
+            <label for="attendance-date">Attendance date</label>
+            <input
+              id="attendance-date"
+              :value="props.attendanceDate"
+              type="date"
+              readonly
+            >
+          </div>
+
+          <div class="field">
+            <label for="request-action">Request action</label>
+            <select
+              id="request-action"
+              v-model="requestAction"
+              :disabled="props.submitting"
+              required
+            >
+              <option value="" disabled>Select an action</option>
+              <option value="EDIT">Edit attendance</option>
+              <option value="INSERT">Insert attendance</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="event-type">Attendance type</label>
+            <select
+              id="event-type"
+              v-model="eventType"
+              :disabled="props.submitting"
+              required
+            >
+              <option value="" disabled>Select attendance type</option>
+              <option value="CHECK_IN">Check in</option>
+              <option value="CHECK_OUT">Check out</option>
+            </select>
+          </div>
+
+          <div class="field field--full">
+            <label for="corrected-time">Corrected attendance time</label>
+            <input
+              id="corrected-time"
+              v-model="correctedTime"
+              type="time"
+              :disabled="props.submitting"
+              required
+            >
+          </div>
+        </div>
 
         <label for="complaint-reason">
-          Reason and requested correction
+          Reason for the change
         </label>
         <textarea
           id="complaint-reason"
@@ -192,7 +175,7 @@ onBeforeUnmount(() => {
           rows="5"
           minlength="10"
           maxlength="2000"
-          placeholder="Describe the mistake and the correct attendance information"
+          placeholder="Explain why this attendance change is needed"
           :disabled="props.submitting"
           required
         />
@@ -220,7 +203,7 @@ onBeforeUnmount(() => {
             type="submit"
             :disabled="!canSubmit"
           >
-            {{ props.submitting ? "Submitting..." : "Submit complaint" }}
+            {{ props.submitting ? "Submitting..." : "Send request" }}
           </button>
         </footer>
       </form>
@@ -307,29 +290,9 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0;
-  gap: 12px;
-}
-
-dt {
-  margin-bottom: 4px;
+.selected-record span {
   color: #64748b;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-dd {
-  margin: 0;
-  overflow: hidden;
-  color: #172033;
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 13px;
 }
 
 form {
@@ -344,6 +307,7 @@ label {
   font-weight: 700;
 }
 
+input,
 select,
 textarea {
   width: 100%;
@@ -354,10 +318,25 @@ textarea {
   outline: none;
 }
 
+input,
 select {
   height: 42px;
-  margin-bottom: 18px;
   padding: 0 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 18px;
+  gap: 16px;
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  margin-bottom: 7px;
 }
 
 textarea {
@@ -367,12 +346,15 @@ textarea {
   resize: vertical;
 }
 
+input:focus,
 select:focus,
 textarea:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
 }
 
+input:disabled,
+input:read-only,
 select:disabled,
 textarea:disabled {
   color: #64748b;
@@ -454,8 +436,12 @@ textarea:disabled {
     margin-left: 16px;
   }
 
-  dl {
+  .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .field--full {
+    grid-column: auto;
   }
 
   .modal-actions {

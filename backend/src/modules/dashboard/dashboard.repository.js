@@ -100,32 +100,33 @@ const countFromSummary = (value) => {
   return Number(value || 0);
 };
 
+const attendanceEventColumns = () => Prisma.sql`
+  a.id,
+  a.user_id AS userId,
+  a.user_code AS userCode,
+  a.biometric_id AS biometricId,
+  a.full_name AS fullName,
+  a.location_id AS locationId,
+  a.department_id AS departmentId,
+  a.designation_id AS designationId,
+  CAST(a.event_type AS CHAR) AS eventType,
+  a.event_time AS eventTime,
+  a.remarks,
+  a.source_key AS sourceKey,
+  a.created_at AS createdAt,
+  a.updated_at AS updatedAt
+`;
+
 const getEmployeeWeeklyAttendance = async (userId) => {
   const { monday, saturday } = currentWeekRange();
 
-  return prisma.attendance.findMany({
-
-    where: {
-
-      userId,
-
-      attendanceDate: {
-
-        gte: dateFromKey(monday),
-
-        lte: dateFromKey(saturday)
-
-      }
-
-    },
-
-    orderBy: {
-
-      attendanceDate: "asc"
-
-    }
-
-  });
+  return prisma.$queryRaw`
+    SELECT ${attendanceEventColumns()}
+    FROM attendance AS a
+    WHERE a.user_id = ${userId}
+      AND DATE(a.event_time) BETWEEN ${monday} AND ${saturday}
+    ORDER BY a.event_time ASC, a.id ASC
+  `;
 
 };
 
@@ -145,7 +146,7 @@ const getSummary = async (scopeWhere = {}) => {
       FROM attendance AS a
       JOIN users AS u
         ON u.id = a.user_id
-      WHERE a.attendance_date = ${targetDate}
+      WHERE DATE(a.event_time) = ${targetDate}
         AND a.event_type = 'CHECK_IN'
       ${scopeSql(scopeWhere)}
       GROUP BY a.user_id
@@ -165,16 +166,16 @@ const getAttendanceTrend = async (scopeWhere = {}) => {
   const { monday, saturday } = currentWeekRange();
   const rows = await prisma.$queryRaw`
     SELECT
-      DATE_FORMAT(a.attendance_date, '%a') AS day,
+      DATE_FORMAT(a.event_time, '%a') AS day,
       COUNT(DISTINCT a.user_id) AS count
     FROM attendance AS a
     JOIN users AS u
       ON u.id = a.user_id
-    WHERE a.attendance_date BETWEEN ${monday} AND ${saturday}
+    WHERE DATE(a.event_time) BETWEEN ${monday} AND ${saturday}
       AND a.event_type = 'CHECK_IN'
     ${scopeSql(scopeWhere)}
-    GROUP BY a.attendance_date
-    ORDER BY a.attendance_date ASC
+    GROUP BY DATE_FORMAT(a.event_time, '%a')
+    ORDER BY MIN(a.event_time) ASC
   `;
 
   const week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -206,7 +207,7 @@ const getDepartmentAttendance = async (scopeWhere = {}) => {
       ON u.id = a.user_id
     LEFT JOIN departments AS d
       ON d.id = u.department_id
-    WHERE a.attendance_date = ${targetDate}
+    WHERE DATE(a.event_time) = ${targetDate}
       AND a.event_type = 'CHECK_IN'
     ${scopeSql(scopeWhere)}
     GROUP BY d.id, d.department_name
@@ -229,16 +230,16 @@ const getTopLateEmployees = async (scopeWhere = {}) => {
     FROM (
       SELECT
         a.user_id,
-        a.attendance_date,
+        DATE(a.event_time) AS attendance_date,
         COALESCE(NULLIF(TRIM(CONCAT(u.firstName, ' ', u.lastName)), ''), u.userCode) AS name,
         MIN(a.event_time) AS first_check_in
       FROM attendance AS a
       JOIN users AS u
         ON u.id = a.user_id
-      WHERE a.attendance_date BETWEEN ${monday} AND ${saturday}
+      WHERE DATE(a.event_time) BETWEEN ${monday} AND ${saturday}
         AND a.event_type = 'CHECK_IN'
       ${scopeSql(scopeWhere)}
-      GROUP BY a.user_id, a.attendance_date, u.firstName, u.lastName, u.userCode
+      GROUP BY a.user_id, DATE(a.event_time), u.firstName, u.lastName, u.userCode
     ) AS late_checkins
     WHERE TIME(late_checkins.first_check_in) > ${lateCutoffTime}
     GROUP BY late_checkins.user_id, late_checkins.name
@@ -260,7 +261,7 @@ const getRecentAttendance = async (scopeWhere = {}, take = 10) => {
       COALESCE(NULLIF(TRIM(CONCAT(u.firstName, ' ', u.lastName)), ''), u.userCode) AS fullName,
       r.role_name AS role,
       COALESCE(d.department_name, 'Unassigned') AS department,
-      DATE_FORMAT(a.attendance_date, '%Y-%m-%d') AS attendanceDate,
+      DATE_FORMAT(a.event_time, '%Y-%m-%d') AS attendanceDate,
       CASE
         WHEN a.event_type = 'CHECK_IN' THEN TIME_FORMAT(a.event_time, '%H:%i:%s')
         ELSE NULL
@@ -288,27 +289,13 @@ const getRecentAttendance = async (scopeWhere = {}, take = 10) => {
 const getEmployeeTodayAttendance = async (userId) => {
   const today = currentAttendanceDateKey();
 
-  return prisma.attendance.findMany({
-
-    where: {
-
-      userId,
-
-      attendanceDate: {
-
-        equals: dateFromKey(today)
-
-      }
-
-    },
-
-    orderBy: {
-
-      eventTime: "asc"
-
-    }
-
-  });
+  return prisma.$queryRaw`
+    SELECT ${attendanceEventColumns()}
+    FROM attendance AS a
+    WHERE a.user_id = ${userId}
+      AND DATE(a.event_time) = ${today}
+    ORDER BY a.event_time ASC, a.id ASC
+  `;
 
 };
 module.exports = {

@@ -25,11 +25,6 @@ const props = defineProps<{
   attendanceDate: string;
   records: RawAttendanceRecord[];
   loading: boolean;
-  canComplain: boolean;
-}>();
-
-const emit = defineEmits<{
-  (event: "complain", record: RawAttendanceRecord): void;
 }>();
 
 const heading = computed(() => {
@@ -97,7 +92,6 @@ const logNumber = (index: number) => {
             <th scope="col">Event</th>
             <th scope="col">Time</th>
             <th scope="col">Remarks</th>
-            <th scope="col" class="request-column">Correction</th>
           </tr>
         </thead>
         <tbody>
@@ -118,27 +112,6 @@ const logNumber = (index: number) => {
             </td>
             <td class="time">{{ formatTime(record.eventTime) }}</td>
             <td class="remarks">{{ record.remarks || "--" }}</td>
-            <td class="request-column">
-              <div class="request-action">
-                <span
-                  v-if="record.complaint"
-                  class="complaint-status"
-                  :class="`complaint-status--${statusClass(record.complaint.status)}`"
-                >
-                  {{ record.complaint.status }}
-                </span>
-                <button
-                  class="correction-button"
-                  type="button"
-                  :disabled="!props.canComplain"
-                  :aria-label="`Request a correction for attendance record ${record.id}`"
-                  title="Request attendance correction"
-                  @click="emit('complain', record)"
-                >
-                  <span aria-hidden="true">!</span>
-                </button>
-              </div>
-            </td>
           </tr>
         </tbody>
       </table>

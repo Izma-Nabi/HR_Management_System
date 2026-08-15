@@ -1,3 +1,4 @@
+const { Prisma } = require("@prisma/client");
 const { prisma } = require("../../../../database/prisma");
 const attendanceRules = require("../../config/attendance.config");
 
@@ -53,6 +54,41 @@ const attendanceDateValue = (date) => {
   }
 
   return value;
+};
+const attendanceDateKey = (value) => {
+  return typeof value === "string"
+    ? value.slice(0, 10)
+    : value.toISOString().slice(0, 10);
+};
+
+const findAttendanceEventsForDate = async (userIds, attendanceDate) => {
+  if (!userIds.length) {
+    return [];
+  }
+
+  const date = attendanceDateKey(attendanceDate);
+
+  return prisma.$queryRaw`
+    SELECT
+      id,
+      user_id AS userId,
+      user_code AS userCode,
+      biometric_id AS biometricId,
+      full_name AS fullName,
+      location_id AS locationId,
+      department_id AS departmentId,
+      designation_id AS designationId,
+      CAST(event_type AS CHAR) AS eventType,
+      event_time AS eventTime,
+      remarks,
+      source_key AS sourceKey,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM attendance
+    WHERE user_id IN (${Prisma.join(userIds)})
+      AND DATE(event_time) = ${date}
+    ORDER BY user_id ASC, event_time ASC
+  `;
 };
 const formatHHMM = (minutes) => {
 
@@ -173,19 +209,7 @@ const getAttendanceEvents = async (
   userId,
   attendanceDate
 ) => {
-  const normalizedDate =
-    attendanceDateValue(attendanceDate);
-
-  return prisma.attendance.findMany({
-    where: {
-      userId,
-      attendanceDate: normalizedDate
-    },
-
-    orderBy: {
-      eventTime: "asc"
-    }
-  });
+  return findAttendanceEventsForDate([userId], attendanceDate);
 };
 
 
@@ -453,24 +477,7 @@ const generateDailyAttendanceSummaries = async (
         userId: true
       }
     }),
-
-    prisma.attendance.findMany({
-      where: {
-        userId: {
-          in: userIds
-        },
-        attendanceDate
-      },
-      orderBy: [
-        {
-          userId: "asc"
-        },
-        {
-          eventTime: "asc"
-        }
-      ]
-    }),
-
+    findAttendanceEventsForDate(userIds, attendanceDate),
     prisma.attendanceSummary.findMany({
       where: {
         userId: {

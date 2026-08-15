@@ -19,6 +19,10 @@ type AttendanceDay = {
   source: string | null;
   adjustmentReason: string | null;
   canComplain: boolean;
+  latestRequest: {
+    id: number;
+    status: string;
+  } | null;
 };
 
 type AttendanceComplaint = {
@@ -59,7 +63,8 @@ type AttendanceUser = {
   days: AttendanceDay[];
 };
 
-type ComplaintType = "CHECK_IN" | "CHECK_OUT" | "BOTH" | "STATUS" | "OTHER";
+type RequestAction = "INSERT" | "EDIT";
+type AttendanceEventType = "CHECK_IN" | "CHECK_OUT";
 
 definePageMeta({
   layout: "dashboard"
@@ -80,7 +85,7 @@ const allUsers = ref<AttendanceUser[]>([]);
 const userSearch = ref("");
 const selectedDate = ref<string | null>(null);
 const dayDetails = ref<DayDetails | null>(null);
-const selectedRecord = ref<RawAttendanceRecord | null>(null);
+const selectedRequestDate = ref<string | null>(null);
 const loadingWeek = ref(true);
 const loadingDay = ref(false);
 const submittingComplaint = ref(false);
@@ -203,7 +208,7 @@ const clearSelectedDay = () => {
   dayRequestId += 1;
   selectedDate.value = null;
   dayDetails.value = null;
-  selectedRecord.value = null;
+  selectedRequestDate.value = null;
   loadingDay.value = false;
   detailError.value = "";
   complaintError.value = "";
@@ -342,31 +347,34 @@ const selectDay = async (attendanceDate: string) => {
   await loadDay(attendanceDate);
 };
 
-const openComplaint = (record: RawAttendanceRecord) => {
-  if (!dayDetails.value?.canComplain) {
+const openComplaint = (attendanceDate: string) => {
+  const day = days.value.find(
+    (attendanceDay) => attendanceDay.attendanceDate === attendanceDate
+  );
+
+  if (!day?.canComplain) {
     return;
   }
 
   complaintError.value = "";
-  selectedRecord.value = record;
+  selectedRequestDate.value = attendanceDate;
 };
 
 const closeComplaint = () => {
   if (!submittingComplaint.value) {
     complaintError.value = "";
-    selectedRecord.value = null;
+    selectedRequestDate.value = null;
   }
 };
 
 const submitComplaint = async (payload: {
-  complaintType: ComplaintType;
+  attendanceDate: string;
+  requestAction: RequestAction;
+  eventType: AttendanceEventType;
+  correctedTime: string;
   reason: string;
 }) => {
-  if (
-    !selectedRecord.value ||
-    !dayDetails.value?.dailyAttendanceId ||
-    !selectedDate.value
-  ) {
+  if (!selectedRequestDate.value) {
     return;
   }
 
@@ -375,20 +383,20 @@ const submitComplaint = async (payload: {
 
   try {
     await attendanceService.createComplaint({
-      dailyAttendanceId: dayDetails.value.dailyAttendanceId,
-      rawAttendanceId: selectedRecord.value.id,
-      complaintType: payload.complaintType,
+      attendanceDate: payload.attendanceDate,
+      requestAction: payload.requestAction,
+      eventType: payload.eventType,
+      correctedTime: payload.correctedTime,
       reason: payload.reason
     });
 
-    selectedRecord.value = null;
-    successMessage.value = "Attendance complaint submitted successfully.";
-
-    await loadDay(selectedDate.value);
+    selectedRequestDate.value = null;
+    await loadWeek();
+    successMessage.value = "Attendance change request submitted successfully.";
   } catch (error: any) {
     complaintError.value =
       error?.data?.message ||
-      "Unable to submit attendance complaint";
+      "Unable to submit attendance change request";
   } finally {
     submittingComplaint.value = false;
   }
@@ -515,6 +523,7 @@ onMounted(loadWeek);
       :days="days"
       :selected-date="selectedDate"
       @select="selectDay"
+      @request="openComplaint"
     />
 
     <p v-if="detailError" class="notice notice--error" role="alert">
@@ -526,15 +535,12 @@ onMounted(loadWeek);
       :attendance-date="selectedDate"
       :records="dayDetails?.records || []"
       :loading="loadingDay"
-      :can-complain="dayDetails?.canComplain || false"
-      @complain="openComplaint"
     />
 
     <AttendanceComplaintModal
-      v-if="!isSuperAdmin && selectedRecord && selectedDate"
-      :key="`${selectedDate}-${selectedRecord.id}`"
-      :attendance-date="selectedDate"
-      :record="selectedRecord"
+      v-if="!isSuperAdmin && selectedRequestDate"
+      :key="selectedRequestDate"
+      :attendance-date="selectedRequestDate"
       :submitting="submittingComplaint"
       :error="complaintError"
       @close="closeComplaint"
