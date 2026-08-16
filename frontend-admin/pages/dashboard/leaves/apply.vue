@@ -9,42 +9,139 @@ const router = useRouter();
 
 const { roleKey } = useAuthUser();
 
-const loading = ref(false);
+const loadingOptions = ref(false);
+const submitting = ref(false);
+
 const errorMessage = ref("");
 const successMessage = ref("");
 
-const form = ref({
+const form = reactive({
   type: "",
   startDate: "",
   endDate: "",
   reason: "",
+  reportingToId: "",
+  backupEmployeeId: "",
+});
+
+type Approver = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  designation?: {
+    id: number;
+    designationName: string;
+  };
+};
+
+type BackupEmployee = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  designation?: {
+    id: number;
+    designationName: string;
+  };
+};
+
+const approvers = ref<Approver[]>([]);
+const backupEmployees = ref<BackupEmployee[]>([]);
+
+const loadLeaveOptions = async () => {
+  loadingOptions.value = true;
+  errorMessage.value = "";
+
+  try {
+    const [approverResponse, backupResponse] = await Promise.all([
+      leaveService.getLeaveApprovers(),
+      leaveService.getBackupEmployees(),
+    ]);
+
+    const approverData = approverResponse as {
+      success?: boolean;
+      data?: Approver[];
+    };
+
+    const backupData = backupResponse as {
+      success?: boolean;
+      data?: BackupEmployee[];
+    };
+
+    approvers.value = approverData?.data ?? [];
+    backupEmployees.value = backupData?.data ?? [];
+  } catch (error: unknown) {
+    console.error("Failed to load leave options:", error);
+
+    const err = error as {
+      data?: {
+        message?: string;
+      };
+      response?: {
+        data?: {
+          message?: string;
+        };
+      };
+      message?: string;
+    };
+
+    errorMessage.value =
+      err?.data?.message ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "Unable to load managers and employees.";
+
+    approvers.value = [];
+    backupEmployees.value = [];
+  } finally {
+    loadingOptions.value = false;
+  }
+};
+
+onMounted(async () => {
+  const currentRole = String(roleKey.value || "").toUpperCase();
+
+  if (!["ADMIN", "EMPLOYEE"].includes(currentRole)) {
+    await router.replace("/dashboard/leaves");
+    return;
+  }
+
+  await loadLeaveOptions();
 });
 
 const canApplyLeave = computed(() => {
+  const currentRole = String(roleKey.value || "").toUpperCase();
+
   return (
-    ["ADMIN", "EMPLOYEE"].includes(roleKey.value) &&
-    form.value.type !== "" &&
-    form.value.startDate !== "" &&
-    form.value.endDate !== ""
+    ["ADMIN", "EMPLOYEE"].includes(currentRole) &&
+    form.type !== "" &&
+    form.startDate !== "" &&
+    form.endDate !== "" &&
+    form.reportingToId !== "" &&
+    totalDays.value > 0 &&
+    !submitting.value
   );
 });
 
-onMounted(() => {
-  if (!["ADMIN", "EMPLOYEE"].includes(roleKey.value)) {
-    router.replace("/dashboard/leaves");
-  }
-});
-
 const totalDays = computed(() => {
-  if (!form.value.startDate || !form.value.endDate) {
+  if (!form.startDate || !form.endDate) {
     return 0;
   }
 
-  const start = new Date(`${form.value.startDate}T00:00:00`);
-  const end = new Date(`${form.value.endDate}T00:00:00`);
+  const start = new Date(`${form.startDate}T00:00:00`);
+  const end = new Date(`${form.endDate}T00:00:00`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
 
   const difference = end.getTime() - start.getTime();
-  const days = Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+
+  const days =
+    Math.floor(
+      difference / (1000 * 60 * 60 * 24)
+    ) + 1;
 
   return days > 0 ? days : 0;
 });
@@ -53,43 +150,76 @@ const submitLeave = async () => {
   errorMessage.value = "";
   successMessage.value = "";
 
-  if (!canApplyLeave.value) {
-    errorMessage.value = "Please fill in all required fields.";
+  if (!form.type) {
+    errorMessage.value = "Please select leave type.";
+    return;
+  }
+
+  if (!form.startDate) {
+    errorMessage.value = "Please select start date.";
+    return;
+  }
+
+  if (!form.endDate) {
+    errorMessage.value = "Please select end date.";
+    return;
+  }
+
+  if (form.endDate < form.startDate) {
+    errorMessage.value =
+      "End date cannot be before start date.";
+    return;
+  }
+
+  if (!form.reportingToId) {
+    errorMessage.value =
+      "Please select who you report to.";
     return;
   }
 
   if (totalDays.value <= 0) {
-    errorMessage.value = "End date must be on or after the start date.";
+    errorMessage.value =
+      "Please select valid leave dates.";
     return;
   }
 
-  loading.value = true;
+  submitting.value = true;
 
   try {
-    const response = await leaveService.createLeaveRequest({
-      type: form.value.type,
-      startDate: form.value.startDate,
-      endDate: form.value.endDate,
+    const payload = {
+      type: form.type,
+      startDate: form.startDate,
+      endDate: form.endDate,
       totalDays: totalDays.value,
-      reason: form.value.reason.trim() || null,
-    });
+      reason: form.reason.trim() || null,
 
-    console.log("Leave created:", response);
+      // Required reporting manager / team lead
+      reportingToId: Number(form.reportingToId),
 
-    successMessage.value = "Leave request submitted successfully.";
+      // Optional backup employee
+      backupEmployeeId: form.backupEmployeeId
+        ? Number(form.backupEmployeeId)
+        : null,
+    };
 
-    setTimeout(() => {
-      router.push("/dashboard/leaves");
-    }, 800);
+    console.log("Submitting leave request:", payload);
+
+    await leaveService.createLeaveRequest(payload);
+
+    successMessage.value =
+      "Leave request submitted successfully.";
+
+    await router.push("/dashboard/leaves");
   } catch (error: any) {
     console.error("Failed to submit leave:", error);
 
     errorMessage.value =
       error?.data?.message ||
       error?.response?.data?.message ||
+      error?.message ||
       "Unable to submit leave request.";
   } finally {
-    loading.value = false;
+    submitting.value = false;
   }
 };
 </script>
@@ -170,6 +300,47 @@ const submitLeave = async () => {
         Total Days: <strong>{{ totalDays }}</strong>
       </div>
 
+<div class="form-group">
+  <label>Reporting To</label>
+
+  <select v-model="form.reportingToId">
+    <option value="">
+      Select Manager / Team Lead
+    </option>
+
+    <option
+      v-for="person in approvers"
+      :key="person.id"
+      :value="person.id"
+    >
+      {{ person.firstName }}
+      {{ person.lastName }}
+    </option>
+  </select>
+</div>
+
+
+  <div class="form-group">
+    <label>
+      Backup Employee
+      <span class="optional">(Optional)</span>
+    </label>
+
+    <select v-model="form.backupEmployeeId">
+      <option value="">
+        No backup employee
+      </option>
+
+      <option
+        v-for="employee in backupEmployees"
+        :key="employee.id"
+        :value="employee.id"
+      >
+        {{ employee.firstName }}
+        {{ employee.lastName }}
+      </option>
+    </select>
+  </div>
       <div class="form-group">
         <label>Reason</label>
 
@@ -185,7 +356,7 @@ const submitLeave = async () => {
         <button
           class="cancel-btn"
           type="button"
-          :disabled="loading"
+          :disabled="submitting"
           @click="router.push('/dashboard/leaves')"
         >
           Cancel
@@ -194,10 +365,10 @@ const submitLeave = async () => {
         <button
           class="submit-btn"
           type="button"
-          :disabled="!canApplyLeave || loading"
+          :disabled="!canApplyLeave || submitting"
           @click="submitLeave"
         >
-          {{ loading ? "Submitting..." : "Apply Leave" }}
+          {{ submitting ? "Submitting..." : "Apply Leave" }}
         </button>
 
       </div>

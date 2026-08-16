@@ -1,10 +1,5 @@
 const leavesService = require("./leave.service");
 
-
-// ============================================================
-// CREATE LEAVE
-// ============================================================
-
 const createLeave = async (req, res, next) => {
   try {
     const {
@@ -13,15 +8,23 @@ const createLeave = async (req, res, next) => {
       endDate,
       totalDays,
       reason,
+      reportingToId,
+      backupEmployeeId
     } = req.body;
 
-    if (!type || !startDate || !endDate || !totalDays) {
+    if (
+      !type ||
+      !startDate ||
+      !endDate ||
+      !totalDays ||
+      !reportingToId
+    ) {
       return res.status(400).json({
         success: false,
         statusCode: 400,
         message:
-          "Leave type, start date, end date and total days are required.",
-        errors: [],
+          "Leave type, start date, end date, total days and reporting to are required.",
+        errors: []
       });
     }
 
@@ -30,7 +33,7 @@ const createLeave = async (req, res, next) => {
         success: false,
         statusCode: 400,
         message: "Total days must be greater than zero.",
-        errors: [],
+        errors: []
       });
     }
 
@@ -41,7 +44,7 @@ const createLeave = async (req, res, next) => {
         success: false,
         statusCode: 401,
         message: "Authenticated user not found.",
-        errors: [],
+        errors: []
       });
     }
 
@@ -52,7 +55,11 @@ const createLeave = async (req, res, next) => {
         startDate,
         endDate,
         totalDays: Number(totalDays),
-        reason: reason || null,
+        reason,
+        reportingToId: Number(reportingToId),
+        backupEmployeeId: backupEmployeeId
+          ? Number(backupEmployeeId)
+          : null
       }
     );
 
@@ -60,7 +67,7 @@ const createLeave = async (req, res, next) => {
       success: true,
       statusCode: 201,
       message: "Leave request created successfully",
-      data: leaveRequest,
+      data: leaveRequest
     });
   } catch (error) {
     next(error);
@@ -133,9 +140,7 @@ const teamLeaves = async (req, res, next) => {
 };
 
 
-// ============================================================
-// GET ALL LEAVE REQUESTS
-// ============================================================
+
 
 const getLeaveRequests = async (req, res, next) => {
   try {
@@ -145,17 +150,13 @@ const getLeaveRequests = async (req, res, next) => {
       success: true,
       statusCode: 200,
       message: "Leave requests fetched successfully",
-      data,
+      data
     });
   } catch (error) {
     next(error);
   }
 };
 
-
-// ============================================================
-// GET SINGLE LEAVE REQUEST
-// ============================================================
 
 const getLeaveRequest = async (req, res, next) => {
   try {
@@ -166,7 +167,7 @@ const getLeaveRequest = async (req, res, next) => {
         success: false,
         statusCode: 400,
         message: "Invalid leave request ID",
-        errors: [],
+        errors: []
       });
     }
 
@@ -177,7 +178,7 @@ const getLeaveRequest = async (req, res, next) => {
         success: false,
         statusCode: 404,
         message: "Leave request not found",
-        errors: [],
+        errors: []
       });
     }
 
@@ -185,17 +186,47 @@ const getLeaveRequest = async (req, res, next) => {
       success: true,
       statusCode: 200,
       message: "Leave request fetched successfully",
-      data,
+      data
     });
   } catch (error) {
     next(error);
   }
 };
 
+const getLeaveApprovers = async (req, res, next) => {
+  try {
+    const data = await leavesService.getLeaveApprovers(
+      req.user.id
+    );
 
-// ============================================================
-// APPROVE LEAVE
-// ============================================================
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Leave approvers fetched successfully",
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getBackupEmployees = async (req, res, next) => {
+  try {
+    const data = await leavesService.getBackupEmployees(
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Backup employees fetched successfully",
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 const approveLeave = async (req, res, next) => {
   try {
@@ -244,10 +275,6 @@ const approveLeave = async (req, res, next) => {
 };
 
 
-// ============================================================
-// REJECT LEAVE
-// ============================================================
-
 const rejectLeave = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
@@ -295,10 +322,6 @@ const rejectLeave = async (req, res, next) => {
 };
 
 
-// ============================================================
-// CANCEL LEAVE
-// ============================================================
-
 const cancelLeave = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
@@ -329,10 +352,6 @@ const cancelLeave = async (req, res, next) => {
 };
 
 
-// ============================================================
-// EXPORTS
-// ============================================================
-
 module.exports = {
   createLeave,
   myLeaves,
@@ -342,4 +361,6 @@ module.exports = {
   approveLeave,
   rejectLeave,
   cancelLeave,
+  getLeaveApprovers,
+  getBackupEmployees
 };

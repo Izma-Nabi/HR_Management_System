@@ -29,6 +29,7 @@
     "vue3-apexcharts": "^1.11.1"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "prisma": "^6.19.3"
   },
   "version": "1.0.0",

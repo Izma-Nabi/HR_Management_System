@@ -89,6 +89,32 @@ const cancelLeave = async (id) => {
   );
 };
 
+const getLeaveApprovers = async () => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(
+    `${config.public.apiBase}/leaves/approvers`,
+    {
+      method: "GET",
+      headers: authService.getAuthHeaders(),
+    }
+  );
+};
+
+
+const getBackupEmployees = async () => {
+  const config = useRuntimeConfig();
+
+  return await $fetch(
+    `${config.public.apiBase}/leaves/backup-employees`,
+    {
+      method: "GET",
+      headers: authService.getAuthHeaders(),
+    }
+  );
+};
+
+
 export default {
   getLeaveRequests,
   getMyLeaveRequests,
@@ -97,4 +123,6 @@ export default {
   approveLeave,
   rejectLeave,
   cancelLeave,
+  getLeaveApprovers,
+  getBackupEmployees,
 };

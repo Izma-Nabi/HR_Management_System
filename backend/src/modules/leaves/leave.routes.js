@@ -3,11 +3,10 @@ const router = require("express").Router();
 const auth = require("../../middlewares/auth.middleware");
 const {
   requirePermission,
-  requireAnyRole
+  requireAnyRole,
 } = require("../../middlewares/permission.middleware");
 
 const leaveController = require("./leave.controller");
-
 
 // Get all leave requests
 router.get(
@@ -17,6 +16,37 @@ router.get(
   leaveController.getLeaveRequests
 );
 
+// Get logged-in user's leaves
+router.get(
+  "/my",
+  auth,
+  requirePermission("VIEW_OWN_LEAVES"),
+  leaveController.myLeaves
+);
+
+// Get team leaves
+router.get(
+  "/team",
+  auth,
+  requirePermission("VIEW_TEAM_LEAVES"),
+  leaveController.teamLeaves
+);
+
+// Get managers / team leads for "Reporting To"
+router.get(
+  "/approvers",
+  auth,
+  requirePermission("CREATE_LEAVE"),
+  leaveController.getLeaveApprovers
+);
+
+// Get employees for optional "Backup Employee"
+router.get(
+  "/backup-employees",
+  auth,
+  requirePermission("CREATE_LEAVE"),
+  leaveController.getBackupEmployees
+);
 
 // Create leave request
 router.post(
@@ -27,24 +57,13 @@ router.post(
   leaveController.createLeave
 );
 
-
-// Get logged-in user's leaves
+// Get a single leave request
 router.get(
-  "/my",
+  "/:id",
   auth,
-  requirePermission("VIEW_OWN_LEAVES"),
-  leaveController.myLeaves
+  requirePermission("VIEW_ALL_LEAVES"),
+  leaveController.getLeaveRequest
 );
-
-
-// Get team leaves
-router.get(
-  "/team",
-  auth,
-  requirePermission("VIEW_TEAM_LEAVES"),
-  leaveController.teamLeaves
-);
-
 
 // Approve leave
 router.patch(
@@ -54,7 +73,6 @@ router.patch(
   leaveController.approveLeave
 );
 
-
 // Reject leave
 router.patch(
   "/:id/reject",
@@ -63,27 +81,12 @@ router.patch(
   leaveController.rejectLeave
 );
 
-
 // Cancel leave
 router.patch(
   "/:id/cancel",
   auth,
   requirePermission("CANCEL_LEAVE"),
   leaveController.cancelLeave
-);
-
-router.get(
-  "/",
-  auth,
-  requirePermission("VIEW_ALL_LEAVES"),
-  leaveController.getLeaveRequests
-);
-
-router.get(
-  "/:id",
-  auth,
-  requirePermission("VIEW_ALL_LEAVES"),
-  leaveController.getLeaveRequest
 );
 
 module.exports = router;

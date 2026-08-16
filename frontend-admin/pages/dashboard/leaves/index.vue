@@ -124,9 +124,17 @@ const loadLeaves = async () => {
           ? leave.approvals[leave.approvals.length - 1]
           : null;
 
-      const requesterName =
-        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-        "Unknown User";
+      const requesterName = isEmployee.value
+        ? `${authUser.value?.firstName || ""} ${
+            authUser.value?.lastName || ""
+          }`.trim() || "You"
+        : `${user.firstName || ""} ${
+            user.lastName || ""
+          }`.trim() || "Unknown User";
+
+      const requesterCode = isEmployee.value
+        ? authUser.value?.userCode || `USER-${leave.userId}`
+        : user.userCode || `USER-${leave.userId}`;
 
       return {
         id: leave.id,
@@ -137,9 +145,7 @@ const loadLeaves = async () => {
 
         requesterName,
 
-        requesterCode:
-          user.userCode ||
-          `USER-${leave.userId}`,
+        requesterCode,
 
         requesterRole:
           user.role?.roleName?.toUpperCase() === "ADMIN"
@@ -148,6 +154,7 @@ const loadLeaves = async () => {
 
         department:
           user.department?.departmentName ||
+          authUser.value?.department?.departmentName ||
           "No Department",
 
         type: leave.type,
@@ -172,7 +179,11 @@ const loadLeaves = async () => {
           ? `${firstApproval.approver.firstName || ""} ${
               firstApproval.approver.lastName || ""
             }`.trim()
-          : null,
+          : leave.reportingTo
+            ? `${leave.reportingTo.firstName || ""} ${
+                leave.reportingTo.lastName || ""
+              }`.trim()
+            : null,
 
         decisionNote:
           firstApproval?.decisionNote || null,
@@ -188,7 +199,6 @@ const loadLeaves = async () => {
     ) {
       selectedRequestId.value = leaveRequests.value[0].id;
     }
-
   } catch (error: any) {
     console.error("Failed to load leaves:", error);
 
