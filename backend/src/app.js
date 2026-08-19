@@ -14,6 +14,7 @@ const leaveRoutes = require("./modules/leaves/leave.routes");
 const roleRoutes = require("./modules/roles/role.routes");
 const designationRoutes = require("./modules/designations/designation.routes");
 const { testPrismaConnection } = require("../../database/prisma");
+const aiAssistantRoutes = require("./modules/ai-assistant/ai-assistant.routes");
 
 const {
   notFoundHandler,
@@ -53,7 +54,7 @@ app.use("/api", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/designations", designationRoutes);
-
+app.use("/api/ai-assistant", aiAssistantRoutes);
 
 // Log HTTP requests during development.
 if (env.nodeEnv !== "test") {

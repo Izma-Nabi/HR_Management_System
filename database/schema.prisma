@@ -240,26 +240,6 @@ model Attendance {
   @@map("attendance")
 }
 
-model AttendanceLegacy {
-  id             Int                    @id @default(autoincrement())
-  userId         Int?                   @map("user_id") @db.UnsignedInt
-  user           User?                  @relation(fields: [userId], references: [id], onDelete: Cascade, map: "attendance_user_id_fkey")
-  userCode       String                 @map("user_code") @db.VarChar(50)
-  fullName       String                 @map("full_name") @db.VarChar(100)
-  role           String                 @db.VarChar(50)
-  department     String                 @db.VarChar(100)
-  attendanceDate DateTime               @map("attendance_date") @db.Date
-  checkIn        DateTime?              @map("check_in") @db.Time(0)
-  checkOut       DateTime?              @map("check_out") @db.Time(0)
-  status         AttendanceLegacyStatus
-  remarks        String?                @db.Text
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @map("updated_at")
-  sourceKey      String?                @unique(map: "attendance_source_key_key") @map("source_key") @db.VarChar(128)
-
-  @@index([userId, attendanceDate], map: "attendance_user_id_attendance_date_idx")
-  @@map("attendance_old")
-}
 
 model AttendanceSummary {
   id Int @id @default(autoincrement()) @db.UnsignedInt

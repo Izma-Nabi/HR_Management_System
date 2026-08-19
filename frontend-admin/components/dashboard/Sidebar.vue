@@ -253,6 +253,32 @@ const canViewAttendanceComplaints = computed(() => {
           Attendance Complaints
         </span>
       </NuxtLink>
+        <NuxtLink
+          to="/dashboard/ai-assistant/ai-assistant"
+          class="nav-item"
+          style="--i: 8"
+        >
+          <span class="nav-icon">
+            <svg
+              viewBox="0 0 24 24"
+              width="19"
+              height="19"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3a7 7 0 0 0-7 7v4a3 3 0 0 0 3 3h1" />
+              <path d="M12 3a7 7 0 0 1 7 7v4a3 3 0 0 1-3 3h-1" />
+              <path d="M8 17v1a4 4 0 0 0 8 0v-1" />
+              <path d="M9 11h.01M15 11h.01" />
+              <path d="M9 14c1.8 1.2 4.2 1.2 6 0" />
+            </svg>
+          </span>
+
+          <span class="nav-label">AI Assistant</span>
+        </NuxtLink>
     </nav>
 
     <div class="sidebar-foot">
