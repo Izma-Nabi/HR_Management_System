@@ -1,39 +1,69 @@
-const axios = require("axios");
+const env = require("../../../../../global/env");
 
-const generateAnswer = async (prompt) => {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("OPENROUTER_API_KEY is not configured.");
+const askOpenRouter = async ({
+  systemPrompt,
+  question,
+}) => {
+  const apiKey =
+    process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "OPENROUTER_API_KEY is not configured."
+    );
   }
 
-  const response = await axios.post(
+  const model =
+    env.openRouterModel ||
+    "openrouter/auto";
+
+  const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    },
-    {
+      method: "POST",
+
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
+
+      body: JSON.stringify({
+        model,
+
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: question,
+          },
+        ],
+
+        // IMPORTANT
+        max_tokens: 1200,
+
+        temperature: 0.2,
+      }),
     }
   );
 
-  const answer =
-    response.data?.choices?.[0]?.message?.content;
+  const data = await response.json();
 
-  if (!answer) {
-    throw new Error("OpenRouter returned an empty response.");
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        "OpenRouter request failed."
+    );
   }
 
-  return answer.trim();
+  return (
+    data?.choices?.[0]?.message?.content ||
+    "I could not generate an answer."
+  );
 };
 
 module.exports = {
-  generateAnswer,
+  askOpenRouter,
 };
