@@ -14,7 +14,7 @@ const askGemini = async ({
   // Get API key
   // ----------------------------------------------------------
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = env.geminiApiKey;
 
   if (!apiKey || !apiKey.trim()) {
     throw new Error(
@@ -35,7 +35,7 @@ const askGemini = async ({
   // ----------------------------------------------------------
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: env.geminiModel,
   });
 
   // ----------------------------------------------------------

@@ -64,6 +64,8 @@ const reviewerScopeWhere = (user) => {
     }
 
     return {
+      currentApprovalLevel: 2,
+      reportingToId: Number(user.id),
       user: {
         departmentId
       }

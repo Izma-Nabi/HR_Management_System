@@ -1,5 +1,6 @@
 const { prisma } = require("../../../../database/prisma");
 const env = require("../../../../global/env");
+const attendanceRules = require("../../config/attendance.config");
 
 // ============================================================
 // HELPERS
@@ -20,6 +21,30 @@ const safeString = (value) => {
   }
 
   return String(value);
+};
+
+const PAKISTAN_TIME_ZONE = "Asia/Karachi";
+
+const pakistanDateTimeParts = (date) => {
+  const value = new Date(date);
+
+  if (Number.isNaN(value.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PAKISTAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+
+  return Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
 };
 
 const normalizeRole = (value) => {
@@ -56,7 +81,11 @@ const formatDate = (date) => {
     return null;
   }
 
-  return new Date(date).toISOString().split("T")[0];
+  const parts = pakistanDateTimeParts(date);
+
+  return parts
+    ? `${parts.year}-${parts.month}-${parts.day}`
+    : null;
 };
 
 const formatDateTime = (date) => {
@@ -64,7 +93,11 @@ const formatDateTime = (date) => {
     return null;
   }
 
-  return new Date(date).toISOString();
+  const parts = pakistanDateTimeParts(date);
+
+  return parts
+    ? `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} (Asia/Karachi)`
+    : null;
 };
 
 const getStartOfDay = (date = new Date()) => {
@@ -894,11 +927,9 @@ const getLateEmployees = async ({
   }
 
   // ----------------------------------------------------------
-  // Calculate late based on 10:00 AM
+  // Calculate lateness using the same Pakistan-time office
+  // configuration as the attendance module.
   // ----------------------------------------------------------
-
-  const OFFICE_START_HOUR = 10;
-  const OFFICE_START_MINUTE = 0;
 
   const results = Object.values(grouped);
 
@@ -907,18 +938,19 @@ const getLateEmployees = async ({
       continue;
     }
 
-    const checkIn = new Date(record.checkIn);
+    const parts = pakistanDateTimeParts(record.checkIn);
 
-    const officeStart = new Date(checkIn);
+    if (!parts) {
+      continue;
+    }
 
-    officeStart.setHours(
-      OFFICE_START_HOUR,
-      OFFICE_START_MINUTE,
-      0,
-      0
-    );
+    const checkInMinutes =
+      Number(parts.hour) * 60 + Number(parts.minute);
+    const allowedMinutes =
+      attendanceRules.office.startMinutes +
+      attendanceRules.office.graceMinutes;
 
-    if (checkIn > officeStart) {
+    if (checkInMinutes > allowedMinutes) {
       record.late = true;
     }
   }
@@ -1470,6 +1502,39 @@ const getAttendanceSummary = async ({
       summary.departments[
         department
       ].late += 1;
+    }
+  }
+
+  // Attendance devices normally store late arrivals as CHECK_IN
+  // events. Reconcile the summary with the same derived-lateness
+  // calculation used by the "Late Employees" and frequency intents.
+  const lateArrivals = await getLateEmployees({
+    startDate,
+    endDate,
+    departmentId,
+  });
+
+  summary.lateEvents = lateArrivals.length;
+
+  Object.values(summary.employees).forEach((employee) => {
+    employee.late = 0;
+  });
+
+  Object.values(summary.departments).forEach((departmentSummary) => {
+    departmentSummary.late = 0;
+  });
+
+  for (const lateArrival of lateArrivals) {
+    const employee = summary.employees[lateArrival.userId];
+    const departmentSummary =
+      summary.departments[lateArrival.department || "Unknown"];
+
+    if (employee) {
+      employee.late += 1;
+    }
+
+    if (departmentSummary) {
+      departmentSummary.late += 1;
     }
   }
 
@@ -2612,6 +2677,9 @@ const HR_INTENTS = [
     match: (q) =>
       /profile of|details of|information about|find employee|who is\s+[a-z]/i.test(
         q
+      ) &&
+      !/absent|late|attendance|leave|checked in|checked out|department|team lead|manager/i.test(
+        q
       ),
     handler: async ({ question }) => {
       const match = question.match(
@@ -2637,7 +2705,8 @@ const HR_INTENTS = [
     match: (q) =>
       /summary|overview|dashboard|how are we doing|company (stats|statistics)/i.test(
         q
-      ),
+      ) &&
+      !/attendance|leave|department/i.test(q),
     handler: async () => {
       const summary = await getHRDashboardSummary();
       return `HR Dashboard Summary:\n${JSON.stringify(

@@ -72,6 +72,10 @@ module.exports = {
   geminiApiKey:
     process.env.GEMINI_API_KEY || "",
 
+  geminiModel:
+    process.env.GEMINI_MODEL ||
+    "gemini-3.6-flash",
+
   openRouterApiKey:
     process.env.OPENROUTER_API_KEY || "",
 

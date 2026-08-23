@@ -126,7 +126,7 @@ const teamLeaves = async (req, res, next) => {
       });
     }
 
-    const data = await leavesService.getTeamLeaves(departmentId);
+    const data = await leavesService.getLeaveRequests(req.user);
 
     return res.status(200).json({
       success: true,
