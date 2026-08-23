@@ -59,17 +59,28 @@ const hasPermission = (actor, permission) => {
 };
 
 const requireCreatePermission = (actor, roleKey) => {
-  const adminRoles = new Set([
-    ROLE_KEYS.SUPER_ADMIN,
-    ROLE_KEYS.ADMIN
-  ]);
+  // First check general permission to create users
+  if (!hasPermission(actor, "CREATE_USER")) {
+    throw new ApiError(
+      403,
+      "You do not have permission to create users"
+    );
+  }
 
-  const requiredPermission = adminRoles.has(roleKey)
-    ? "CREATE_ADMIN"
-    : "CREATE_EMPLOYEE";
+  // Super Admin can create any user type
+  if (actor.role === ROLE_KEYS.SUPER_ADMIN) {
+    return;
+  }
 
-  if (!hasPermission(actor, requiredPermission)) {
-    throw new ApiError(403, "You do not have permission to create this user type");
+  // Other roles cannot create Super Admin or Admin
+  if (
+    roleKey === ROLE_KEYS.SUPER_ADMIN ||
+    roleKey === ROLE_KEYS.ADMIN
+  ) {
+    throw new ApiError(
+      403,
+      "You do not have permission to create this user type"
+    );
   }
 };
 
