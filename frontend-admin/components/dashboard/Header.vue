@@ -1,5 +1,5 @@
 <template>
-  <header class="header">
+  <header class="header" :class="{ 'header--sidebar-expanded': props.sidebarExpanded }">
     <div class="header-leading">
       <button class="menu-btn" type="button" aria-label="Open navigation" @click="emit('toggleMenu')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -41,7 +41,20 @@
 <script setup>
 import authService from "~/services/auth.service";
 
-const { authUser, role } = useAuthUser();
+const props = defineProps({
+  sidebarExpanded: {
+    type: Boolean,
+    default: false
+  }
+});
+const {
+  authUser,
+  role,
+  isSuperAdmin,
+  isAdmin,
+  isHr,
+  isTeamLead
+} = useAuthUser();
 const route = useRoute();
 const emit = defineEmits(["toggleMenu"]);
 
@@ -59,6 +72,9 @@ const displayName = computed(() => {
 });
 
 const roleLabel = computed(() => {
+  if (isTeamLead.value) return "Team Lead";
+  if (isHr.value) return "HR";
+
   return authUser.value?.roleName || humanizeRole(role.value) || "User";
 });
 
@@ -71,7 +87,13 @@ const pageTitle = computed(() => {
   if (path.includes("departments")) return "Departments";
   if (path.includes("designations")) return "Designations";
   if (path.includes("roles")) return "Roles & permissions";
-  if (path.includes("leaves")) return "Leave management";
+  if (path.includes("leaves")) {
+    const employeeView = route.query.view === "employees"
+      || isAdmin.value
+      || isSuperAdmin.value;
+
+    return employeeView ? "Employee leaves" : "Own leaves";
+  }
   if (path.includes("employees")) return "My attendance";
   if (path.includes("users")) return "People";
 
@@ -315,6 +337,11 @@ const logout = () => {
   background: rgba(243, 242, 236, 0.83);
   border-bottom: 1px solid rgba(200, 211, 205, 0.78);
   backdrop-filter: blur(18px);
+  transition: left 220ms var(--ease-out);
+}
+
+.header--sidebar-expanded {
+  left: var(--sidebar-width);
 }
 
 .header-leading,
@@ -416,6 +443,10 @@ const logout = () => {
 
 @media (max-width: 980px) {
   .header {
+    left: 0;
+  }
+
+  .header--sidebar-expanded {
     left: 0;
   }
 

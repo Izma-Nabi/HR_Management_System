@@ -175,6 +175,7 @@ const rolePermissionGroups = [
     roleNames: ["HR", "Human Resources", "HUMAN_RESOURCES"],
     permissions: [
       "CREATE_LEAVE",
+      "VIEW_OWN_ATTENDANCE",
       "VIEW_OWN_LEAVES",
       "VIEW_ALL_LEAVES",
       "LIST_LEAVE_REQUESTS",

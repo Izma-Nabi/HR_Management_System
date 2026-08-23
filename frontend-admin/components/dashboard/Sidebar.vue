@@ -3,15 +3,43 @@ const {
   authUser,
   roleKey,
   isSuperAdmin,
+  isAdmin,
+  isLeaveReviewer,
   hasAnyPermission
 } = useAuthUser();
+const route = useRoute();
 const props = defineProps({
   open: {
     type: Boolean,
     default: false
   }
 });
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "expanded-change"]);
+const hovered = ref(false);
+const focusWithin = ref(false);
+
+const syncExpandedState = () => {
+  emit("expanded-change", hovered.value || focusWithin.value);
+};
+
+const setHovered = (value) => {
+  hovered.value = value;
+  syncExpandedState();
+};
+
+const handleFocusIn = () => {
+  focusWithin.value = true;
+  syncExpandedState();
+};
+
+const handleFocusOut = (event) => {
+  if (event.currentTarget?.contains(event.relatedTarget)) {
+    return;
+  }
+
+  focusWithin.value = false;
+  syncExpandedState();
+};
 
 const canManageUsers = computed(() =>
   roleKey.value !== "EMPLOYEE" && hasAnyPermission(
@@ -54,14 +82,33 @@ const canManageDesignations = computed(() =>
   )
 );
 
-const canViewLeaves = computed(() =>
+const canViewOwnLeaves = computed(() =>
+  !isAdmin.value &&
+  !isSuperAdmin.value &&
   hasAnyPermission(
     "CREATE_LEAVE",
-    "VIEW_OWN_LEAVES",
+    "VIEW_OWN_LEAVES"
+  )
+);
+
+const canViewEmployeeLeaves = computed(() =>
+  isLeaveReviewer.value &&
+  hasAnyPermission(
     "VIEW_TEAM_LEAVES",
     "VIEW_ALL_LEAVES",
     "LIST_LEAVE_REQUESTS"
   )
+);
+
+const employeeLeavesActive = computed(() =>
+  route.path.startsWith("/dashboard/leaves") &&
+  (route.query.view === "employees" || (!canViewOwnLeaves.value && canViewEmployeeLeaves.value))
+);
+
+const ownLeavesActive = computed(() =>
+  route.path.startsWith("/dashboard/leaves") &&
+  canViewOwnLeaves.value &&
+  route.query.view !== "employees"
 );
 
 const canViewAttendance = computed(() =>
@@ -98,7 +145,14 @@ const canViewAttendanceComplaints = computed(() => {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--open': props.open }">
+  <aside
+    class="sidebar"
+    :class="{ 'sidebar--open': props.open }"
+    @mouseenter="setHovered(true)"
+    @mouseleave="setHovered(false)"
+    @focusin="handleFocusIn"
+    @focusout="handleFocusOut"
+  >
     <div class="logo">
       <span class="logo-mark">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -202,9 +256,12 @@ const canViewAttendanceComplaints = computed(() => {
       </NuxtLink>
 
       <NuxtLink
-        v-if="canViewLeaves"
-        to="/dashboard/leaves"
+        v-if="canViewOwnLeaves"
+        :to="{ path: '/dashboard/leaves', query: { view: 'own' } }"
         class="nav-item"
+        :class="{ 'router-link-active': ownLeavesActive }"
+        active-class=""
+        exact-active-class=""
         style="--i: 5"
       >
         <span class="nav-icon">
@@ -214,10 +271,29 @@ const canViewAttendanceComplaints = computed(() => {
             <path d="m8.5 15 2 2 4-4" />
           </svg>
         </span>
-        <span class="nav-label">Leave Requests</span>
+        <span class="nav-label">Own Leaves</span>
       </NuxtLink>
 
-      <NuxtLink v-if="canViewAttendance" to="/dashboard/attendance" class="nav-item" style="--i: 6">
+      <NuxtLink
+        v-if="canViewEmployeeLeaves"
+        :to="{ path: '/dashboard/leaves', query: { view: 'employees' } }"
+        class="nav-item"
+        :class="{ 'router-link-active': employeeLeavesActive }"
+        active-class=""
+        exact-active-class=""
+        style="--i: 6"
+      >
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="m17 11 2 2 4-4" />
+          </svg>
+        </span>
+        <span class="nav-label">Employee Leaves</span>
+      </NuxtLink>
+
+      <NuxtLink v-if="canViewAttendance" to="/dashboard/attendance" class="nav-item" style="--i: 7">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="9" />

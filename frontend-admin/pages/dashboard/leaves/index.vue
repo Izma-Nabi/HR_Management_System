@@ -11,10 +11,13 @@ definePageMeta({
 
 const {
   authUser,
-  role,
+  isSuperAdmin,
+  isAdmin,
+  isLeaveReviewer,
   hasPermission,
   hasAnyPermission
 } = useAuthUser();
+const route = useRoute();
 
 const loading = ref(false);
 const errorMessage = ref("");
@@ -29,6 +32,7 @@ const selectedRequestId = ref<number | null>(null);
 const decisionNote = ref("");
 
 const leaveRequests = ref<LeaveRequest[]>([]);
+let loadRequestId = 0;
 
 type LeaveStatus =
   | "PENDING"
@@ -67,21 +71,38 @@ type LeaveRequest = {
   };
 };
 
-const roleKey = computed(() => {
-  return String(role.value || "").toUpperCase();
-});
-
 const userCode = computed(() => {
   return authUser.value?.userCode || "";
 });
 
-const isSuperAdmin = computed(() => {
-  return roleKey.value === "SUPER_ADMIN";
+const canViewOwnLeaves = computed(() =>
+  !isAdmin.value &&
+  !isSuperAdmin.value &&
+  hasAnyPermission("CREATE_LEAVE", "VIEW_OWN_LEAVES")
+);
+
+const canViewEmployeeLeaves = computed(() =>
+  isLeaveReviewer.value &&
+  hasAnyPermission(
+    "LIST_LEAVE_REQUESTS",
+    "VIEW_ALL_LEAVES",
+    "VIEW_TEAM_LEAVES"
+  )
+);
+
+const viewMode = computed<"own" | "employees">(() => {
+  if (route.query.view === "employees" && canViewEmployeeLeaves.value) {
+    return "employees";
+  }
+
+  if (route.query.view === "own" && canViewOwnLeaves.value) {
+    return "own";
+  }
+
+  return canViewOwnLeaves.value ? "own" : "employees";
 });
 
-const isEmployee = computed(() => {
-  return roleKey.value === "EMPLOYEE";
-});
+const isOwnView = computed(() => viewMode.value === "own");
 
 const canApprove = computed(() =>
   hasAnyPermission("ACCEPT_LEAVE_REQUEST", "APPROVE_LEAVE")
@@ -92,7 +113,10 @@ const canReject = computed(() =>
 );
 
 const canCreateLeave = computed(() => {
-  return hasPermission("CREATE_LEAVE");
+  return isOwnView.value &&
+    !isAdmin.value &&
+    !isSuperAdmin.value &&
+    hasPermission("CREATE_LEAVE");
 });
 
 const canFilter = computed(() => {
@@ -104,17 +128,20 @@ const canFilter = computed(() => {
 });
 
 const loadLeaves = async () => {
+  const requestId = ++loadRequestId;
+  const ownView = isOwnView.value;
+
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    const response = isEmployee.value
+    const response = ownView
       ? await leaveService.getMyLeaveRequests()
       : await leaveService.getLeaveRequests();
 
     const rawLeaves = response?.data || [];
 
-    leaveRequests.value = rawLeaves.map((leave: any) => {
+    const mappedLeaves = rawLeaves.map((leave: any) => {
       const user = leave.user || {};
 
       const firstApproval =
@@ -122,7 +149,7 @@ const loadLeaves = async () => {
           ? leave.approvals[leave.approvals.length - 1]
           : null;
 
-      const requesterName = isEmployee.value
+      const requesterName = ownView
         ? `${authUser.value?.firstName || ""} ${
             authUser.value?.lastName || ""
           }`.trim() || "You"
@@ -130,7 +157,7 @@ const loadLeaves = async () => {
             user.lastName || ""
           }`.trim() || "Unknown User";
 
-      const requesterCode = isEmployee.value
+      const requesterCode = ownView
         ? authUser.value?.userCode || `USER-${leave.userId}`
         : user.userCode || `USER-${leave.userId}`;
 
@@ -204,6 +231,12 @@ const loadLeaves = async () => {
       };
     });
 
+    if (requestId !== loadRequestId) {
+      return;
+    }
+
+    leaveRequests.value = mappedLeaves;
+
     if (
       selectedRequestId.value === null &&
       leaveRequests.value.length > 0
@@ -211,6 +244,10 @@ const loadLeaves = async () => {
       selectedRequestId.value = leaveRequests.value[0].id;
     }
   } catch (error: any) {
+    if (requestId !== loadRequestId) {
+      return;
+    }
+
     console.error("Failed to load leaves:", error);
 
     errorMessage.value =
@@ -220,7 +257,9 @@ const loadLeaves = async () => {
 
     leaveRequests.value = [];
   } finally {
-    loading.value = false;
+    if (requestId === loadRequestId) {
+      loading.value = false;
+    }
   }
 };
 
@@ -250,7 +289,7 @@ const canRejectSelected = computed(() =>
 const filteredRequests = computed(() => {
   let requests = [...leaveRequests.value];
 
-  if (isEmployee.value) {
+  if (isOwnView.value) {
     requests = requests.filter(
       (request) => request.requesterCode === userCode.value
     );
@@ -287,7 +326,7 @@ const filteredRequests = computed(() => {
 });
 
 const summary = computed(() => {
-  const requests = isEmployee.value
+  const requests = isOwnView.value
     ? leaveRequests.value.filter(
         (request) =>
           request.requesterCode === userCode.value
@@ -436,21 +475,28 @@ watch(
   }
 );
 
-onMounted(() => {
-  loadLeaves();
-});
+watch(
+  viewMode,
+  () => {
+    selectedRequestId.value = null;
+    decisionNote.value = "";
+    loadLeaves();
+  }
+);
+
+onMounted(loadLeaves);
 </script>
 
 <template>
   <div class="page-header">
     <div>
       <h1>
-        {{ isEmployee ? "My Leaves" : "Leave Requests" }}
+        {{ isOwnView ? "Own Leaves" : "Employee Leaves" }}
       </h1>
 
       <p>
         {{
-          isEmployee
+          isOwnView
             ? "View and apply for your leaves"
             : "Review employee leave requests"
         }}

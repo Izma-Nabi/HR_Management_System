@@ -98,6 +98,49 @@ const permissionsFromRole = (role) => {
   return Array.from(permissions).sort();
 };
 
+const permissionsFromUser = (user) => {
+  const permissions = new Set(permissionsFromRole(user?.role));
+  const roleKey = toRoleKey(user?.role);
+  const designation = String(user?.designation?.designationName || "")
+    .trim()
+    .toLowerCase();
+  const isTeamLead = roleKey === ROLE_KEYS.TEAM_LEAD
+    || designation.includes("team lead")
+    || designation.includes("project manager");
+  const isHr = roleKey === ROLE_KEYS.HR
+    || designation === "hr"
+    || designation.startsWith("hr ")
+    || designation.includes("human resources");
+
+  if (isTeamLead) {
+    [
+      "CREATE_LEAVE",
+      "VIEW_OWN_LEAVES",
+      "CANCEL_LEAVE",
+      "VIEW_OWN_ATTENDANCE",
+      "VIEW_TEAM_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST"
+    ].forEach((permission) => permissions.add(permission));
+  }
+
+  if (isHr) {
+    [
+      "CREATE_LEAVE",
+      "VIEW_OWN_LEAVES",
+      "CANCEL_LEAVE",
+      "VIEW_OWN_ATTENDANCE",
+      "VIEW_ALL_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST"
+    ].forEach((permission) => permissions.add(permission));
+  }
+
+  return Array.from(permissions).sort();
+};
+
 const toSafeUser = (user) => {
   if (!user) {
     return null;
@@ -122,7 +165,7 @@ const toSafeUser = (user) => {
     departmentId: user.departmentId,
     department: user.department || null,
     managedDepartments: user.department ? [user.department] : [],
-    permissions: permissionsFromRole(user.role),
+    permissions: permissionsFromUser(user),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };

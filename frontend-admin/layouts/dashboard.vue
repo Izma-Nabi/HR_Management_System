@@ -1,11 +1,21 @@
 <template>
-  <div class="dashboard-layout">
+  <div
+    class="dashboard-layout"
+    :class="{ 'dashboard-layout--sidebar-expanded': sidebarExpanded }"
+  >
 
-    <Sidebar :open="sidebarOpen" @close="sidebarOpen = false" />
+    <Sidebar
+      :open="sidebarOpen"
+      @close="sidebarOpen = false"
+      @expanded-change="sidebarExpanded = $event"
+    />
 
     <div class="content-area">
 
-      <Header @toggle-menu="sidebarOpen = !sidebarOpen" />
+      <Header
+        :sidebar-expanded="sidebarExpanded"
+        @toggle-menu="sidebarOpen = !sidebarOpen"
+      />
 
       <main class="page-content">
         <slot />
@@ -23,6 +33,7 @@ import Header from "~/components/dashboard/Header.vue";
 
 const route = useRoute();
 const sidebarOpen = ref(false);
+const sidebarExpanded = ref(false);
 
 watch(
   () => route.fullPath,
@@ -47,6 +58,11 @@ watch(
   transition: margin-left 220ms var(--ease-out), width 220ms var(--ease-out);
 }
 
+.dashboard-layout--sidebar-expanded .content-area {
+  width: calc(100% - var(--sidebar-width));
+  margin-left: var(--sidebar-width);
+}
+
 .page-content {
   width: min(100%, 1600px);
   margin: 0 auto;
@@ -56,6 +72,11 @@ watch(
 
 @media (max-width: 980px) {
   .content-area {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .dashboard-layout--sidebar-expanded .content-area {
     width: 100%;
     margin-left: 0;
   }

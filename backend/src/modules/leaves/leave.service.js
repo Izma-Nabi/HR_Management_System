@@ -15,16 +15,22 @@ const hasAnyPermission = (user, ...permissions) => {
 };
 
 const designationName = (user) =>
-  String(user?.designation?.designationName || user?.designation || "").toLowerCase();
+  String(user?.designation?.designationName || user?.designation || "")
+    .trim()
+    .toLowerCase();
 
 const isHrActor = (user) => {
   const roleKey = toRoleKey(user?.role || user?.roleName);
   const normalizedRole = normalizeKey(user?.roleName || user?.role);
+  const designation = designationName(user);
 
   return [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.ADMIN, ROLE_KEYS.HR].includes(roleKey)
     || normalizedRole === "HUMAN_RESOURCES"
     || normalizedRole.startsWith("HR_")
-    || normalizedRole.endsWith("_HR");
+    || normalizedRole.endsWith("_HR")
+    || designation === "hr"
+    || designation.startsWith("hr ")
+    || designation.includes("human resources");
 };
 
 const isTeamLeadActor = (user) => {
@@ -415,6 +421,27 @@ const getHRUsers = async () => {
               "HUMAN_RESOURCES"
             ]
           }
+        }
+      },
+      {
+        designation: {
+          OR: [
+            {
+              designationName: {
+                equals: "HR"
+              }
+            },
+            {
+              designationName: {
+                startsWith: "HR "
+              }
+            },
+            {
+              designationName: {
+                contains: "Human Resources"
+              }
+            }
+          ]
         }
       }
     ]
