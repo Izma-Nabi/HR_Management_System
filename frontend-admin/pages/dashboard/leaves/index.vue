@@ -60,6 +60,11 @@ type LeaveRequest = {
   approverName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
+  workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";
+  allowedActions: {
+    accept: boolean;
+    reject: boolean;
+  };
 };
 
 const roleKey = computed(() => {
@@ -78,31 +83,24 @@ const isEmployee = computed(() => {
   return roleKey.value === "EMPLOYEE";
 });
 
-const canApprove = computed(() => hasPermission("APPROVE_LEAVE"));
+const canApprove = computed(() =>
+  hasAnyPermission("ACCEPT_LEAVE_REQUEST", "APPROVE_LEAVE")
+);
 
-const canReject = computed(() => hasPermission("REJECT_LEAVE"));
+const canReject = computed(() =>
+  hasAnyPermission("REJECT_LEAVE_REQUEST", "REJECT_LEAVE")
+);
 
 const canCreateLeave = computed(() => {
-  return ["ADMIN", "EMPLOYEE"].includes(roleKey.value);
+  return hasPermission("CREATE_LEAVE");
 });
 
 const canFilter = computed(() => {
   return hasAnyPermission(
     "VIEW_ALL_LEAVES",
-    "VIEW_TEAM_LEAVES"
+    "VIEW_TEAM_LEAVES",
+    "LIST_LEAVE_REQUESTS"
   );
-});
-
-const currentApproverLabel = computed(() => {
-  if (roleKey.value === "SUPER_ADMIN") {
-    return "Super Admin";
-  }
-
-  if (roleKey.value === "ADMIN") {
-    return "Admin";
-  }
-
-  return "Approver";
 });
 
 const loadLeaves = async () => {
@@ -190,6 +188,19 @@ const loadLeaves = async () => {
 
         decidedAt:
           firstApproval?.decidedAt || null,
+
+        workflowStage:
+          leave.workflowStage ||
+          (leave.status === "PENDING"
+            ? Number(leave.currentApprovalLevel) === 2
+              ? "TEAM_LEAD_REVIEW"
+              : "HR_REVIEW"
+            : "COMPLETED"),
+
+        allowedActions: {
+          accept: Boolean(leave.allowedActions?.accept),
+          reject: Boolean(leave.allowedActions?.reject),
+        },
       };
     });
 
@@ -221,6 +232,20 @@ const selectedRequest = computed(() => {
     ) || null
   );
 });
+
+const canApproveSelected = computed(() =>
+  Boolean(
+    canApprove.value &&
+    selectedRequest.value?.allowedActions.accept
+  )
+);
+
+const canRejectSelected = computed(() =>
+  Boolean(
+    canReject.value &&
+    selectedRequest.value?.allowedActions.reject
+  )
+);
 
 const filteredRequests = computed(() => {
   let requests = [...leaveRequests.value];
@@ -343,7 +368,9 @@ const updateDecision = async (status: "APPROVED" | "REJECTED") => {
   }
 
   const hasDecisionPermission =
-    status === "APPROVED" ? canApprove.value : canReject.value;
+    status === "APPROVED"
+      ? canApproveSelected.value
+      : canRejectSelected.value;
 
   if (!hasDecisionPermission) {
     errorMessage.value = `You do not have permission to ${status.toLowerCase()} leave requests.`;
@@ -358,16 +385,20 @@ const updateDecision = async (status: "APPROVED" | "REJECTED") => {
 
     const note = decisionNote.value.trim();
 
+    let response: any;
+
     if (status === "APPROVED") {
-      await leaveService.approveLeave(selectedRequest.value.id, note);
+      response = await leaveService.approveLeave(selectedRequest.value.id, note);
     } else {
-      await leaveService.rejectLeave(selectedRequest.value.id, note);
+      response = await leaveService.rejectLeave(selectedRequest.value.id, note);
     }
 
     decisionNote.value = "";
 
     await loadLeaves();
-    successMessage.value = `Leave request ${status.toLowerCase()} successfully.`;
+    successMessage.value =
+      response?.message ||
+      `Leave request ${status.toLowerCase()} successfully.`;
 
   } catch (error: any) {
     console.error(`Failed to ${status.toLowerCase()} leave:`, error);
@@ -471,8 +502,8 @@ onMounted(() => {
       :selected-request="selectedRequest"
       :decision-note="decisionNote"
       :format-date="formatDate"
-      :can-approve="canApprove"
-      :can-reject="canReject"
+      :can-approve="canApproveSelected"
+      :can-reject="canRejectSelected"
       :processing-decision="processingDecision"
       @update:decision-note="decisionNote = $event"
       @update-decision="updateDecision"

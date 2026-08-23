@@ -29,6 +29,11 @@ type LeaveRequest = {
   approverName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
+  workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";
+  allowedActions: {
+    accept: boolean;
+    reject: boolean;
+  };
 };
 
 const {
@@ -111,9 +116,21 @@ const emit = defineEmits<{
 
       <!-- Decision Summary (Visible to Everyone) -->
       <section class="decision-summary">
-        <h3>Decision</h3>
+        <h3>Workflow</h3>
 
-        <p>
+        <p v-if="selectedRequest.workflowStage === 'HR_REVIEW'">
+          Waiting for HR review.
+        </p>
+
+        <p v-else-if="selectedRequest.workflowStage === 'TEAM_LEAD_REVIEW'">
+          HR accepted this request. Waiting for Team Lead review.
+        </p>
+
+        <p v-else>
+          Review completed: {{ selectedRequest.status }}.
+        </p>
+
+        <p class="decision-note">
           {{ selectedRequest.decisionNote || "No note added." }}
         </p>
 
@@ -266,6 +283,10 @@ const emit = defineEmits<{
   margin: 0;
   color: #4b5563;
   line-height: 1.55;
+}
+
+.decision-summary .decision-note {
+  margin-top: 8px;
 }
 
 .decision-box {

@@ -1,5 +1,198 @@
 const { prisma } = require("../../../../database/prisma");
 const mailTransporter = require("../auth/mail.service");
+const { ApiError } = require("../../utils/apiResponse");
+const { ROLE_KEYS, toRoleKey } = require("../../utils/roles");
+
+const normalizeKey = (value) =>
+  String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+
+const permissionSet = (user) =>
+  new Set((user?.permissions || []).map(normalizeKey));
+
+const hasAnyPermission = (user, ...permissions) => {
+  const available = permissionSet(user);
+  return permissions.some((permission) => available.has(normalizeKey(permission)));
+};
+
+const designationName = (user) =>
+  String(user?.designation?.designationName || user?.designation || "").toLowerCase();
+
+const isHrActor = (user) => {
+  const roleKey = toRoleKey(user?.role || user?.roleName);
+  const normalizedRole = normalizeKey(user?.roleName || user?.role);
+
+  return [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.ADMIN, ROLE_KEYS.HR].includes(roleKey)
+    || normalizedRole === "HUMAN_RESOURCES"
+    || normalizedRole.startsWith("HR_")
+    || normalizedRole.endsWith("_HR");
+};
+
+const isTeamLeadActor = (user) => {
+  const roleKey = toRoleKey(user?.role || user?.roleName);
+  const designation = designationName(user);
+
+  return roleKey === ROLE_KEYS.TEAM_LEAD
+    || designation.includes("team lead")
+    || designation.includes("project manager");
+};
+
+const isSuperAdminActor = (user) =>
+  toRoleKey(user?.role || user?.roleName) === ROLE_KEYS.SUPER_ADMIN;
+
+const reviewerScopeWhere = (user) => {
+  if (
+    isHrActor(user)
+    || hasAnyPermission(user, "VIEW_ALL_LEAVES")
+  ) {
+    return {};
+  }
+
+  if (
+    isTeamLeadActor(user)
+    || hasAnyPermission(user, "VIEW_TEAM_LEAVES")
+  ) {
+    const departmentId = Number(user?.departmentId || user?.department?.id);
+
+    if (!departmentId) {
+      throw new ApiError(403, "A Team Lead must be assigned to a department");
+    }
+
+    return {
+      user: {
+        departmentId
+      }
+    };
+  }
+
+  throw new ApiError(403, "You are not allowed to list employee leave requests");
+};
+
+const workflowStage = (leaveRequest) => {
+  if (leaveRequest.status !== "PENDING") {
+    return "COMPLETED";
+  }
+
+  return Number(leaveRequest.currentApprovalLevel) === 2
+    ? "TEAM_LEAD_REVIEW"
+    : "HR_REVIEW";
+};
+
+const actorCanReviewStage = (leaveRequest, user) => {
+  if (!leaveRequest || leaveRequest.status !== "PENDING") {
+    return false;
+  }
+
+  if (Number(leaveRequest.userId) === Number(user?.id)) {
+    return false;
+  }
+
+  const stage = workflowStage(leaveRequest);
+
+  if (stage === "HR_REVIEW") {
+    return isHrActor(user);
+  }
+
+  const reviewerDepartmentId = Number(user?.departmentId || user?.department?.id);
+  const requesterDepartmentId = Number(
+    leaveRequest.user?.departmentId || leaveRequest.user?.department?.id
+  );
+
+  return isTeamLeadActor(user)
+    && Number(leaveRequest.reportingToId) === Number(user?.id)
+    && reviewerDepartmentId > 0
+    && reviewerDepartmentId === requesterDepartmentId;
+};
+
+const withWorkflowMetadata = (leaveRequest, user) => {
+  if (!leaveRequest) {
+    return null;
+  }
+
+  const canReview = actorCanReviewStage(leaveRequest, user);
+  const canAccept = isSuperAdminActor(user)
+    || hasAnyPermission(user, "ACCEPT_LEAVE_REQUEST", "APPROVE_LEAVE");
+  const canReject = isSuperAdminActor(user)
+    || hasAnyPermission(user, "REJECT_LEAVE_REQUEST", "REJECT_LEAVE");
+
+  return {
+    ...leaveRequest,
+    workflowStage: workflowStage(leaveRequest),
+    allowedActions: {
+      accept: canReview && canAccept,
+      reject: canReview && canReject
+    }
+  };
+};
+
+const escapeHtml = (value) => String(value ?? "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#039;");
+
+const portalLeavesUrl = () => {
+  const baseUrl = String(process.env.FRONTEND_URL || "http://localhost:3000")
+    .trim()
+    .replace(/\/$/, "");
+
+  return `${baseUrl}/dashboard/leaves`;
+};
+
+const sendMailSafely = async (options, context) => {
+  try {
+    await mailTransporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      ...options
+    });
+  } catch (error) {
+    console.error(`${context} email failed:`, error);
+  }
+};
+
+const sendTeamLeadReviewEmail = async (leaveRequest) => {
+  if (!leaveRequest.reportingTo?.email) {
+    return;
+  }
+
+  const employeeName = `${leaveRequest.user?.firstName || ""} ${leaveRequest.user?.lastName || ""}`.trim();
+
+  await sendMailSafely({
+    to: leaveRequest.reportingTo.email,
+    subject: `HR accepted leave request #${leaveRequest.id} - Team Lead review required`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#222">
+        <h2>Team Lead Review Required</h2>
+        <p>HR accepted the leave request from <strong>${escapeHtml(employeeName)}</strong>.</p>
+        <p>Please log in to the portal to accept or reject request <strong>#${leaveRequest.id}</strong>.</p>
+        <p><a href="${escapeHtml(portalLeavesUrl())}">Open Leave Requests</a></p>
+      </div>
+    `
+  }, "Team Lead review");
+};
+
+const sendEmployeeDecisionEmail = async (leaveRequest, accepted, decisionNote) => {
+  if (!leaveRequest.user?.email) {
+    return;
+  }
+
+  const decision = accepted ? "accepted" : "rejected";
+  const employeeName = `${leaveRequest.user.firstName || ""} ${leaveRequest.user.lastName || ""}`.trim();
+
+  await sendMailSafely({
+    to: leaveRequest.user.email,
+    subject: `Your leave request #${leaveRequest.id} was ${decision}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#222">
+        <h2>Leave Request ${accepted ? "Accepted" : "Rejected"}</h2>
+        <p>Hello ${escapeHtml(employeeName)},</p>
+        <p>Your leave request <strong>#${leaveRequest.id}</strong> was ${decision}.</p>
+        ${decisionNote ? `<p><strong>Decision note:</strong> ${escapeHtml(decisionNote)}</p>` : ""}
+        <p><a href="${escapeHtml(portalLeavesUrl())}">View Leave Request</a></p>
+      </div>
+    `
+  }, `Employee leave ${decision}`);
+};
 
 const getLeaveApprovers = async (userId) => {
   const currentUser = await prisma.user.findUnique({
@@ -27,20 +220,31 @@ const getLeaveApprovers = async (userId) => {
         not: currentUser.id
       },
       employmentStatus: "ACTIVE",
-      designation: {
-        OR: [
-          {
-            designationName: {
-              contains: "Team Lead"
-            }
-          },
-          {
-            designationName: {
-              contains: "Project Manager"
+      OR: [
+        {
+          role: {
+            roleName: {
+              in: ["Team Lead", "TEAM_LEAD", "TEAM LEAD", "Project Manager"]
             }
           }
-        ]
-      }
+        },
+        {
+          designation: {
+            OR: [
+              {
+                designationName: {
+                  contains: "Team Lead"
+                }
+              },
+              {
+                designationName: {
+                  contains: "Project Manager"
+                }
+              }
+            ]
+          },
+        }
+      ]
     },
     select: {
       id: true,
@@ -143,20 +347,31 @@ const getBackupEmployees = async (userId) => {
       },
       employmentStatus: "ACTIVE",
       NOT: {
-        designation: {
-          OR: [
-            {
-              designationName: {
-                contains: "Team Lead"
-              }
-            },
-            {
-              designationName: {
-                contains: "Project Manager"
+        OR: [
+          {
+            role: {
+              roleName: {
+                in: ["Team Lead", "TEAM_LEAD", "TEAM LEAD", "Project Manager"]
               }
             }
-          ]
-        }
+          },
+          {
+            designation: {
+              OR: [
+                {
+                  designationName: {
+                    contains: "Team Lead"
+                  }
+                },
+                {
+                  designationName: {
+                    contains: "Project Manager"
+                  }
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     select: {
@@ -182,7 +397,7 @@ const getBackupEmployees = async (userId) => {
   });
 };
 
-const getHRUsers = async (departmentId = null) => {
+const getHRUsers = async () => {
   const where = {
     employmentStatus: "ACTIVE",
     OR: [
@@ -192,27 +407,18 @@ const getHRUsers = async (departmentId = null) => {
       {
         role: {
           roleName: {
-            in: ["Admin", "HR"]
+            in: [
+              "Admin",
+              "ADMIN",
+              "HR",
+              "Human Resources",
+              "HUMAN_RESOURCES"
+            ]
           }
         }
       }
     ]
   };
-
-  if (departmentId) {
-    where.AND = [
-      {
-        OR: [
-          {
-            departmentId: Number(departmentId)
-          },
-          {
-            email: "hr@company.com"
-          }
-        ]
-      }
-    ];
-  }
 
   return prisma.user.findMany({
     where,
@@ -342,6 +548,7 @@ const createLeave = async (
     reportingTo.designation?.designationName || "";
 
   const isValidApprover =
+    toRoleKey(reportingTo.role) === ROLE_KEYS.TEAM_LEAD ||
     designationName.toLowerCase().includes("team lead") ||
     designationName.toLowerCase().includes("project manager");
 
@@ -369,6 +576,12 @@ const createLeave = async (
           select: {
             id: true,
             designationName: true
+          }
+        },
+        role: {
+          select: {
+            id: true,
+            roleName: true
           }
         }
       }
@@ -403,6 +616,7 @@ const createLeave = async (
       backupEmployee.designation?.designationName || "";
 
     const isManager =
+      toRoleKey(backupEmployee.role) === ROLE_KEYS.TEAM_LEAD ||
       backupDesignation.toLowerCase().includes("team lead") ||
       backupDesignation.toLowerCase().includes("project manager");
 
@@ -427,7 +641,7 @@ const createLeave = async (
       reason: reason || null,
       status: "PENDING",
       currentApprovalLevel: 1,
-      currentRefersTo: reportingTo.id
+      currentRefersTo: null
     },
     include: {
       user: {
@@ -476,7 +690,7 @@ const createLeave = async (
     }
   });
 
-  const hrUsers = await getHRUsers(requester.departmentId);
+  const hrUsers = await getHRUsers();
 
   const fallbackHrEmail = (
     process.env.HR_EMAIL || "hr@company.com"
@@ -499,7 +713,7 @@ const createLeave = async (
   if (fullLeaveRecipients.length > 0) {
     try {
       await mailTransporter.sendMail({
-        from: process.env.SMTP_USER,
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: fullLeaveRecipients.join(","),
         subject: `New Leave Request #${leaveRequest.id}`,
         html: `
@@ -585,7 +799,12 @@ const createLeave = async (
             <hr>
 
             <p>
-              Please review this leave request in the Attendance Management System.
+              HR must review this request first. The Team Lead will be able to decide
+              after HR accepts it. Please log in to the Attendance Management System.
+            </p>
+
+            <p>
+              <a href="${escapeHtml(portalLeavesUrl())}">Open Leave Requests</a>
             </p>
           </div>
         `
@@ -605,7 +824,7 @@ const createLeave = async (
   if (backupEmployee?.email) {
     try {
       await mailTransporter.sendMail({
-        from: process.env.SMTP_USER,
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: backupEmployee.email,
         subject: `Backup Assignment for Leave Request #${leaveRequest.id}`,
         html: `
@@ -657,7 +876,8 @@ const createLeave = async (
 };
 
 const getLeaveRequests = async (user) => {
-  return prisma.leaveRequest.findMany({
+  const requests = await prisma.leaveRequest.findMany({
+    where: reviewerScopeWhere(user),
     include: {
       user: {
         select: {
@@ -666,6 +886,7 @@ const getLeaveRequests = async (user) => {
           lastName: true,
           email: true,
           userCode: true,
+          departmentId: true,
           role: {
             select: {
               id: true,
@@ -736,12 +957,15 @@ const getLeaveRequests = async (user) => {
       createdAt: "desc"
     }
   });
+
+  return requests.map((request) => withWorkflowMetadata(request, user));
 };
 
-const getLeaveRequest = async (id) => {
-  return prisma.leaveRequest.findUnique({
+const getLeaveRequest = async (id, user) => {
+  const request = await prisma.leaveRequest.findFirst({
     where: {
-      id: Number(id)
+      id: Number(id),
+      ...reviewerScopeWhere(user)
     },
     include: {
       user: {
@@ -751,6 +975,7 @@ const getLeaveRequest = async (id) => {
           lastName: true,
           email: true,
           userCode: true,
+          departmentId: true,
           department: true,
           role: true,
           designation: true
@@ -798,6 +1023,8 @@ const getLeaveRequest = async (id) => {
       }
     }
   });
+
+  return withWorkflowMetadata(request, user);
 };
 
 const leaveDatesInclusive = (startDate, endDate) => {
@@ -948,135 +1175,140 @@ const approveLeave = async (
   const approverId = Number(user.id);
 
   if (!id || !approverId) {
-    throw new Error(
-      "Invalid leave ID or approver ID."
-    );
+    throw new ApiError(400, "Invalid leave ID or approver ID");
   }
 
-  const updatedLeave =
-    await prisma.$transaction(
-      async (tx) => {
-        const leaveRequest =
-          await tx.leaveRequest.findUnique({
-            where: {
-              id
-            },
-            include: {
-              approvals: {
-                orderBy: {
-                  approvalLevel: "asc"
-                }
-              }
-            }
-          });
-
-        if (!leaveRequest) {
-          const error = new Error(
-            "Leave request not found."
-          );
-          error.statusCode = 404;
-          throw error;
+  const updatedLeave = await prisma.$transaction(async (tx) => {
+    const leaveRequest = await tx.leaveRequest.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            departmentId: true,
+            designationId: true
+          }
         }
+      }
+    });
 
-        if (leaveRequest.status !== "PENDING") {
-          const error = new Error(
-            `Leave request is already ${leaveRequest.status.toLowerCase()}.`
-          );
-          error.statusCode = 400;
-          throw error;
-        }
+    if (!leaveRequest) {
+      throw new ApiError(404, "Leave request not found");
+    }
 
-        const pendingApproval =
-          await tx.leaveApproval.findFirst({
-            where: {
-              leaveRequestId: id,
-              refersTo: approverId,
-              status: "PENDING"
-            },
-            orderBy: {
-              approvalLevel: "asc"
-            }
-          });
+    if (leaveRequest.status !== "PENDING") {
+      throw new ApiError(
+        409,
+        `Leave request is already ${leaveRequest.status.toLowerCase()}`
+      );
+    }
 
-        const approvalData = {
+    if (!actorCanReviewStage(leaveRequest, user)) {
+      const stageLabel = workflowStage(leaveRequest) === "HR_REVIEW"
+        ? "HR"
+        : "the selected Team Lead";
+      throw new ApiError(403, `This request must be reviewed by ${stageLabel}`);
+    }
+
+    const approvalLevel = Number(leaveRequest.currentApprovalLevel) === 2 ? 2 : 1;
+    const isFinalApproval = approvalLevel === 2;
+    const requestUpdate = isFinalApproval
+      ? {
           status: "APPROVED",
-          action: "APPROVED",
-          decisionNote,
-          decidedAt: new Date()
+          currentRefersTo: null
+        }
+      : {
+          currentApprovalLevel: 2,
+          currentRefersTo: leaveRequest.reportingToId
         };
 
-        if (pendingApproval) {
-          await tx.leaveApproval.update({
-            where: {
-              id: pendingApproval.id
-            },
-            data: approvalData
-          });
-        } else {
-          await tx.leaveApproval.create({
-            data: {
-              leaveRequestId: id,
-              refersTo: approverId,
-              approvalLevel:
-                leaveRequest.currentApprovalLevel ||
-                1,
-              ...approvalData
-            }
-          });
-        }
+    if (!isFinalApproval && !leaveRequest.reportingToId) {
+      throw new ApiError(409, "The leave request has no Team Lead assigned");
+    }
 
-        const updated =
-          await tx.leaveRequest.update({
-            where: {
-              id
-            },
-            data: {
-              status: "APPROVED",
-              currentRefersTo: null
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  userCode: true,
-                  departmentId: true,
-                  designationId: true
-                }
-              },
-              approvals: {
-                include: {
-                  approver: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true
-                    }
-                  }
-                },
-                orderBy: {
-                  approvalLevel: "asc"
-                }
+    const updateResult = await tx.leaveRequest.updateMany({
+      where: {
+        id,
+        status: "PENDING",
+        currentApprovalLevel: approvalLevel,
+        ...(isFinalApproval ? { currentRefersTo: approverId } : {})
+      },
+      data: requestUpdate
+    });
+
+    if (updateResult.count !== 1) {
+      throw new ApiError(409, "This leave request was already reviewed by another user");
+    }
+
+    await tx.leaveApproval.create({
+      data: {
+        leaveRequestId: id,
+        refersTo: approverId,
+        approvalLevel,
+        status: "APPROVED",
+        action: "APPROVED",
+        decisionNote,
+        decidedAt: new Date()
+      }
+    });
+
+    const updated = await tx.leaveRequest.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            userCode: true,
+            departmentId: true,
+            designationId: true,
+            department: true
+          }
+        },
+        reportingTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        approvals: {
+          include: {
+            approver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
               }
             }
-          });
-
-        await persistApprovedLeaveAttendance(
-          tx,
-          updated
-        );
-
-        return updated;
-      },
-      {
-        timeout: 60000
+          },
+          orderBy: {
+            approvalLevel: "asc"
+          }
+        }
       }
-    );
+    });
 
-  return updatedLeave;
+    if (isFinalApproval) {
+      await persistApprovedLeaveAttendance(tx, updated);
+    }
+
+    return updated;
+  }, {
+    timeout: 60000
+  });
+
+  if (updatedLeave.status === "APPROVED") {
+    await sendEmployeeDecisionEmail(updatedLeave, true, decisionNote);
+  } else {
+    await sendTeamLeadReviewEmail(updatedLeave);
+  }
+
+  return withWorkflowMetadata(updatedLeave, user);
 };
 
 const rejectLeave = async (
@@ -1088,126 +1320,114 @@ const rejectLeave = async (
   const approverId = Number(user.id);
 
   if (!id || !approverId) {
-    throw new Error(
-      "Invalid leave ID or approver ID."
-    );
+    throw new ApiError(400, "Invalid leave ID or approver ID");
   }
 
-  const leaveRequest =
-    await prisma.leaveRequest.findUnique({
-      where: {
-        id
-      },
+  const updatedLeave = await prisma.$transaction(async (tx) => {
+    const leaveRequest = await tx.leaveRequest.findUnique({
+      where: { id },
       include: {
+        user: {
+          select: {
+            id: true,
+            departmentId: true
+          }
+        }
+      }
+    });
+
+    if (!leaveRequest) {
+      throw new ApiError(404, "Leave request not found");
+    }
+
+    if (leaveRequest.status !== "PENDING") {
+      throw new ApiError(
+        409,
+        `Leave request is already ${leaveRequest.status.toLowerCase()}`
+      );
+    }
+
+    if (!actorCanReviewStage(leaveRequest, user)) {
+      const stageLabel = workflowStage(leaveRequest) === "HR_REVIEW"
+        ? "HR"
+        : "the selected Team Lead";
+      throw new ApiError(403, `This request must be reviewed by ${stageLabel}`);
+    }
+
+    const approvalLevel = Number(leaveRequest.currentApprovalLevel) === 2 ? 2 : 1;
+    const updateResult = await tx.leaveRequest.updateMany({
+      where: {
+        id,
+        status: "PENDING",
+        currentApprovalLevel: approvalLevel,
+        ...(approvalLevel === 2 ? { currentRefersTo: approverId } : {})
+      },
+      data: {
+        status: "REJECTED",
+        currentRefersTo: null
+      }
+    });
+
+    if (updateResult.count !== 1) {
+      throw new ApiError(409, "This leave request was already reviewed by another user");
+    }
+
+    await tx.leaveApproval.create({
+      data: {
+        leaveRequestId: id,
+        refersTo: approverId,
+        approvalLevel,
+        status: "REJECTED",
+        action: "REJECTED",
+        decisionNote,
+        decidedAt: new Date()
+      }
+    });
+
+    return tx.leaveRequest.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            departmentId: true,
+            department: true
+          }
+        },
+        reportingTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        backupEmployee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
         approvals: {
+          include: {
+            approver: true
+          },
           orderBy: {
             approvalLevel: "asc"
           }
         }
       }
     });
-
-  if (!leaveRequest) {
-    const error = new Error(
-      "Leave request not found."
-    );
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (leaveRequest.status !== "PENDING") {
-    const error = new Error(
-      `Leave request is already ${leaveRequest.status.toLowerCase()}.`
-    );
-    error.statusCode = 400;
-    throw error;
-  }
-
-  let approval =
-    await prisma.leaveApproval.findFirst({
-      where: {
-        leaveRequestId: id,
-        refersTo: approverId,
-        status: "PENDING"
-      },
-      orderBy: {
-        approvalLevel: "asc"
-      }
-    });
-
-  if (!approval) {
-    approval =
-      await prisma.leaveApproval.create({
-        data: {
-          leaveRequestId: id,
-          refersTo: approverId,
-          approvalLevel:
-            leaveRequest.currentApprovalLevel ||
-            1,
-          status: "REJECTED",
-          action: "REJECTED",
-          decisionNote,
-          decidedAt: new Date()
-        }
-      });
-  } else {
-    approval =
-      await prisma.leaveApproval.update({
-        where: {
-          id: approval.id
-        },
-        data: {
-          status: "REJECTED",
-          action: "REJECTED",
-          decisionNote,
-          decidedAt: new Date()
-        }
-      });
-  }
-
-  return prisma.leaveRequest.update({
-    where: {
-      id
-    },
-    data: {
-      status: "REJECTED",
-      currentRefersTo: null
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true
-        }
-      },
-      reportingTo: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true
-        }
-      },
-      backupEmployee: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true
-        }
-      },
-      approvals: {
-        include: {
-          approver: true
-        },
-        orderBy: {
-          approvalLevel: "asc"
-        }
-      }
-    }
   });
+
+  await sendEmployeeDecisionEmail(updatedLeave, false, decisionNote);
+
+  return withWorkflowMetadata(updatedLeave, user);
 };
 
 const getMyLeaves = async (userId) => {

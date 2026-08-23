@@ -59,7 +59,8 @@ const canViewLeaves = computed(() =>
     "CREATE_LEAVE",
     "VIEW_OWN_LEAVES",
     "VIEW_TEAM_LEAVES",
-    "VIEW_ALL_LEAVES"
+    "VIEW_ALL_LEAVES",
+    "LIST_LEAVE_REQUESTS"
   )
 );
 

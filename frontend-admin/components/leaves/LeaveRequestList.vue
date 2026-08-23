@@ -29,6 +29,11 @@ type LeaveRequest = {
   approverName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
+  workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";
+  allowedActions: {
+    accept: boolean;
+    reject: boolean;
+  };
 };
 
 const props = defineProps<{
@@ -82,6 +87,10 @@ const emit = defineEmits<{
         -
         {{ props.formatDate(request.endDate) }}
       </div>
+
+      <div v-if="request.status === 'PENDING'" class="workflow-stage">
+        {{ request.workflowStage === "HR_REVIEW" ? "Waiting for HR" : "Waiting for Team Lead" }}
+      </div>
     </div>
 
     <div
@@ -132,9 +141,16 @@ const emit = defineEmits<{
 
 .request-main span,
 .request-meta,
-.date-range {
+.date-range,
+.workflow-stage {
   color: #6b7280;
   font-size: 13px;
+}
+
+.workflow-stage {
+  margin-top: 7px;
+  color: #92400e;
+  font-weight: 800;
 }
 
 .request-meta {

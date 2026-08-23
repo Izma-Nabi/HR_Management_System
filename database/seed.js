@@ -7,6 +7,8 @@ const prisma = new PrismaClient();
 const roles = [
   { roleName: "Super Admin" },
   { roleName: "Admin" },
+  { roleName: "HR" },
+  { roleName: "Team Lead" },
   { roleName: "Employee" }
 ];
 
@@ -99,6 +101,9 @@ const permissions = [
   "VIEW_OWN_LEAVES",
   "VIEW_TEAM_LEAVES",
   "VIEW_ALL_LEAVES",
+  "LIST_LEAVE_REQUESTS",
+  "ACCEPT_LEAVE_REQUEST",
+  "REJECT_LEAVE_REQUEST",
   "APPROVE_LEAVE",
   "REJECT_LEAVE",
   "CANCEL_LEAVE"
@@ -136,6 +141,9 @@ const rolePermissionGroups = [
       "VIEW_REPORTS",
       "VIEW_ALL_LEAVES",
       "VIEW_TEAM_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST",
       "APPROVE_LEAVE",
       "REJECT_LEAVE"
     ]
@@ -155,8 +163,36 @@ const rolePermissionGroups = [
       "VIEW_OWN_LEAVES",
       "VIEW_ALL_LEAVES",
       "VIEW_TEAM_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST",
       "APPROVE_LEAVE",
       "REJECT_LEAVE",
+      "CANCEL_LEAVE"
+    ]
+  },
+  {
+    roleNames: ["HR", "Human Resources", "HUMAN_RESOURCES"],
+    permissions: [
+      "CREATE_LEAVE",
+      "VIEW_OWN_LEAVES",
+      "VIEW_ALL_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST",
+      "CANCEL_LEAVE"
+    ]
+  },
+  {
+    roleNames: ["Team Lead", "TEAM_LEAD", "TEAM LEAD", "Project Manager"],
+    permissions: [
+      "CREATE_LEAVE",
+      "VIEW_OWN_ATTENDANCE",
+      "VIEW_OWN_LEAVES",
+      "VIEW_TEAM_LEAVES",
+      "LIST_LEAVE_REQUESTS",
+      "ACCEPT_LEAVE_REQUEST",
+      "REJECT_LEAVE_REQUEST",
       "CANCEL_LEAVE"
     ]
   },

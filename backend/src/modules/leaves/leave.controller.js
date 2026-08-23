@@ -171,7 +171,7 @@ const getLeaveRequest = async (req, res, next) => {
       });
     }
 
-    const data = await leavesService.getLeaveRequest(id);
+    const data = await leavesService.getLeaveRequest(id, req.user);
 
     if (!data) {
       return res.status(404).json({
@@ -266,7 +266,9 @@ const approveLeave = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       statusCode: 200,
-      message: "Leave request approved successfully",
+      message: data.status === "PENDING"
+        ? "HR accepted the leave request and forwarded it to the Team Lead"
+        : "Leave request approved successfully",
       data,
     });
   } catch (error) {

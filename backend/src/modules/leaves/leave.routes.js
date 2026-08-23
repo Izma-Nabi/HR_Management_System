@@ -3,7 +3,7 @@ const router = require("express").Router();
 const auth = require("../../middlewares/auth.middleware");
 const {
   requirePermission,
-  requireAnyRole,
+  requireAnyPermission,
 } = require("../../middlewares/permission.middleware");
 
 const leaveController = require("./leave.controller");
@@ -12,7 +12,11 @@ const leaveController = require("./leave.controller");
 router.get(
   "/",
   auth,
-  requirePermission("VIEW_ALL_LEAVES"),
+  requireAnyPermission(
+    "LIST_LEAVE_REQUESTS",
+    "VIEW_ALL_LEAVES",
+    "VIEW_TEAM_LEAVES"
+  ),
   leaveController.getLeaveRequests
 );
 
@@ -52,7 +56,6 @@ router.get(
 router.post(
   "/",
   auth,
-  requireAnyRole("ADMIN", "EMPLOYEE"),
   requirePermission("CREATE_LEAVE"),
   leaveController.createLeave
 );
@@ -61,7 +64,11 @@ router.post(
 router.get(
   "/:id",
   auth,
-  requirePermission("VIEW_ALL_LEAVES"),
+  requireAnyPermission(
+    "LIST_LEAVE_REQUESTS",
+    "VIEW_ALL_LEAVES",
+    "VIEW_TEAM_LEAVES"
+  ),
   leaveController.getLeaveRequest
 );
 
@@ -69,7 +76,10 @@ router.get(
 router.patch(
   "/:id/approve",
   auth,
-  requirePermission("APPROVE_LEAVE"),
+  requireAnyPermission(
+    "ACCEPT_LEAVE_REQUEST",
+    "APPROVE_LEAVE"
+  ),
   leaveController.approveLeave
 );
 
@@ -77,7 +87,10 @@ router.patch(
 router.patch(
   "/:id/reject",
   auth,
-  requirePermission("REJECT_LEAVE"),
+  requireAnyPermission(
+    "REJECT_LEAVE_REQUEST",
+    "REJECT_LEAVE"
+  ),
   leaveController.rejectLeave
 );
 

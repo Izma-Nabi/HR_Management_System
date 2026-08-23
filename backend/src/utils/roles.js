@@ -1,6 +1,8 @@
 const ROLE_KEYS = {
   SUPER_ADMIN: "SUPER_ADMIN",      
   ADMIN: "ADMIN",
+  HR: "HR",
+  TEAM_LEAD: "TEAM_LEAD",
   EMPLOYEE: "EMPLOYEE"
 };
 
@@ -14,6 +16,20 @@ const ROLE_NAME_ALIASES = {
   [ROLE_KEYS.ADMIN]: [
     "Admin",
     "ADMIN"
+  ],
+
+  [ROLE_KEYS.HR]: [
+    "HR",
+    "Human Resources",
+    "HUMAN_RESOURCES"
+  ],
+
+  [ROLE_KEYS.TEAM_LEAD]: [
+    "Team Lead",
+    "TEAM_LEAD",
+    "TEAM LEAD",
+    "Project Manager",
+    "PROJECT_MANAGER"
   ],
 
   [ROLE_KEYS.EMPLOYEE]: [
@@ -46,12 +62,16 @@ const ROLE_KEY_BY_ALIAS = Object.entries(ROLE_NAME_ALIASES).reduce(
 const DASHBOARD_BY_ROLE = {
   [ROLE_KEYS.SUPER_ADMIN]: "SUPER_ADMIN",
   [ROLE_KEYS.ADMIN]: "ADMIN",
+  [ROLE_KEYS.HR]: "HR",
+  [ROLE_KEYS.TEAM_LEAD]: "TEAM_LEAD",
   [ROLE_KEYS.EMPLOYEE]: "EMPLOYEE"
 };
 
 const LEAVE_APPROVAL_LEVEL = {
   [ROLE_KEYS.ADMIN]: 1,
-  [ROLE_KEYS.SUPER_ADMIN]: 2
+  [ROLE_KEYS.HR]: 1,
+  [ROLE_KEYS.SUPER_ADMIN]: 1,
+  [ROLE_KEYS.TEAM_LEAD]: 2
 };
 
 const toRoleKey = (role) => {
@@ -120,6 +140,12 @@ const isAdmin = (role) =>
 const isEmployee = (role) =>
   toRoleKey(role) === ROLE_KEYS.EMPLOYEE;
 
+const isHr = (role) =>
+  [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.ADMIN, ROLE_KEYS.HR].includes(toRoleKey(role));
+
+const isTeamLead = (role) =>
+  toRoleKey(role) === ROLE_KEYS.TEAM_LEAD;
+
 module.exports = {
   ROLE_KEYS,
   ROLE_NAME_ALIASES,
@@ -132,5 +158,7 @@ module.exports = {
   getApprovalLevel,
   isSuperAdmin,
   isAdmin,
+  isHr,
+  isTeamLead,
   isEmployee
 };

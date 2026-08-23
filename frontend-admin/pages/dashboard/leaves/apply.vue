@@ -7,7 +7,7 @@ definePageMeta({
 
 const router = useRouter();
 
-const { roleKey } = useAuthUser();
+const { hasPermission } = useAuthUser();
 
 const loadingOptions = ref(false);
 const submitting = ref(false);
@@ -100,9 +100,7 @@ const loadLeaveOptions = async () => {
 };
 
 onMounted(async () => {
-  const currentRole = String(roleKey.value || "").toUpperCase();
-
-  if (!["ADMIN", "EMPLOYEE"].includes(currentRole)) {
+  if (!hasPermission("CREATE_LEAVE")) {
     await router.replace("/dashboard/leaves");
     return;
   }
@@ -111,10 +109,8 @@ onMounted(async () => {
 });
 
 const canApplyLeave = computed(() => {
-  const currentRole = String(roleKey.value || "").toUpperCase();
-
   return (
-    ["ADMIN", "EMPLOYEE"].includes(currentRole) &&
+    hasPermission("CREATE_LEAVE") &&
     form.type !== "" &&
     form.startDate !== "" &&
     form.endDate !== "" &&
