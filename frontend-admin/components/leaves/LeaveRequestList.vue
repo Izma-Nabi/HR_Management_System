@@ -27,6 +27,7 @@ type LeaveRequest = {
   reason: string;
   submittedAt: string;
   approverName: string | null;
+  assignedReviewerName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
   workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";

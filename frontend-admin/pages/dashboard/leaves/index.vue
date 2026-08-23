@@ -62,6 +62,7 @@ type LeaveRequest = {
   reason: string;
   submittedAt: string;
   approverName: string | null;
+  assignedReviewerName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
   workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";
@@ -210,6 +211,12 @@ const loadLeaves = async () => {
               }`.trim()
             : null,
 
+        assignedReviewerName: leave.reportingTo
+          ? `${leave.reportingTo.firstName || ""} ${
+              leave.reportingTo.lastName || ""
+            }`.trim() || null
+          : null,
+
         decisionNote:
           firstApproval?.decisionNote || null,
 
@@ -285,6 +292,36 @@ const canRejectSelected = computed(() =>
     selectedRequest.value?.allowedActions.reject
   )
 );
+
+const showDecisionControls = computed(() =>
+  !isOwnView.value &&
+  selectedRequest.value?.status === "PENDING" &&
+  (canApprove.value || canReject.value)
+);
+
+const reviewAvailabilityMessage = computed(() => {
+  const request = selectedRequest.value;
+
+  if (!request || request.status !== "PENDING") {
+    return "";
+  }
+
+  if (canApproveSelected.value || canRejectSelected.value) {
+    return "This request is ready for your decision.";
+  }
+
+  if (request.workflowStage === "HR_REVIEW") {
+    return "Approve and Reject will unlock after HR accepts this request.";
+  }
+
+  if (request.workflowStage === "TEAM_LEAD_REVIEW") {
+    return request.assignedReviewerName
+      ? `This request is assigned to ${request.assignedReviewerName}. Only the assigned Team Lead can approve or reject it.`
+      : "Only the assigned Team Lead can approve or reject this request.";
+  }
+
+  return "This request is not available for review.";
+});
 
 const filteredRequests = computed(() => {
   let requests = [...leaveRequests.value];
@@ -491,7 +528,7 @@ onMounted(loadLeaves);
   <div class="page-header">
     <div>
       <h1>
-        {{ isOwnView ? "Own Leaves" : "Employee Leaves" }}
+        {{ isOwnView ? "My Leaves" : "Employee Leaves" }}
       </h1>
 
       <p>
@@ -548,8 +585,12 @@ onMounted(loadLeaves);
       :selected-request="selectedRequest"
       :decision-note="decisionNote"
       :format-date="formatDate"
+      :show-decision-controls="showDecisionControls"
+      :show-approve-action="canApprove"
+      :show-reject-action="canReject"
       :can-approve="canApproveSelected"
       :can-reject="canRejectSelected"
+      :review-availability-message="reviewAvailabilityMessage"
       :processing-decision="processingDecision"
       @update:decision-note="decisionNote = $event"
       @update-decision="updateDecision"

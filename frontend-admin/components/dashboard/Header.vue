@@ -92,7 +92,7 @@ const pageTitle = computed(() => {
       || isAdmin.value
       || isSuperAdmin.value;
 
-    return employeeView ? "Employee leaves" : "Own leaves";
+    return employeeView ? "Employee leaves" : "My leaves";
   }
   if (path.includes("employees")) return "My attendance";
   if (path.includes("users")) return "People";

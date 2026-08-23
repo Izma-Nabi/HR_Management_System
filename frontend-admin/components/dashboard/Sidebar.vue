@@ -271,7 +271,7 @@ const canViewAttendanceComplaints = computed(() => {
             <path d="m8.5 15 2 2 4-4" />
           </svg>
         </span>
-        <span class="nav-label">Own Leaves</span>
+        <span class="nav-label">My Leaves</span>
       </NuxtLink>
 
       <NuxtLink

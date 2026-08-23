@@ -27,6 +27,7 @@ type LeaveRequest = {
   reason: string;
   submittedAt: string;
   approverName: string | null;
+  assignedReviewerName: string | null;
   decisionNote: string | null;
   decidedAt: string | null;
   workflowStage: "HR_REVIEW" | "TEAM_LEAD_REVIEW" | "COMPLETED";
@@ -40,15 +41,23 @@ const {
   selectedRequest,
   decisionNote,
   formatDate,
+  showDecisionControls,
+  showApproveAction,
+  showRejectAction,
   canApprove,
   canReject,
+  reviewAvailabilityMessage,
   processingDecision
 } = defineProps<{
   selectedRequest: LeaveRequest | null;
   decisionNote: string;
   formatDate: (date: string) => string;
+  showDecisionControls: boolean;
+  showApproveAction: boolean;
+  showRejectAction: boolean;
   canApprove: boolean;
   canReject: boolean;
+  reviewAvailabilityMessage: string;
   processingDecision: "APPROVED" | "REJECTED" | null;
 }>();
 
@@ -141,11 +150,17 @@ const emit = defineEmits<{
         </span>
       </section>
 
-      <!-- Only Admin / Super Admin can approve -->
       <section
-        v-if="(canApprove || canReject) && selectedRequest.status === 'PENDING'"
+        v-if="showDecisionControls"
         class="decision-box"
       >
+        <p
+          class="decision-guidance"
+          :class="{ 'decision-guidance--ready': canApprove || canReject }"
+        >
+          {{ reviewAvailabilityMessage }}
+        </p>
+
         <label for="decision-note">
           Decision Note
         </label>
@@ -153,6 +168,7 @@ const emit = defineEmits<{
         <textarea
           id="decision-note"
           :value="decisionNote"
+          :disabled="!canApprove && !canReject"
           rows="4"
           placeholder="Add an optional note..."
           @input="
@@ -165,20 +181,20 @@ const emit = defineEmits<{
 
         <div class="decision-actions">
           <button
-            v-if="canReject"
+            v-if="showRejectAction"
             type="button"
             class="reject-btn"
-            :disabled="processingDecision !== null"
+            :disabled="processingDecision !== null || !canReject"
             @click="emit('updateDecision', 'REJECTED')"
           >
             {{ processingDecision === "REJECTED" ? "Rejecting..." : "Reject" }}
           </button>
 
           <button
-            v-if="canApprove"
+            v-if="showApproveAction"
             type="button"
             class="approve-btn"
-            :disabled="processingDecision !== null"
+            :disabled="processingDecision !== null || !canApprove"
             @click="emit('updateDecision', 'APPROVED')"
           >
             {{ processingDecision === "APPROVED" ? "Approving..." : "Approve" }}
@@ -293,6 +309,24 @@ const emit = defineEmits<{
   margin-top: 16px;
 }
 
+.decision-guidance {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.decision-guidance--ready {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
 .decision-box textarea {
   width: 100%;
   min-height: 104px;
@@ -306,6 +340,12 @@ const emit = defineEmits<{
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79,70,229,.12);
   outline: none;
+}
+
+.decision-box textarea:disabled {
+  color: #94a3b8;
+  background: #f8fafc;
+  cursor: not-allowed;
 }
 
 .decision-actions {
