@@ -183,18 +183,11 @@ const deleteAttendanceByDates = async (dates) => {
 };
 
 
-const equalsOrNull = (column, value) => {
-  return value === null
-    ? Prisma.sql`${Prisma.raw(column)} IS NULL`
-    : Prisma.sql`${Prisma.raw(column)} = ${value}`;
-};
-
 const exactRecordCondition = (record) => {
   return Prisma.sql`(
     user_id = ${record.userId}
     AND event_type = ${record.eventType}
     AND event_time = ${record.eventTime}
-    AND ${equalsOrNull("remarks", record.remarks)}
   )`;
 };
 

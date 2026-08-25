@@ -105,6 +105,7 @@ const getDashboard = async (user) => {
       id: user.id,
       fullName: user.fullName,
       role: user.role,
+      department: user.department?.departmentName || null,
       permissions: user.permissions
     },
     sections

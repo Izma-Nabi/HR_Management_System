@@ -1,4 +1,6 @@
 <script setup>
+import attendanceService from "~/services/attendance.service";
+
 definePageMeta({
   layout: "dashboard"
 });
@@ -84,11 +86,81 @@ const topLateEmployees = computed(() =>
   []
 );
 
-const recentAttendance = computed(() =>
-  sections.value.teamAttendance?.recentAttendance ||
-  sections.value.recentAttendance ||
-  []
+const todayAttendance = ref({
+  attendanceDate: "",
+  records: []
+});
+const todayAttendanceError = ref("");
+
+const pakistanDateString = () => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const loadTodayAttendance = async () => {
+  if (mode.value !== "own") {
+    todayAttendance.value = {
+      attendanceDate: "",
+      records: []
+    };
+    todayAttendanceError.value = "";
+    return;
+  }
+
+  try {
+    todayAttendanceError.value = "";
+    const result = await attendanceService.getMyDayDetails(
+      pakistanDateString()
+    );
+
+    todayAttendance.value = {
+      attendanceDate: result?.attendanceDate || pakistanDateString(),
+      records: Array.isArray(result?.records) ? result.records : []
+    };
+  } catch (attendanceError) {
+    console.error("Failed loading today's attendance:", attendanceError);
+    todayAttendance.value = {
+      attendanceDate: pakistanDateString(),
+      records: []
+    };
+    todayAttendanceError.value =
+      attendanceError?.data?.message ||
+      attendanceError?.message ||
+      "Unable to load today's attendance.";
+  }
+};
+
+const ownRecentAttendance = computed(() =>
+  todayAttendance.value.records.map((record) => ({
+    id: record.id,
+    attendanceDate:
+      record.attendanceDate || todayAttendance.value.attendanceDate,
+    fullName: dashboard.value?.user?.fullName || "You",
+    department: dashboard.value?.user?.department || "-",
+    status: record.eventType,
+    checkIn: record.eventType === "CHECK_IN" ? record.eventTime : null,
+    checkOut: record.eventType === "CHECK_OUT" ? record.eventTime : null
+  }))
 );
+
+const recentAttendance = computed(() => {
+  if (mode.value === "own") {
+    return ownRecentAttendance.value;
+  }
+
+  return sections.value.teamAttendance?.recentAttendance ||
+    sections.value.recentAttendance ||
+    [];
+});
 
 let dashboardRefreshTimer = null;
 
@@ -100,8 +172,13 @@ onMounted(async () => {
     return;
   }
 
-  dashboardRefreshTimer = window.setInterval(() => {
-    fetchDashboard({ silent: true });
+  await loadTodayAttendance();
+
+  dashboardRefreshTimer = window.setInterval(async () => {
+    await Promise.all([
+      fetchDashboard({ silent: true }),
+      loadTodayAttendance()
+    ]);
   }, 30000);
 });
 
@@ -246,7 +323,9 @@ onUnmounted(() => {
                 <td data-label="Time" class="time-cell">{{ item.checkIn || item.checkOut || "-" }}</td>
               </tr>
               <tr v-if="recentAttendance.length === 0">
-                <td class="table-empty" colspan="5">No attendance records found.</td>
+                <td class="table-empty" colspan="5">
+                  {{ todayAttendanceError || "No attendance records found." }}
+                </td>
               </tr>
             </tbody>
           </table>

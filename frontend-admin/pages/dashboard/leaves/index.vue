@@ -33,6 +33,7 @@ const decisionNote = ref("");
 
 const leaveRequests = ref<LeaveRequest[]>([]);
 let loadRequestId = 0;
+let successMessageTimer: ReturnType<typeof setTimeout> | null = null;
 
 type LeaveStatus =
   | "PENDING"
@@ -476,6 +477,15 @@ const updateDecision = async (status: "APPROVED" | "REJECTED") => {
       response?.message ||
       `Leave request ${status.toLowerCase()} successfully.`;
 
+    if (successMessageTimer) {
+      clearTimeout(successMessageTimer);
+    }
+
+    successMessageTimer = setTimeout(() => {
+      successMessage.value = "";
+      successMessageTimer = null;
+    }, 5000);
+
   } catch (error: any) {
     console.error(`Failed to ${status.toLowerCase()} leave:`, error);
 
@@ -517,11 +527,25 @@ watch(
   () => {
     selectedRequestId.value = null;
     decisionNote.value = "";
+    errorMessage.value = "";
+    successMessage.value = "";
+
+    if (successMessageTimer) {
+      clearTimeout(successMessageTimer);
+      successMessageTimer = null;
+    }
+
     loadLeaves();
   }
 );
 
 onMounted(loadLeaves);
+
+onUnmounted(() => {
+  if (successMessageTimer) {
+    clearTimeout(successMessageTimer);
+  }
+});
 </script>
 
 <template>

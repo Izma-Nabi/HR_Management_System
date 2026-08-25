@@ -226,11 +226,27 @@ const sourceHashFromRecord = (record) => {
       record.userId,
       record.attendanceDate,
       record.eventType,
-      record.eventTime,
-      record.remarks || ""
+      record.eventTime
     ]))
     .digest("hex")
     .slice(0, 48);
+};
+
+const normalizeAttendanceHeader = (value) => {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};
+
+const normalizeAttendanceRow = (row) => {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      normalizeAttendanceHeader(key),
+      value
+    ])
+  );
 };
 
 const parseExcelDate = (value) => {
@@ -315,7 +331,7 @@ const parseExcelTime = (value) => {
 
   const match = String(value)
     .trim()
-    .match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    .match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(AM|PM)?$/i);
 
   if (!match) {
     return null;
@@ -337,67 +353,176 @@ const parseExcelTime = (value) => {
   return timeFromParts(hours, minutes, seconds);
 };
 
+const pakistanDateTimeFromDate = (date) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PAKISTAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return {
+    attendanceDate: `${values.year}-${values.month}-${values.day}`,
+    eventTime: `${values.hour}:${values.minute}:${values.second}`
+  };
+};
+
+const parseExcelEventDate = (value) => {
+  if (isMissing(value)) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return {
+      attendanceDate: dateFromParts(
+        value.getFullYear(),
+        value.getMonth() + 1,
+        value.getDate()
+      ),
+      eventTime: timeFromParts(
+        value.getHours(),
+        value.getMinutes(),
+        value.getSeconds()
+      )
+    };
+  }
+
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+
+    if (!parsed) {
+      return null;
+    }
+
+    return {
+      attendanceDate: dateFromParts(parsed.y, parsed.m, parsed.d),
+      eventTime: timeFromParts(parsed.H, parsed.M, Math.floor(parsed.S || 0))
+    };
+  }
+
+  const text = String(value).trim();
+  const isoLikeMatch = text.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})[T\s]+(.+)$/
+  );
+  const slashMatch = text.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.+)$/
+  );
+
+  if (isoLikeMatch) {
+    const eventTime = parseExcelTime(isoLikeMatch[4]);
+
+    if (eventTime) {
+      return {
+        attendanceDate: dateFromParts(
+          Number(isoLikeMatch[1]),
+          Number(isoLikeMatch[2]),
+          Number(isoLikeMatch[3])
+        ),
+        eventTime
+      };
+    }
+  }
+
+  if (slashMatch) {
+    const eventTime = parseExcelTime(slashMatch[4]);
+
+    if (eventTime) {
+      return {
+        attendanceDate: dateFromParts(
+          Number(slashMatch[3]),
+          Number(slashMatch[1]),
+          Number(slashMatch[2])
+        ),
+        eventTime
+      };
+    }
+  }
+
+  const parsed = new Date(text);
+
+  return Number.isNaN(parsed.getTime())
+    ? null
+    : pakistanDateTimeFromDate(parsed);
+};
+
 const validateRow = (row, rowNumber) => {
 
-  if (!normalizeUserCode(row["User Code"])) {
+  if (!normalizeUserCode(row.USER_CODE)) {
     throw new ApiError(
       400,
       `Row ${rowNumber}: User Code is required.`
     );
   }
 
-  if (isMissing(row["Date"])) {
+  if (isMissing(row.NAME) && isMissing(row.FULL_NAME)) {
     throw new ApiError(
       400,
-      `Row ${rowNumber}: Date is required.`
+      `Row ${rowNumber}: Name is required.`
+    );
+  }
+
+  if (!normalizeEventType(row.EVENT_TYPE)) {
+    throw new ApiError(
+      400,
+      `Row ${rowNumber}: Event Type must be CHECK_IN, CHECK_OUT, BREAK_START, or BREAK_END.`
+    );
+  }
+
+  if (
+    isMissing(row.EVENT_DATE) &&
+    (isMissing(row.DATE) || isMissing(row.EVENT_TIME))
+  ) {
+    throw new ApiError(
+      400,
+      `Row ${rowNumber}: Event Date is required and must contain both date and time.`
     );
   }
 };
 
-const eventsFromRow = (row, rowNumber) => {
-  const eventTypeValue = row["Event Type"];
-  const eventTimeValue = row["Event Time"];
-  const usesEventRowFormat =
-    !isMissing(eventTypeValue) ||
-    !isMissing(eventTimeValue);
+const eventFromRow = (row, rowNumber) => {
+  const eventType = normalizeEventType(row.EVENT_TYPE);
+  const eventDate = !isMissing(row.EVENT_DATE)
+    ? parseExcelEventDate(row.EVENT_DATE)
+    : (() => {
+        const attendanceDate = parseExcelDate(row.DATE);
+        const eventTime = parseExcelTime(row.EVENT_TIME);
 
-  if (usesEventRowFormat) {
-    const eventType = normalizeEventType(eventTypeValue);
+        return attendanceDate && eventTime
+          ? { attendanceDate, eventTime }
+          : null;
+      })();
 
-    if (!eventType) {
-      throw new ApiError(
-        400,
-        `Row ${rowNumber}: Event Type must be CHECK_IN, CHECK_OUT, BREAK_START, or BREAK_END.`
-      );
-    }
-
-    const time = parseExcelTime(eventTimeValue);
-
-    if (!time) {
-      throw new ApiError(
-        400,
-        `Row ${rowNumber}: Event Time is required and must be a valid time.`
-      );
-    }
-
-    return [
-      {
-        eventType,
-        time
-      }
-    ];
+  if (!eventDate) {
+    throw new ApiError(
+      400,
+      `Row ${rowNumber}: Event Date must contain a valid date and time.`
+    );
   }
 
-  return [
-    {
-      eventType: "CHECK_IN",
-      time: parseExcelTime(row["Check-In"])
-    },
-    {
-      eventType: "CHECK_OUT",
-      time: parseExcelTime(row["Check-Out"])
-    }
-  ].filter((event) => event.time);
+  return {
+    eventType,
+    ...eventDate
+  };
+};
+
+const parseAttendanceSheetRow = (rawRow, rowNumber = 2) => {
+  const row = normalizeAttendanceRow(rawRow);
+
+  validateRow(row, rowNumber);
+
+  return {
+    rowNumber,
+    userCode: normalizeUserCode(row.USER_CODE),
+    name: String(row.NAME || row.FULL_NAME || "").trim(),
+    ...eventFromRow(row, rowNumber)
+  };
 };
 
 
@@ -429,25 +554,9 @@ const importAttendance = async () => {
   const sourceHashCounts = new Map();
 
   for (let index = 0; index < rows.length; index++) {
-    const row = rows[index];
-
-    validateRow(row, index + 2);
-
-    const attendanceDate = parseExcelDate(row["Date"]);
-
-    if (!attendanceDate) {
-      throw new ApiError(
-        400,
-        `Row ${index + 2}: Invalid Date.`
-      );
-    }
-
-    parsedRows.push({
-      row,
-      rowNumber: index + 2,
-      userCode: normalizeUserCode(row["User Code"]),
-      attendanceDate
-    });
+    parsedRows.push(
+      parseAttendanceSheetRow(rows[index], index + 2)
+    );
   }
 
   const users = await attendanceRepository.findUsersByCodes(
@@ -459,7 +568,6 @@ const importAttendance = async () => {
   const attendanceRecords = [];
 
   for (const parsedRow of parsedRows) {
-    const row = parsedRow.row;
     const user = usersByCode.get(userCodeKey(parsedRow.userCode));
 
     if (!user) {
@@ -469,33 +577,30 @@ const importAttendance = async () => {
       );
     }
 
-    const eventTimes = eventsFromRow(row, parsedRow.rowNumber);
+    const attendanceRecord = {
+      userId: user.id,
+      userCode: user.userCode,
+      biometricId: user.biometricId || user.userCode,
+      fullName: [user.firstName, user.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || parsedRow.name || user.userCode,
+      locationId: null,
+      // Department and designation are authoritative user data, not sheet input.
+      departmentId: user.departmentId,
+      designationId: user.designationId,
+      attendanceDate: parsedRow.attendanceDate,
+      eventType: parsedRow.eventType,
+      eventTime: `${parsedRow.attendanceDate} ${parsedRow.eventTime}`,
+      remarks: null
+    };
+    const sourceHash = sourceHashFromRecord(attendanceRecord);
+    const sourceOccurrence = (sourceHashCounts.get(sourceHash) || 0) + 1;
 
-    for (const event of eventTimes) {
-      const attendanceRecord = {
-        userId: user.id,
-        userCode: user.userCode,
-        biometricId: user.biometricId || user.userCode,
-        fullName: [user.firstName, user.lastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim() || user.userCode,
-        locationId: null,
-        departmentId: user.departmentId,
-        designationId: user.designationId,
-        attendanceDate: parsedRow.attendanceDate,
-        eventType: event.eventType,
-        eventTime: `${parsedRow.attendanceDate} ${event.time}`,
-        remarks: row["Remarks"]?.toString().trim() || null
-      };
-      const sourceHash = sourceHashFromRecord(attendanceRecord);
-      const sourceOccurrence = (sourceHashCounts.get(sourceHash) || 0) + 1;
+    sourceHashCounts.set(sourceHash, sourceOccurrence);
+    attendanceRecord.sourceKey = `${sourceHash}:${sourceOccurrence}`;
 
-      sourceHashCounts.set(sourceHash, sourceOccurrence);
-      attendanceRecord.sourceKey = `${sourceHash}:${sourceOccurrence}`;
-
-      attendanceRecords.push(attendanceRecord);
-    }
+    attendanceRecords.push(attendanceRecord);
   }
 
   const result = await attendanceRepository.syncNewAttendance(attendanceRecords);
@@ -1233,6 +1338,7 @@ module.exports = {
   getAllUsersWeek,
   getMyDayDetails,
   importAttendance,
+  parseAttendanceSheetRow,
   getAttendanceComplaints,
   reviewAttendanceComplaint,
   editAttendanceComplaint,
