@@ -8,11 +8,72 @@ const {
 
 const leaveController = require("./leave.controller");
 
+// Middleware allowing Admins, HR (hr@company.com), Team Leads, and Project Managers to review leaves
+const canReviewLeaves = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      statusCode: 401,
+      message: "Authentication is required"
+    });
+  }
+
+  const role = String(req.user.role || req.user.roleName || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (role === "SUPER_ADMIN" || role === "ADMIN") {
+    return next();
+  }
+
+  const email = String(req.user.email || "").trim().toLowerCase();
+  const departmentName = String(
+    req.user.department?.departmentName || ""
+  ).trim().toLowerCase();
+  const designation = String(
+    req.user.designation?.designationName || req.user.designation || ""
+  ).trim().toLowerCase();
+
+  const isHR =
+    email === "hr@company.com" ||
+    departmentName === "hr" ||
+    departmentName === "human resources" ||
+    designation.includes("hr");
+
+  const isLeadOrManager =
+    designation.includes("team lead") ||
+    designation.includes("project manager");
+
+  const permissions = new Set(
+    (req.user.permissions || []).map((p) =>
+      String(p).trim().toUpperCase().replace(/[\s-]+/g, "_")
+    )
+  );
+
+  if (
+    isHR ||
+    isLeadOrManager ||
+    permissions.has("APPROVE_LEAVE") ||
+    permissions.has("REJECT_LEAVE") ||
+    permissions.has("VIEW_ALL_LEAVES") ||
+    permissions.has("VIEW_TEAM_LEAVES")
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    statusCode: 403,
+    message: "You do not have permission to review leave requests"
+  });
+};
+
 // Get all leave requests
 router.get(
   "/",
   auth,
-  requirePermission("VIEW_ALL_LEAVES"),
+  canReviewLeaves,
   leaveController.getLeaveRequests
 );
 
@@ -28,7 +89,7 @@ router.get(
 router.get(
   "/team",
   auth,
-  requirePermission("VIEW_TEAM_LEAVES"),
+  canReviewLeaves,
   leaveController.teamLeaves
 );
 
@@ -61,7 +122,7 @@ router.post(
 router.get(
   "/:id",
   auth,
-  requirePermission("VIEW_ALL_LEAVES"),
+  canReviewLeaves,
   leaveController.getLeaveRequest
 );
 
@@ -69,7 +130,7 @@ router.get(
 router.patch(
   "/:id/approve",
   auth,
-  requirePermission("APPROVE_LEAVE"),
+  canReviewLeaves,
   leaveController.approveLeave
 );
 
@@ -77,7 +138,7 @@ router.patch(
 router.patch(
   "/:id/reject",
   auth,
-  requirePermission("REJECT_LEAVE"),
+  canReviewLeaves,
   leaveController.rejectLeave
 );
 

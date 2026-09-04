@@ -5,16 +5,63 @@ const {
   isSuperAdmin,
   hasAnyPermission
 } = useAuthUser();
+
 const props = defineProps({
   open: {
     type: Boolean,
     default: false
   }
 });
+
 const emit = defineEmits(["close"]);
 
+const designationName = computed(() => {
+  const user = authUser.value || {};
+
+  return String(
+    user?.designation?.designationName ||
+    user?.designationName ||
+    (typeof user?.designation === "string"
+      ? user.designation
+      : "")
+  )
+    .trim()
+    .toLowerCase();
+});
+
+const isHRDesignation = computed(() => {
+  const designation = designationName.value;
+
+  return (
+    designation === "hr" ||
+    designation.includes("human resources") ||
+    designation.startsWith("hr ")
+  );
+});
+
+const isTeamLeadDesignation = computed(() => {
+  return designationName.value.includes("team lead");
+});
+
+const isProjectManagerDesignation = computed(() => {
+  return (
+    designationName.value.includes("project manager") ||
+    designationName.value === "manager" ||
+    designationName.value.includes(" manager")
+  );
+});
+
+const isSpecialLeaveUser = computed(() => {
+  return (
+    isHRDesignation.value ||
+    isTeamLeadDesignation.value ||
+    isProjectManagerDesignation.value
+  );
+});
+
 const canManageUsers = computed(() =>
-  roleKey.value !== "EMPLOYEE" && hasAnyPermission(
+  roleKey.value !== "EMPLOYEE" &&
+  hasAnyPermission(
     "VIEW_ADMINS",
     "VIEW_EMPLOYEES",
     "CREATE_ADMIN",
@@ -54,14 +101,32 @@ const canManageDesignations = computed(() =>
   )
 );
 
-const canViewLeaves = computed(() =>
-  hasAnyPermission(
-    "CREATE_LEAVE",
-    "VIEW_OWN_LEAVES",
-    "VIEW_TEAM_LEAVES",
-    "VIEW_ALL_LEAVES"
-  )
-);
+/*
+ * HR / Team Lead / Project Manager can always
+ * access their own leave page.
+ */
+const canViewMyLeaves = computed(() => {
+  return (
+    isSpecialLeaveUser.value ||
+    hasAnyPermission(
+      "CREATE_LEAVE",
+      "VIEW_OWN_LEAVES"
+    )
+  );
+});
+
+const canViewLeaveRequests = computed(() => {
+  return (
+    isSpecialLeaveUser.value ||
+    hasAnyPermission(
+      "VIEW_TEAM_LEAVES",
+      "VIEW_ALL_LEAVES",
+      "APPROVE_LEAVE",
+      "REJECT_LEAVE",
+      "MANAGE_LEAVES"
+    )
+  );
+});
 
 const canViewAttendance = computed(() =>
   hasAnyPermission(
@@ -74,10 +139,14 @@ const canViewAttendance = computed(() =>
 
 const hasAssignedDepartment = computed(() => {
   const departmentId = Number(
-    authUser.value?.departmentId || authUser.value?.department?.id
+    authUser.value?.departmentId ||
+    authUser.value?.department?.id
   );
 
-  return Number.isInteger(departmentId) && departmentId > 0;
+  return (
+    Number.isInteger(departmentId) &&
+    departmentId > 0
+  );
 });
 
 const canViewAttendanceComplaints = computed(() => {
@@ -97,28 +166,64 @@ const canViewAttendanceComplaints = computed(() => {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--open': props.open }">
+  <aside
+    class="sidebar"
+    :class="{ 'sidebar--open': props.open }"
+  >
+    <!-- =====================================================
+         LOGO
+    ====================================================== -->
+
     <div class="logo">
       <span class="logo-mark">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
         </svg>
       </span>
+
       <div class="logo-text">
         <h2>AMS</h2>
         <span>Attendance System</span>
       </div>
 
-      <button class="sidebar-close" type="button" aria-label="Close navigation" @click="emit('close')">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+      <button
+        class="sidebar-close"
+        type="button"
+        aria-label="Close navigation"
+        @click="emit('close')"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <path d="m6 6 12 12M18 6 6 18" />
         </svg>
       </button>
     </div>
 
-    <p class="nav-eyebrow">Menu</p>
+    <p class="nav-eyebrow">
+      Menu
+    </p>
 
     <nav @click="emit('close')">
+
+      <!-- ===================================================
+           DASHBOARD
+      ==================================================== -->
+
       <NuxtLink
         to="/dashboard"
         class="nav-item"
@@ -127,15 +232,55 @@ const canViewAttendanceComplaints = computed(() => {
         exact-active-class="router-link-active"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="9" rx="1.5" />
-            <rect x="14" y="3" width="7" height="5" rx="1.5" />
-            <rect x="14" y="12" width="7" height="9" rx="1.5" />
-            <rect x="3" y="16" width="7" height="5" rx="1.5" />
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect
+              x="3"
+              y="3"
+              width="7"
+              height="9"
+              rx="1.5"
+            />
+            <rect
+              x="14"
+              y="3"
+              width="7"
+              height="5"
+              rx="1.5"
+            />
+            <rect
+              x="14"
+              y="12"
+              width="7"
+              height="9"
+              rx="1.5"
+            />
+            <rect
+              x="3"
+              y="16"
+              width="7"
+              height="5"
+              rx="1.5"
+            />
           </svg>
         </span>
-        <span class="nav-label">Dashboard</span>
+
+        <span class="nav-label">
+          Dashboard
+        </span>
       </NuxtLink>
+
+      <!-- ===================================================
+           USERS
+      ==================================================== -->
 
       <NuxtLink
         v-if="canManageUsers"
@@ -144,15 +289,35 @@ const canViewAttendanceComplaints = computed(() => {
         style="--i: 1"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
+            <circle
+              cx="9"
+              cy="7"
+              r="4"
+            />
             <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </span>
-        <span class="nav-label">Users</span>
+
+        <span class="nav-label">
+          Users
+        </span>
       </NuxtLink>
+
+      <!-- ===================================================
+           ROLES & PERMISSIONS
+      ==================================================== -->
 
       <NuxtLink
         v-if="canManageRoles"
@@ -161,13 +326,29 @@ const canViewAttendanceComplaints = computed(() => {
         style="--i: 2"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3z" />
             <path d="m9.5 12 2 2 4-4" />
           </svg>
         </span>
-        <span class="nav-label">Roles &amp; Permissions</span>
+
+        <span class="nav-label">
+          Roles &amp; Permissions
+        </span>
       </NuxtLink>
+
+      <!-- ===================================================
+           DEPARTMENTS
+      ==================================================== -->
 
       <NuxtLink
         v-if="canManageDepartments"
@@ -176,14 +357,30 @@ const canViewAttendanceComplaints = computed(() => {
         style="--i: 3"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M3 21V7l9-4 9 4v14" />
             <path d="M9 21v-6h6v6" />
             <path d="M9 12h.01M15 12h.01M9 9h.01M15 9h.01" />
           </svg>
         </span>
-        <span class="nav-label">Departments</span>
+
+        <span class="nav-label">
+          Departments
+        </span>
       </NuxtLink>
+
+      <!-- ===================================================
+           DESIGNATIONS
+      ==================================================== -->
 
       <NuxtLink
         v-if="canManageDesignations"
@@ -192,43 +389,123 @@ const canViewAttendanceComplaints = computed(() => {
         style="--i: 4"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M12 2 8 4.5v5c0 4.2 2.8 7.4 4 8.5 1.2-1.1 4-4.3 4-8.5v-5L12 2z" />
-            <circle cx="12" cy="8.5" r="1.8" />
+            <circle
+              cx="12"
+              cy="8.5"
+              r="1.8"
+            />
           </svg>
         </span>
-        <span class="nav-label">Designations</span>
+
+        <span class="nav-label">
+          Designations
+        </span>
       </NuxtLink>
 
+      <!-- ===================================================
+           MY LEAVES
+           
+           ONLY:
+           - HR
+           - Team Lead
+           - Project Manager
+           
+           This is intentionally designation based.
+      ==================================================== -->
+
       <NuxtLink
-        v-if="canViewLeaves"
-        to="/dashboard/leaves"
+        v-if="canViewMyLeaves"
+        to="/dashboard/leaves?scope=my"
         class="nav-item"
         style="--i: 5"
       >
         <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="17" rx="2" />
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="17"
+              rx="2"
+            />
             <path d="M16 2v4M8 2v4M3 10h18" />
             <path d="m8.5 15 2 2 4-4" />
           </svg>
         </span>
-        <span class="nav-label">Leave Requests</span>
+
+        <span class="nav-label">
+          My Leaves
+        </span>
       </NuxtLink>
 
-      <NuxtLink v-if="canViewAttendance" to="/dashboard/attendance" class="nav-item" style="--i: 6">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3.5 2" />
-          </svg>
-        </span>
-        <span class="nav-label">Attendance</span>
-      </NuxtLink>
+      <!-- ===================================================
+           LEAVE REQUESTS / TEAM LEAVES
+           
+           HR / Team Lead / Project Manager can see this
+           because they are leave reviewers.
+      ==================================================== -->
 
       <NuxtLink
-        v-if="canViewAttendanceComplaints"
-        to="/dashboard/attendance-complaints"
+        v-if="canViewLeaveRequests"
+        to="/dashboard/leaves?scope=employee"
+        class="nav-item"
+        style="--i: 6"
+      >
+        <span class="nav-icon">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="17"
+              rx="2"
+            />
+            <path d="M16 2v4M8 2v4M3 10h18" />
+            <path d="M8 15h8M8 18h5" />
+          </svg>
+        </span>
+
+        <span class="nav-label">
+          Leave Requests
+        </span>
+      </NuxtLink>
+
+      <!-- ===================================================
+           ATTENDANCE
+      ==================================================== -->
+
+      <NuxtLink
+        v-if="canViewAttendance"
+        to="/dashboard/attendance"
         class="nav-item"
         style="--i: 7"
       >
@@ -243,9 +520,44 @@ const canViewAttendanceComplaints = computed(() => {
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            <path d="M8 9h8"/>
-            <path d="M8 13h5"/>
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+            />
+            <path d="M12 7v5l3.5 2" />
+          </svg>
+        </span>
+
+        <span class="nav-label">
+          Attendance
+        </span>
+      </NuxtLink>
+
+      <!-- ===================================================
+           ATTENDANCE COMPLAINTS
+      ==================================================== -->
+
+      <NuxtLink
+        v-if="canViewAttendanceComplaints"
+        to="/dashboard/attendance-complaints"
+        class="nav-item"
+        style="--i: 8"
+      >
+        <span class="nav-icon">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <path d="M8 9h8" />
+            <path d="M8 13h5" />
           </svg>
         </span>
 
@@ -253,39 +565,55 @@ const canViewAttendanceComplaints = computed(() => {
           Attendance Complaints
         </span>
       </NuxtLink>
-        <NuxtLink
-          to="/dashboard/ai-assistant/ai-assistant"
-          class="nav-item"
-          style="--i: 8"
-        >
-          <span class="nav-icon">
-            <svg
-              viewBox="0 0 24 24"
-              width="19"
-              height="19"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 3a7 7 0 0 0-7 7v4a3 3 0 0 0 3 3h1" />
-              <path d="M12 3a7 7 0 0 1 7 7v4a3 3 0 0 1-3 3h-1" />
-              <path d="M8 17v1a4 4 0 0 0 8 0v-1" />
-              <path d="M9 11h.01M15 11h.01" />
-              <path d="M9 14c1.8 1.2 4.2 1.2 6 0" />
-            </svg>
-          </span>
 
-          <span class="nav-label">AI Assistant</span>
-        </NuxtLink>
+      <!-- ===================================================
+           AI ASSISTANT
+      ==================================================== -->
+
+      <NuxtLink
+        to="/dashboard/ai-assistant/ai-assistant"
+        class="nav-item"
+        style="--i: 9"
+      >
+        <span class="nav-icon">
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 3a7 7 0 0 0-7 7v4a3 3 0 0 0 3 3h1" />
+            <path d="M12 3a7 7 0 0 1 7 7v4a3 3 0 0 1-3 3h-1" />
+            <path d="M8 17v1a4 4 0 0 0 8 0v-1" />
+            <path d="M9 11h.01M15 11h.01" />
+            <path d="M9 14c1.8 1.2 4.2 1.2 6 0" />
+          </svg>
+        </span>
+
+        <span class="nav-label">
+          AI Assistant
+        </span>
+      </NuxtLink>
+
     </nav>
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
 
     <div class="sidebar-foot">
       <span class="sidebar-foot-dot"></span>
       <span>System operational</span>
     </div>
   </aside>
+
+  <!-- =======================================================
+       MOBILE BACKDROP
+  ======================================================== -->
 
   <button
     v-if="props.open"
@@ -326,7 +654,12 @@ const canViewAttendanceComplaints = computed(() => {
   height: 40px;
   flex-shrink: 0;
   color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
+  background: linear-gradient(
+    135deg,
+    #3b82f6 0%,
+    #2563eb 55%,
+    #1d4ed8 100%
+  );
   border-radius: 11px;
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
   animation: markPulse 3.2s ease-in-out infinite;
@@ -377,7 +710,9 @@ nav {
   transform: translateX(-8px);
   animation: navIn 0.45s ease forwards;
   animation-delay: calc(var(--i) * 45ms);
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .nav-item::before {
@@ -388,7 +723,8 @@ nav {
   background: #eef2ff;
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: -1;
 }
 
@@ -411,7 +747,9 @@ nav {
   justify-content: center;
   flex-shrink: 0;
   color: #9098ab;
-  transition: color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    color 0.2s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .nav-label {
@@ -439,7 +777,11 @@ nav {
 
 .router-link-active {
   color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(
+    135deg,
+    #3b82f6 0%,
+    #2563eb 100%
+  );
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
 }
 
@@ -469,6 +811,7 @@ nav {
     opacity: 0;
     transform: translateX(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -476,39 +819,44 @@ nav {
 }
 
 @keyframes markPulse {
-  0%, 100% {
-    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.32);
+  0%,
+  100% {
+    box-shadow:
+      0 6px 16px rgba(79, 70, 229, 0.32);
   }
+
   50% {
-    box-shadow: 0 6px 22px rgba(79, 70, 229, 0.5);
+    box-shadow:
+      0 6px 22px rgba(79, 70, 229, 0.5);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nav-item,
-  .logo-mark {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .nav-item:hover {
-    transform: none;
-  }
-}
-</style>
+/* =========================================================
+ * COLLAPSED SIDEBAR
+ * ========================================================= */
 
-<style scoped>
 .sidebar {
   width: var(--sidebar-collapsed-width);
   padding: 22px 14px;
   color: rgba(255, 255, 255, 0.78);
   background:
-    radial-gradient(circle at 20% 0%, rgba(59, 130, 246, 0.2), transparent 18rem),
-    linear-gradient(180deg, #0f2a4a 0%, #0b1f3a 100%);
+    radial-gradient(
+      circle at 20% 0%,
+      rgba(59, 130, 246, 0.2),
+      transparent 18rem
+    ),
+    linear-gradient(
+      180deg,
+      #0f2a4a 0%,
+      #0b1f3a 100%
+    );
   border-right: 0;
-  box-shadow: 18px 0 50px rgba(16, 37, 43, 0.08);
+  box-shadow:
+    18px 0 50px rgba(16, 37, 43, 0.08);
   overflow-x: hidden;
-  transition: width 240ms var(--ease-out), transform 260ms var(--ease-out);
+  transition:
+    width 240ms var(--ease-out),
+    transform 260ms var(--ease-out);
 }
 
 .sidebar:hover,
@@ -526,9 +874,14 @@ nav {
   width: 42px;
   height: 42px;
   color: #eff6ff;
-  background: linear-gradient(145deg, #60a5fa, #2563eb);
+  background: linear-gradient(
+    145deg,
+    #60a5fa,
+    #2563eb
+  );
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.2);
   animation: none;
 }
 
@@ -566,7 +919,10 @@ nav {
   opacity: 1;
   visibility: visible;
   transform: translateX(0);
-  transition-delay: 70ms, 70ms, 0s;
+  transition-delay:
+    70ms,
+    70ms,
+    0s;
 }
 
 .nav-eyebrow {
@@ -575,7 +931,10 @@ nav {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.38);
   opacity: 0;
-  transition: height 200ms var(--ease-out), margin 200ms var(--ease-out), opacity 150ms ease;
+  transition:
+    height 200ms var(--ease-out),
+    margin 200ms var(--ease-out),
+    opacity 150ms ease;
 }
 
 .sidebar:hover .nav-eyebrow,
@@ -628,7 +987,8 @@ nav {
   color: #14343a;
   background: #e5f3ef;
   border-color: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.18);
   transform: none;
 }
 
@@ -672,7 +1032,8 @@ nav {
   height: 7px;
   background: #60a5fa;
   border-radius: 50%;
-  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+  box-shadow:
+    0 0 0 4px rgba(96, 165, 250, 0.12);
 }
 
 .sidebar-backdrop {
@@ -685,12 +1046,17 @@ nav {
   backdrop-filter: blur(3px);
 }
 
+/* =========================================================
+ * MOBILE
+ * ========================================================= */
+
 @media (max-width: 980px) {
   .sidebar {
     z-index: 110;
     width: min(86vw, 300px);
     transform: translateX(-105%);
-    transition: transform 260ms var(--ease-out);
+    transition:
+      transform 260ms var(--ease-out);
   }
 
   .sidebar--open {
@@ -717,6 +1083,19 @@ nav {
 
   .sidebar-backdrop {
     display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item,
+  .logo-mark {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .nav-item:hover {
+    transform: none;
   }
 }
 </style>

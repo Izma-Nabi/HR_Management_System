@@ -3,8 +3,6 @@ const { ApiError } = require("../../utils/apiResponse");
 const XLSX = require("xlsx");
 const axios = require("axios");
 const attendanceRepository = require("./attendance.repository");
-const attendanceCalculator = require("./attendance.calculator");
-const { isAdmin, isSuperAdmin } = require("../../utils/roles");
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1uNA77aFV8J1Mj8uKKKc0gnOQIXaD0WZ7uYgCWdNQE7w/export?format=xlsx";
 const PAKISTAN_TIME_ZONE = "Asia/Karachi";
@@ -112,36 +110,6 @@ const isDateInCurrentWeek = (date) => {
   return date >= week.startDate && date <= week.endDate;
 };
 
-const attendanceRequestDates = () => {
-  const today = dateStringInPakistan();
-  const yesterday = dateAtUtcMidnight(today);
-
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-
-  return {
-    today,
-    yesterday: utcDateString(yesterday)
-  };
-};
-
-const isAttendanceRequestDate = (date) => {
-  const allowedDates = attendanceRequestDates();
-
-  return date === allowedDates.today || date === allowedDates.yesterday;
-};
-
-const isValidDateString = (date) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
-    return false;
-  }
-
-  return utcDateString(dateAtUtcMidnight(date)) === date;
-};
-
-const isValidTimeString = (time) => {
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || ""));
-};
-
 const dayNameFromDate = (date) => {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
@@ -224,9 +192,10 @@ const sourceHashFromRecord = (record) => {
     .createHash("sha256")
     .update(JSON.stringify([
       record.userId,
-      record.attendanceDate,
       record.eventType,
-      record.eventTime,
+      record.eventTime instanceof Date
+        ? record.eventTime.toISOString()
+        : record.eventTime,
       record.remarks || ""
     ]))
     .digest("hex")
@@ -481,11 +450,12 @@ const importAttendance = async () => {
           .join(" ")
           .trim() || user.userCode,
         locationId: null,
-        departmentId: user.departmentId,
-        designationId: user.designationId,
-        attendanceDate: parsedRow.attendanceDate,
+        departmentId: user.departmentId || null,
+        designationId: user.designationId || null,
         eventType: event.eventType,
-        eventTime: `${parsedRow.attendanceDate} ${event.time}`,
+        eventTime: new Date(
+          `${parsedRow.attendanceDate}T${event.time}+05:00`
+        ),
         remarks: row["Remarks"]?.toString().trim() || null
       };
       const sourceHash = sourceHashFromRecord(attendanceRecord);
@@ -511,147 +481,11 @@ const importAttendance = async () => {
 
 const getMyCurrentWeek = async (userId, startDate) => {
   const week = requestedWeek(startDate);
-
   let summaries;
 
   try {
-    summaries =
-      await attendanceRepository.findDailyAttendanceForWeek(
-        userId,
-        week.startDate,
-        week.endDate
-      );
-  } catch (error) {
-    if (isMissingDailyAttendanceTable(error)) {
-      throw dailyAttendanceUnavailableError();
-    }
-
-    throw error;
-  }
-
-  const summaryByDate = new Map(
-    summaries.map((summary) => [
-      summary.attendanceDate,
-      summary
-    ])
-  );
-  const complaints = await attendanceRepository.findLatestComplaintsForDates(
-    userId,
-    week.dates.map(dateAtUtcMidnight)
-  );
-  const latestComplaintByDate = new Map();
-
-  for (const complaint of complaints) {
-    const complaintDate = dateOnlyFromValue(complaint.attendanceDate);
-
-    if (!latestComplaintByDate.has(complaintDate)) {
-      latestComplaintByDate.set(complaintDate, {
-        ...complaint,
-        attendanceDate: complaintDate
-      });
-    }
-  }
-
-  const days = week.dates.map((attendanceDate) => {
-    const dayName = dayNameFromDate(attendanceDate);
-
-    /*
-     * TODAY:
-     * Do NOT display attendanceSummary values.
-     *
-     * Today's attendance is only shown when the user
-     * clicks the day and opens the live details.
-     */
-    const isToday =
-      attendanceDate === week.today;
-
-    const storedSummary = summaryByDate.get(attendanceDate);
-    const summary = isToday && storedSummary?.status !== "ON_LEAVE"
-      ? null
-      : storedSummary;
-
-    let status =
-      summary?.status || "NO_RECORD";
-
-    if (
-      !summary &&
-      attendanceDate > week.today
-    ) {
-      status = "UPCOMING";
-    } else if (
-      !summary &&
-      ["Saturday", "Sunday"].includes(dayName)
-    ) {
-      status = "WEEKEND";
-    }
-
-    return {
-      dailyAttendanceId: summary
-        ? databaseInteger(summary.id)
-        : null,
-
-      attendanceDate,
-
-      dayName,
-
-      firstCheckIn:
-        summary?.firstCheckIn || null,
-
-      finalCheckOut:
-        summary?.finalCheckOut || null,
-
-      workedMinutes:
-        summary
-          ? databaseInteger(
-              summary.workedMinutes
-            )
-          : null,
-
-      lateMinutes:
-        summary
-          ? databaseInteger(
-              summary.lateMinutes
-            )
-          : null,
-
-      earlyLeaveMinutes:
-        summary
-          ? databaseInteger(
-              summary.earlyLeaveMinutes
-            )
-          : null,
-
-      overtimeMinutes:
-        summary
-          ? databaseInteger(
-              summary.overtimeMinutes
-            )
-          : null,
-
-      status,
-      source: summary?.source || null,
-      adjustmentReason: summary?.adjustmentReason || null,
-      canComplain: isAttendanceRequestDate(attendanceDate),
-      latestRequest: latestComplaintByDate.get(attendanceDate) || null
-    };
-  });
-
-  return {
-    weekStart: week.startDate,
-    weekEnd: week.endDate,
-    today: week.today,
-    isCurrentWeek:
-      week.startDate === currentWeek().startDate,
-    days
-  };
-};
-
-const getAllUsersWeek = async (startDate) => {
-  const week = requestedWeek(startDate);
-  let rows;
-
-  try {
-    rows = await attendanceRepository.findAllUsersAttendanceForWeek(
+    summaries = await attendanceRepository.findDailyAttendanceForWeek(
+      userId,
       week.startDate,
       week.endDate
     );
@@ -663,70 +497,47 @@ const getAllUsersWeek = async (startDate) => {
     throw error;
   }
 
-  const usersById = new Map();
+  const summaryByDate = new Map(
+    summaries.map((summary) => [summary.attendanceDate, summary])
+  );
 
-  for (const row of rows) {
-    const userId = databaseInteger(row.userId);
+  const days = week.dates.map((attendanceDate) => {
+    const summary = summaryByDate.get(attendanceDate);
+    const dayName = dayNameFromDate(attendanceDate);
+    let status = summary?.status || "NO_RECORD";
 
-    if (!usersById.has(userId)) {
-      usersById.set(userId, {
-        id: userId,
-        userCode: row.userCode || null,
-        fullName: row.fullName,
-        department: row.department || null,
-        designation: row.designation || null,
-        summariesByDate: new Map()
-      });
+    if (!summary && attendanceDate > week.today) {
+      status = "UPCOMING";
+    } else if (!summary && ["Saturday", "Sunday"].includes(dayName)) {
+      status = "WEEKEND";
     }
-
-    if (row.attendanceDate) {
-      usersById.get(userId).summariesByDate.set(row.attendanceDate, row);
-    }
-  }
-
-  const users = Array.from(usersById.values()).map((user) => {
-    const days = week.dates.map((attendanceDate) => {
-      const summary = user.summariesByDate.get(attendanceDate);
-      const dayName = dayNameFromDate(attendanceDate);
-      let status = summary?.status || "NO_RECORD";
-
-      if (!summary && attendanceDate > week.today) {
-        status = "UPCOMING";
-      } else if (!summary && ["Saturday", "Sunday"].includes(dayName)) {
-        status = "WEEKEND";
-      }
-
-      return {
-        dailyAttendanceId: summary
-          ? databaseInteger(summary.dailyAttendanceId)
-          : null,
-        attendanceDate,
-        dayName,
-        firstCheckIn: summary?.firstCheckIn || null,
-        finalCheckOut: summary?.finalCheckOut || null,
-        workedMinutes: summary
-          ? databaseInteger(summary.workedMinutes)
-          : null,
-        lateMinutes: summary
-          ? databaseInteger(summary.lateMinutes)
-          : null,
-        earlyLeaveMinutes: summary
-          ? databaseInteger(summary.earlyLeaveMinutes)
-          : null,
-        overtimeMinutes: summary
-          ? databaseInteger(summary.overtimeMinutes)
-          : null,
-        status
-      };
-    });
 
     return {
-      id: user.id,
-      userCode: user.userCode,
-      fullName: user.fullName,
-      department: user.department,
-      designation: user.designation,
-      days
+      dailyAttendanceId: summary ? databaseInteger(summary.id) : null,
+      attendanceDate,
+      dayName,
+      firstCheckIn: summary?.firstCheckIn || null,
+      finalCheckOut: summary?.finalCheckOut || null,
+      workedMinutes: summary
+        ? databaseInteger(summary.workedMinutes)
+        : null,
+      lateMinutes: summary
+        ? databaseInteger(summary.lateMinutes)
+        : null,
+      earlyLeaveMinutes: summary
+        ? databaseInteger(summary.earlyLeaveMinutes)
+        : null,
+      overtimeMinutes: summary
+        ? databaseInteger(summary.overtimeMinutes)
+        : null,
+      status,
+      source: summary?.source || null,
+      adjustmentReason: summary?.adjustmentReason || null,
+      canComplain: Boolean(
+        summary &&
+        isDateInCurrentWeek(attendanceDate) &&
+        attendanceDate <= week.today
+      )
     };
   });
 
@@ -735,127 +546,11 @@ const getAllUsersWeek = async (startDate) => {
     weekEnd: week.endDate,
     today: week.today,
     isCurrentWeek: week.startDate === currentWeek().startDate,
-    userCount: users.length,
-    users
+    days
   };
 };
 
 const getMyDayDetails = async (userId, attendanceDate) => {
-  let dailyAttendance;
-
-  try {
-    dailyAttendance =
-      await attendanceRepository.findDailyAttendanceByDate(
-        userId,
-        attendanceDate
-      );
-  } catch (error) {
-    if (isMissingDailyAttendanceTable(error)) {
-      throw dailyAttendanceUnavailableError();
-    }
-
-    throw error;
-  }
-
-  const week = currentWeek();
-
-  const isToday =
-    attendanceDate === week.today;
-
-  const rawRecords =
-    await attendanceRepository.findRawAttendanceForDay(
-      userId,
-      attendanceDate
-    );
-
-  const complaints =
-    await attendanceRepository.findLatestComplaintsForRawAttendance(
-      userId,
-      rawRecords.map((record) =>
-        databaseInteger(record.id)
-      )
-    );
-
-  const latestComplaintByRawId = new Map();
-
-  for (const complaint of complaints) {
-    if (
-      !latestComplaintByRawId.has(
-        complaint.rawAttendanceId
-      )
-    ) {
-      latestComplaintByRawId.set(
-        complaint.rawAttendanceId,
-        complaint
-      );
-    }
-  }
-
-  /*
-   * Today's attendance is LIVE.
-   * It comes directly from attendance events.
-   */
-  const liveAttendance =
-    isToday
-      ? attendanceCalculator.calculateEmployeeLiveAttendance(
-          rawRecords
-        )
-      : null;
-  return {
-    attendanceDate,
-
-    dailyAttendanceId:
-      dailyAttendance
-        ? databaseInteger(
-            dailyAttendance.id
-          )
-        : null,
-
-    canComplain: Boolean(
-      isAttendanceRequestDate(attendanceDate)
-    ),
-
-    liveAttendance,
-
-    records: rawRecords.map((record) => ({
-      ...record,
-
-      id: databaseInteger(record.id),
-
-      userId: databaseInteger(
-        record.userId
-      ),
-
-      complaint:
-        latestComplaintByRawId.get(
-          databaseInteger(record.id)
-        ) || null
-    }))
-  };
-};
-
-const createAttendanceComplaint = async (userId, input) => {
-  const attendanceDate = input.attendanceDate;
-
-  if (!isValidDateString(attendanceDate) || !isAttendanceRequestDate(attendanceDate)) {
-    throw new ApiError(
-      400,
-      "Attendance change requests can only be submitted for today or yesterday"
-    );
-  }
-
-  if (!["INSERT", "EDIT"].includes(input.requestAction)) {
-    throw new ApiError(400, "Select whether to insert or edit attendance");
-  }
-
-  if (!["CHECK_IN", "CHECK_OUT"].includes(input.eventType)) {
-    throw new ApiError(400, "Select check in or check out");
-  }
-
-  if (!isValidTimeString(input.correctedTime)) {
-    throw new ApiError(400, "Corrected time must use HH:mm format");
-  }
-
   let dailyAttendance;
 
   try {
@@ -871,102 +566,125 @@ const createAttendanceComplaint = async (userId, input) => {
     throw error;
   }
 
-  let rawAttendance = null;
+  const rawRecords = await attendanceRepository.findRawAttendanceForDay(
+    userId,
+    attendanceDate
+  );
+  const complaints = await attendanceRepository.findLatestComplaintsForRawAttendance(
+    userId,
+    rawRecords.map((record) => databaseInteger(record.id))
+  );
+  const latestComplaintByRawId = new Map();
 
-  if (input.requestAction === "EDIT") {
-    const records = await attendanceRepository.findRawAttendanceForDay(
-      userId,
-      attendanceDate
-    );
-    const matchingRecords = records.filter(
-      (record) => record.eventType === input.eventType
-    );
-
-    rawAttendance = input.eventType === "CHECK_OUT"
-      ? matchingRecords[matchingRecords.length - 1]
-      : matchingRecords[0];
-
-    if (!rawAttendance) {
-      throw new ApiError(
-        404,
-        `No existing ${input.eventType === "CHECK_IN" ? "check-in" : "check-out"} was found. Select Insert attendance instead.`
-      );
+  for (const complaint of complaints) {
+    if (!latestComplaintByRawId.has(complaint.rawAttendanceId)) {
+      latestComplaintByRawId.set(complaint.rawAttendanceId, complaint);
     }
+  }
+
+  const week = currentWeek();
+
+  return {
+    attendanceDate,
+    dailyAttendanceId: dailyAttendance
+      ? databaseInteger(dailyAttendance.id)
+      : null,
+    canComplain: Boolean(
+      dailyAttendance &&
+      isDateInCurrentWeek(attendanceDate) &&
+      attendanceDate <= week.today
+    ),
+    records: rawRecords.map((record) => ({
+      ...record,
+      id: databaseInteger(record.id),
+      userId: databaseInteger(record.userId),
+      complaint: latestComplaintByRawId.get(
+        databaseInteger(record.id)
+      ) || null
+    }))
+  };
+};
+
+const createAttendanceComplaint = async (userId, input) => {
+  let dailyAttendance;
+
+  try {
+    dailyAttendance = await attendanceRepository.findDailyAttendanceById(
+      input.dailyAttendanceId,
+      userId
+    );
+  } catch (error) {
+    if (isMissingDailyAttendanceTable(error)) {
+      throw dailyAttendanceUnavailableError();
+    }
+
+    throw error;
+  }
+
+  if (!dailyAttendance) {
+    throw new ApiError(
+      404,
+      "The selected daily attendance record was not found"
+    );
+  }
+
+  const attendanceDate = dailyAttendance.attendanceDate;
+  const week = currentWeek();
+
+  if (
+    !isDateInCurrentWeek(attendanceDate) ||
+    attendanceDate > week.today
+  ) {
+    throw new ApiError(
+      400,
+      "Attendance complaints can only be submitted for the current week"
+    );
+  }
+
+  const rawAttendance = await attendanceRepository.findRawAttendanceById(
+    input.rawAttendanceId,
+    userId,
+    attendanceDate
+  );
+
+  if (!rawAttendance) {
+    throw new ApiError(
+      404,
+      "The selected check-in/check-out record was not found"
+    );
   }
 
   const pendingComplaint = await attendanceRepository.findPendingComplaint(
     userId,
-    dateAtUtcMidnight(attendanceDate),
-    input.requestAction,
-    input.eventType
+    databaseInteger(rawAttendance.id),
+    input.complaintType
   );
 
   if (pendingComplaint) {
     throw new ApiError(
       409,
-      "A pending request of this type already exists for this day"
+      "A pending complaint of this type already exists for the selected record"
     );
   }
 
   const complaint = await attendanceRepository.createComplaint({
     userId,
-    dailyAttendanceId: dailyAttendance
-      ? databaseInteger(dailyAttendance.id)
-      : null,
-    rawAttendanceId: rawAttendance
-      ? databaseInteger(rawAttendance.id)
-      : null,
+    dailyAttendanceId: databaseInteger(dailyAttendance.id),
+    rawAttendanceId: databaseInteger(rawAttendance.id),
     attendanceDate: dateAtUtcMidnight(attendanceDate),
-    requestedAttendanceDate: dateAtUtcMidnight(attendanceDate),
-    requestAction: input.requestAction,
-    requestedEventTime: input.correctedTime,
-    complaintType: input.eventType,
+    complaintType: input.complaintType,
     reason: input.reason
   });
 
   return {
     ...complaint,
-    attendanceDate: dateOnlyFromValue(complaint.attendanceDate),
-    requestedAttendanceDate: dateOnlyFromValue(
-      complaint.requestedAttendanceDate
-    )
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
   };
 };
 
 
-const attendanceComplaintDepartmentScope = (reviewer) => {
-  const reviewerRole = reviewer?.role || reviewer?.roleName;
-
-  if (isSuperAdmin(reviewerRole)) {
-    return null;
-  }
-
-  if (!isAdmin(reviewerRole)) {
-    throw new ApiError(
-      403,
-      "Only department HR or Super Admin can review attendance complaints"
-    );
-  }
-
-  const departmentId = Number(
-    reviewer?.departmentId || reviewer?.department?.id
-  );
-
-  if (!Number.isInteger(departmentId) || departmentId <= 0) {
-    throw new ApiError(
-      403,
-      "Department HR must be assigned to a department"
-    );
-  }
-
-  return departmentId;
-};
-
-const getAttendanceComplaints = async (reviewer) => {
-  const departmentId = attendanceComplaintDepartmentScope(reviewer);
-  const complaints = await attendanceRepository.findAttendanceComplaints(
-    departmentId
-  );
+const getAttendanceComplaints = async () => {
+  const complaints = await attendanceRepository.findAttendanceComplaints();
 
   return complaints.map((complaint) => ({
     ...complaint,
@@ -974,10 +692,7 @@ const getAttendanceComplaints = async (reviewer) => {
     userId: databaseInteger(complaint.userId),
     dailyAttendanceId: databaseInteger(complaint.dailyAttendanceId),
     rawAttendanceId: databaseInteger(complaint.rawAttendanceId),
-    attendanceDate: dateOnlyFromValue(complaint.attendanceDate),
-    requestedAttendanceDate: dateOnlyFromValue(
-      complaint.requestedAttendanceDate
-    )
+    attendanceDate: dateOnlyFromValue(complaint.attendanceDate)
   }));
 };
 
@@ -985,15 +700,12 @@ const getAttendanceComplaints = async (reviewer) => {
 const reviewAttendanceComplaint = async (
   complaintId,
   input,
-  reviewer
+  reviewerId
 ) => {
-
-  const departmentId = attendanceComplaintDepartmentScope(reviewer);
 
   const complaint =
     await attendanceRepository.findComplaintById(
-      complaintId,
-      departmentId
+      complaintId
     );
 
   if (!complaint) {
@@ -1022,78 +734,31 @@ const reviewAttendanceComplaint = async (
   }
 
 
-  if (input.status === "APPROVED") {
-    const requestedAttendanceDate = input.attendanceDate ||
-      dateOnlyFromValue(complaint.requestedAttendanceDate);
-    const requestedEventTime = input.correctedTime ||
-      complaint.requestedEventTime;
-
-    if (!isValidDateString(requestedAttendanceDate)) {
-      throw new ApiError(400, "Attendance date must use YYYY-MM-DD format");
-    }
-
-    if (!isValidTimeString(requestedEventTime)) {
-      throw new ApiError(400, "Attendance time must use HH:mm format");
-    }
-
-    const originalAttendanceDate = dateOnlyFromValue(
-      complaint.attendanceDate
-    );
-    const result = await attendanceRepository.applyAttendanceRequest({
-      complaint,
-      attendanceDate: requestedAttendanceDate,
-      eventTime: requestedEventTime,
-      reviewNote: input.reviewNote
-    });
-    const datesToRefresh = new Set([
-      originalAttendanceDate,
-      requestedAttendanceDate
-    ]);
-
-    for (const date of datesToRefresh) {
-      const dateValue = dateAtUtcMidnight(date);
-      const summary = await attendanceCalculator.generateAttendanceSummary(
-        complaint.userId,
-        dateValue
-      );
-
-      if (!summary) {
-        await attendanceRepository.deleteAttendanceSummaryForDate(
-          complaint.userId,
-          dateValue
-        );
-      } else if (date === requestedAttendanceDate) {
-        await attendanceRepository.linkComplaintToSummary(
-          complaint.id,
-          summary.id
-        );
+  const updatedComplaint =
+    await attendanceRepository.updateComplaintStatus(
+      complaintId,
+      {
+        status: input.status,
+        reviewNote: input.reviewNote || null,
+        reviewedAt: new Date()
       }
-    }
+    );
 
-    return {
-      ...result.complaint,
-      attendanceDate: originalAttendanceDate,
-      requestedAttendanceDate,
-      requestedEventTime
-    };
+
+  // If approved then update attendance
+  if (input.status === "APPROVED") {
+
+    await attendanceRepository.applyAttendanceCorrection(
+      complaint
+    );
+
   }
-
-  const updatedComplaint = await attendanceRepository.updateComplaintStatus(
-    Number(complaintId),
-    {
-      status: "REJECTED",
-      reviewNote: input.reviewNote || null
-    }
-  );
 
 
   return {
     ...updatedComplaint,
     attendanceDate: dateOnlyFromValue(
       updatedComplaint.attendanceDate
-    ),
-    requestedAttendanceDate: dateOnlyFromValue(
-      updatedComplaint.requestedAttendanceDate
     )
   };
 };
@@ -1102,15 +767,12 @@ const reviewAttendanceComplaint = async (
 const editAttendanceComplaint = async (
   complaintId,
   input,
-  reviewer
+  reviewerId
 ) => {
-
-  const departmentId = attendanceComplaintDepartmentScope(reviewer);
 
   const complaint =
     await attendanceRepository.findComplaintById(
-      Number(complaintId),
-      departmentId
+      Number(complaintId)
     );
 
 
@@ -1150,7 +812,7 @@ const editAttendanceComplaint = async (
           input.reviewNote ||
           "Attendance updated by admin",
         reviewedAt: new Date(),
-        reviewedBy: reviewer.id
+        reviewedBy: reviewerId
       }
     );
 
@@ -1179,46 +841,66 @@ const calculateWorkedMinutes = (
 
 };
 
-const insertManualAttendance = async (input, reviewer) => {
+const insertManualAttendance = async ({
+  userId,
+  attendanceDate,
+  eventType,
+  eventTime,
+  remarks
+}) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: Number(userId)
+    }
+  });
 
-  const departmentId = attendanceComplaintDepartmentScope(reviewer);
-  const complaintToReview = await attendanceRepository.findComplaintById(
-    Number(input.complaintId),
-    departmentId
-  );
-
-  if (!complaintToReview) {
-    throw new ApiError(404, "Attendance complaint not found");
+  if (!user) {
+    throw new Error("User not found");
   }
 
-  if (complaintToReview.status !== "PENDING") {
-    throw new ApiError(400, "This complaint has already been reviewed");
-  }
+  const sourceKey = `ADMIN_MANUAL_${Date.now()}`;
 
-  const attendance =
-    await attendanceRepository.insertManualAttendance({
-      userId: input.userId,
-      attendanceDate: input.attendanceDate,
-      eventType: input.eventType,
-      eventTime: input.eventTime,
-      remarks: input.remarks
-    });
+  await prisma.$executeRaw`
+    INSERT INTO attendance (
+      user_id,
+      user_code,
+      biometric_id,
+      full_name,
+      location_id,
+      department_id,
+      designation_id,
+      event_type,
+      event_time,
+      remarks,
+      source_key,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${user.id},
+      ${user.userCode},
+      ${user.biometricId || user.userCode},
+      ${`${user.firstName || ""} ${user.lastName || ""}`.trim()},
+      ${null},
+      ${user.departmentId || null},
+      ${user.designationId || null},
+      ${eventType},
+      STR_TO_DATE(
+        ${`${attendanceDate} ${eventTime}:00`},
+        '%Y-%m-%d %H:%i:%s'
+      ),
+      ${remarks || null},
+      ${sourceKey},
+      ${pakistanNowSql()},
+      ${pakistanNowSql()}
+    )
+  `;
 
-  const complaint =
-    await attendanceRepository.updateComplaintStatus(
-      Number(input.complaintId),
-      {
-        status: "APPROVED",
-        reviewNote: "Attendance inserted by admin",
-        reviewedAt: new Date(),
-        reviewedBy: reviewer.id
-      }
-    );
-
-  return {
-    attendance,
-    complaint
-  };
+  return prisma.attendance.findUnique({
+    where: {
+      sourceKey
+    }
+  });
 };
 
 const autoCheckoutEmployees = async () => {
@@ -1230,7 +912,6 @@ const autoCheckoutEmployees = async () => {
 module.exports = {
   createAttendanceComplaint,
   getMyCurrentWeek,
-  getAllUsersWeek,
   getMyDayDetails,
   importAttendance,
   getAttendanceComplaints,

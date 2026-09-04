@@ -67,22 +67,51 @@ const loadTodayAttendance = async () => {
 
     entries.value = data.records || [];
 
-    const checkIns =
-      entries.value.filter(
+    // Make sure events are in chronological order
+    const sortedEntries = [...entries.value].sort(
+      (a, b) =>
+        new Date(a.eventTime).getTime() -
+        new Date(b.eventTime).getTime()
+    );
+
+    entries.value = sortedEntries;
+
+    const firstCheckIn =
+      sortedEntries.find(
         x => x.eventType === "CHECK_IN"
       );
 
-    const checkOuts =
-      entries.value.filter(
-        x => x.eventType === "CHECK_OUT"
-      );
+    /*
+     * IMPORTANT:
+     *
+     * The current attendance state is determined
+     * by the LAST attendance event.
+     *
+     * CHECK_IN  -> employee is currently working
+     * CHECK_OUT -> employee is currently checked out
+     */
+    const lastEvent =
+      sortedEntries.length
+        ? sortedEntries[sortedEntries.length - 1]
+        : null;
 
-    const firstCheckIn =
-      checkIns[0];
+    const isCurrentlyCheckedIn =
+      lastEvent?.eventType === "CHECK_IN";
 
+    /*
+     * Only show Check Out when the LAST event
+     * is CHECK_OUT.
+     *
+     * If the employee checked out earlier and
+     * then checked in again, hide the old checkout.
+     */
     const lastCheckOut =
-      checkOuts.length
-        ? checkOuts[checkOuts.length - 1]
+      !isCurrentlyCheckedIn
+        ? [...sortedEntries]
+            .reverse()
+            .find(
+              x => x.eventType === "CHECK_OUT"
+            )
         : null;
 
     today.value = {
@@ -95,12 +124,17 @@ const loadTodayAttendance = async () => {
       finalCheckOut:
         lastCheckOut?.eventTime || null,
 
-      workedMinutes: today.value.workedMinutes || 0,
-      lateMinutes: today.value.lateMinutes || 0,
-      overtimeMinutes: today.value.overtimeMinutes || 0,
+      workedMinutes:
+        today.value.workedMinutes || 0,
+
+      lateMinutes:
+        today.value.lateMinutes || 0,
+
+      overtimeMinutes:
+        today.value.overtimeMinutes || 0,
 
       status:
-        entries.value.length
+        sortedEntries.length
           ? "PRESENT"
           : "NO_RECORD"
     };

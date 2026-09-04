@@ -1,89 +1,9 @@
 const { Prisma } = require("@prisma/client");
 const { prisma } = require("../../../../database/prisma");
 
-const pakistanNowSql = () => Prisma.sql`DATE_ADD(UTC_TIMESTAMP(), INTERVAL 5 HOUR)`;
+const pakistanNowSql = () =>
+  Prisma.sql`DATE_ADD(UTC_TIMESTAMP(), INTERVAL 5 HOUR)`;
 
-const dateKeyFromValue = (value) => {
-  if (typeof value === "string") {
-    return value.slice(0, 10);
-  }
-
-  return value.toISOString().slice(0, 10);
-};
-
-const currentPakistanDateKey = () => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Karachi",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value])
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
-};
-
-const attendanceRecordSelectSql = () => Prisma.sql`
-  id,
-  user_id AS userId,
-  user_code AS userCode,
-  biometric_id AS biometricId,
-  full_name AS fullName,
-  location_id AS locationId,
-  department_id AS departmentId,
-  designation_id AS designationId,
-  CAST(event_type AS CHAR) AS eventType,
-  event_time AS eventTime,
-  remarks,
-  source_key AS sourceKey,
-  created_at AS createdAt,
-  updated_at AS updatedAt
-`;
-
-const normalizeAttendanceRecord = (record) => {
-  if (!record) {
-    return null;
-  }
-
-  const numberOrNull = (value) => {
-    return value === null || value === undefined
-      ? null
-      : Number(value);
-  };
-
-  return {
-    ...record,
-    id: Number(record.id),
-    userId: Number(record.userId),
-    locationId: numberOrNull(record.locationId),
-    departmentId: numberOrNull(record.departmentId),
-    designationId: numberOrNull(record.designationId)
-  };
-};
-
-const findAttendanceRecordById = async (client, id) => {
-  const rows = await client.$queryRaw`
-    SELECT ${attendanceRecordSelectSql()}
-    FROM attendance
-    WHERE id = ${id}
-    LIMIT 1
-  `;
-
-  return normalizeAttendanceRecord(rows[0]);
-};
-
-const findAttendanceRecordBySourceKey = async (client, sourceKey) => {
-  const rows = await client.$queryRaw`
-    SELECT ${attendanceRecordSelectSql()}
-    FROM attendance
-    WHERE source_key = ${sourceKey}
-    LIMIT 1
-  `;
-
-  return normalizeAttendanceRecord(rows[0]);
-};
 
 const createManyAttendance = async (records) => {
   return prisma.attendance.createMany({
@@ -91,8 +11,11 @@ const createManyAttendance = async (records) => {
   });
 };
 
+
 const findUsersByCodes = async (userCodes) => {
-  const codes = Array.from(new Set(userCodes.filter(Boolean)));
+  const codes = Array.from(
+    new Set(userCodes.filter(Boolean))
+  );
 
   if (!codes.length) {
     return [];
@@ -107,23 +30,7 @@ const findUsersByCodes = async (userCodes) => {
     select: {
       id: true,
       userCode: true,
-      firstName: true,
-      lastName: true,
       biometricId: true,
-      departmentId: true,
-      designationId: true
-    }
-  });
-};
-
-const findUserByBiometricId = async (biometricId) => {
-  return prisma.user.findUnique({
-    where: {
-      biometricId
-    },
-    select: {
-      id: true,
-      userCode: true,
       firstName: true,
       lastName: true,
       departmentId: true,
@@ -132,54 +39,36 @@ const findUserByBiometricId = async (biometricId) => {
   });
 };
 
-const createDeviceAttendance = async (record) => {
-  try {
-    return await prisma.attendance.create({
-      data: {
-        userId: record.userId,
-        userCode: record.userCode,
-        biometricId: record.biometricId,
-        fullName: record.fullName,
-        locationId: record.locationId,
-        departmentId: record.departmentId,
-        designationId: record.designationId,
-        eventType: record.eventType,
-        eventTime: record.eventTime,
-        remarks: record.remarks,
-        sourceKey: record.sourceKey
-      }
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const existing = await prisma.attendance.findUnique({
-        where: { sourceKey: record.sourceKey }
-      });
 
-      if (existing) {
-        return existing;
-      }
-    }
-
-    throw error;
-  }
-};
-
+/**
+ * Delete attendance events for specific dates.
+ * Since attendance table does not have attendance_date,
+ * filter using event_time.
+ */
 const deleteAttendanceByDates = async (dates) => {
-  const dateKeys = dates.map(dateKeyFromValue);
-
-  if (!dateKeys.length) {
+  if (!dates?.length) {
     return { count: 0 };
   }
 
-  const count = await prisma.$executeRaw`
-    DELETE FROM attendance
-    WHERE DATE(event_time) IN (${Prisma.join(dateKeys)})
-  `;
+  const conditions = dates.map((date) => {
+    const start = new Date(`${date}T00:00:00+05:00`);
+    const end = new Date(`${date}T00:00:00+05:00`);
 
-  return { count: Number(count) };
+    end.setDate(end.getDate() + 1);
+
+    return {
+      eventTime: {
+        gte: start,
+        lt: end
+      }
+    };
+  });
+
+  return prisma.attendance.deleteMany({
+    where: {
+      OR: conditions
+    }
+  });
 };
 
 
@@ -189,6 +78,11 @@ const equalsOrNull = (column, value) => {
     : Prisma.sql`${Prisma.raw(column)} = ${value}`;
 };
 
+
+/**
+ * Exact attendance event match.
+ * event_time already contains both date and time.
+ */
 const exactRecordCondition = (record) => {
   return Prisma.sql`(
     user_id = ${record.userId}
@@ -198,12 +92,14 @@ const exactRecordCondition = (record) => {
   )`;
 };
 
+
 const attachSourceKeyToExistingRecord = async (tx, record) => {
+
+
   const result = await tx.$executeRaw`
     UPDATE attendance
     SET
-      source_key = ${record.sourceKey},
-      updated_at = ${pakistanNowSql()}
+      source_key = ${record.sourceKey}
     WHERE source_key IS NULL
       AND ${exactRecordCondition(record)}
     LIMIT 1
@@ -212,7 +108,9 @@ const attachSourceKeyToExistingRecord = async (tx, record) => {
   return Number(result);
 };
 
+
 const insertAttendanceRecordIfMissing = async (tx, record) => {
+
   const result = await tx.$executeRaw`
     INSERT INTO attendance (
       user_id,
@@ -234,7 +132,7 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
       ${record.userCode},
       ${record.biometricId},
       ${record.fullName},
-      ${record.locationId || null},
+      ${record.locationId},
       ${record.departmentId},
       ${record.designationId},
       ${record.eventType},
@@ -247,12 +145,13 @@ const insertAttendanceRecordIfMissing = async (tx, record) => {
       SELECT 1
       FROM attendance
       WHERE source_key = ${record.sourceKey}
-        OR ${exactRecordCondition(record)}
+         OR ${exactRecordCondition(record)}
     )
   `;
 
   return Number(result);
 };
+
 
 const syncNewAttendance = async (records) => {
   if (!records.length) {
@@ -269,14 +168,26 @@ const syncNewAttendance = async (records) => {
       let matchedRows = 0;
 
       for (const record of records) {
-        matchedRows += await attachSourceKeyToExistingRecord(tx, record);
-        insertedRows += await insertAttendanceRecordIfMissing(tx, record);
+        matchedRows +=
+          await attachSourceKeyToExistingRecord(
+            tx,
+            record
+          );
+
+        insertedRows +=
+          await insertAttendanceRecordIfMissing(
+            tx,
+            record
+          );
       }
 
       return {
         insertedRows,
         matchedRows,
-        skippedRows: records.length - insertedRows - matchedRows
+        skippedRows:
+          records.length -
+          insertedRows -
+          matchedRows
       };
     },
     {
@@ -285,75 +196,84 @@ const syncNewAttendance = async (records) => {
   );
 };
 
+
 const getAttendanceCount = async () => {
   return prisma.attendance.count();
 };
 
-const findDailyAttendanceForWeek = async (userId, startDate, endDate) => {
+
+/* =========================================================
+   ATTENDANCE SUMMARY
+   attendance_summary HAS attendance_date
+========================================================= */
+
+
+const findDailyAttendanceForWeek = async (
+  userId,
+  startDate,
+  endDate
+) => {
   return prisma.$queryRaw`
     SELECT
       id,
       user_id AS userId,
-      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
-      TIME_FORMAT(first_check_in, '%H:%i:%s') AS firstCheckIn,
-      TIME_FORMAT(last_check_out, '%H:%i:%s') AS finalCheckOut,
+      DATE_FORMAT(
+        attendance_date,
+        '%Y-%m-%d'
+      ) AS attendanceDate,
+      TIME_FORMAT(
+        first_check_in,
+        '%H:%i:%s'
+      ) AS firstCheckIn,
+      TIME_FORMAT(
+        last_check_out,
+        '%H:%i:%s'
+      ) AS finalCheckOut,
       working_minutes AS workedMinutes,
       late_minutes AS lateMinutes,
       early_leave_minutes AS earlyLeaveMinutes,
       overtime_minutes AS overtimeMinutes,
-      CAST(attendance_status AS CHAR) AS status,
+      CAST(
+        attendance_status AS CHAR
+      ) AS status,
       NULL AS source,
       remarks AS adjustmentReason
     FROM attendance_summary
     WHERE user_id = ${userId}
-      AND attendance_date BETWEEN ${startDate} AND ${endDate}
+      AND attendance_date
+        BETWEEN ${startDate} AND ${endDate}
     ORDER BY attendance_date ASC
   `;
 };
 
-const findAllUsersAttendanceForWeek = async (startDate, endDate) => {
-  return prisma.$queryRaw`
-    SELECT
-      users.id AS userId,
-      users.userCode AS userCode,
-      TRIM(CONCAT_WS(' ', users.firstName, users.lastName)) AS fullName,
-      departments.department_name AS department,
-      designations.designation_name AS designation,
-      summaries.id AS dailyAttendanceId,
-      DATE_FORMAT(summaries.attendance_date, '%Y-%m-%d') AS attendanceDate,
-      TIME_FORMAT(summaries.first_check_in, '%H:%i:%s') AS firstCheckIn,
-      TIME_FORMAT(summaries.last_check_out, '%H:%i:%s') AS finalCheckOut,
-      summaries.working_minutes AS workedMinutes,
-      summaries.late_minutes AS lateMinutes,
-      summaries.early_leave_minutes AS earlyLeaveMinutes,
-      summaries.overtime_minutes AS overtimeMinutes,
-      CAST(summaries.attendance_status AS CHAR) AS status
-    FROM users
-    LEFT JOIN departments
-      ON departments.id = users.department_id
-    LEFT JOIN designations
-      ON designations.id = users.designation_id
-    LEFT JOIN attendance_summary AS summaries
-      ON summaries.user_id = users.id
-      AND summaries.attendance_date BETWEEN ${startDate} AND ${endDate}
-    WHERE users.employmentStatus = 'ACTIVE'
-    ORDER BY users.firstName ASC, users.lastName ASC, summaries.attendance_date ASC
-  `;
-};
 
-const findDailyAttendanceByDate = async (userId, attendanceDate) => {
+const findDailyAttendanceByDate = async (
+  userId,
+  attendanceDate
+) => {
   const rows = await prisma.$queryRaw`
     SELECT
       id,
       user_id AS userId,
-      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate,
-      TIME_FORMAT(first_check_in, '%H:%i:%s') AS firstCheckIn,
-      TIME_FORMAT(last_check_out, '%H:%i:%s') AS finalCheckOut,
+      DATE_FORMAT(
+        attendance_date,
+        '%Y-%m-%d'
+      ) AS attendanceDate,
+      TIME_FORMAT(
+        first_check_in,
+        '%H:%i:%s'
+      ) AS firstCheckIn,
+      TIME_FORMAT(
+        last_check_out,
+        '%H:%i:%s'
+      ) AS finalCheckOut,
       working_minutes AS workedMinutes,
       late_minutes AS lateMinutes,
       early_leave_minutes AS earlyLeaveMinutes,
       overtime_minutes AS overtimeMinutes,
-      CAST(attendance_status AS CHAR) AS status,
+      CAST(
+        attendance_status AS CHAR
+      ) AS status,
       NULL AS source,
       remarks AS adjustmentReason
     FROM attendance_summary
@@ -365,12 +285,19 @@ const findDailyAttendanceByDate = async (userId, attendanceDate) => {
   return rows[0] || null;
 };
 
-const findDailyAttendanceById = async (dailyAttendanceId, userId) => {
+
+const findDailyAttendanceById = async (
+  dailyAttendanceId,
+  userId
+) => {
   const rows = await prisma.$queryRaw`
     SELECT
       id,
       user_id AS userId,
-      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendanceDate
+      DATE_FORMAT(
+        attendance_date,
+        '%Y-%m-%d'
+      ) AS attendanceDate
     FROM attendance_summary
     WHERE id = ${dailyAttendanceId}
       AND user_id = ${userId}
@@ -380,31 +307,72 @@ const findDailyAttendanceById = async (dailyAttendanceId, userId) => {
   return rows[0] || null;
 };
 
-const findRawAttendanceForDay = async (userId, attendanceDate) => {
+
+/* =========================================================
+   RAW ATTENDANCE EVENTS
+   attendance table uses event_time
+========================================================= */
+
+
+const findRawAttendanceForDay = async (
+  userId,
+  attendanceDate
+) => {
   return prisma.$queryRaw`
     SELECT
       id,
       user_id AS userId,
       user_code AS userCode,
-      DATE_FORMAT(event_time, '%Y-%m-%d') AS attendanceDate,
-      CAST(event_type AS CHAR) AS eventType,
-      TIME_FORMAT(event_time, '%H:%i:%s') AS eventTime,
+
+      DATE_FORMAT(
+        DATE_ADD(event_time, INTERVAL 5 HOUR),
+        '%Y-%m-%d'
+      ) AS attendanceDate,
+
+      CAST(
+        event_type AS CHAR
+      ) AS eventType,
+
+      TIME_FORMAT(
+        DATE_ADD(event_time, INTERVAL 5 HOUR),
+        '%H:%i:%s'
+      ) AS eventTime,
+
       remarks
+
     FROM attendance
+
     WHERE user_id = ${userId}
-      AND DATE(event_time) = ${attendanceDate}
+
+      AND DATE(
+        DATE_ADD(event_time, INTERVAL 5 HOUR)
+      ) = ${attendanceDate}
+
     ORDER BY event_time ASC, id ASC
   `;
 };
 
-const findRawAttendanceById = async (rawAttendanceId, userId, attendanceDate) => {
+
+const findRawAttendanceById = async (
+  rawAttendanceId,
+  userId,
+  attendanceDate
+) => {
   const rows = await prisma.$queryRaw`
     SELECT
       id,
       user_id AS userId,
-      DATE_FORMAT(event_time, '%Y-%m-%d') AS attendanceDate,
-      CAST(event_type AS CHAR) AS eventType,
-      TIME_FORMAT(event_time, '%H:%i:%s') AS eventTime,
+      DATE_FORMAT(
+        event_time,
+        '%Y-%m-%d'
+      ) AS attendanceDate,
+      CAST(
+        event_type AS CHAR
+      ) AS eventType,
+      TIME_FORMAT(
+        event_time,
+        '%H:%i:%s'
+      ) AS eventTime,
       remarks
     FROM attendance
     WHERE id = ${rawAttendanceId}
@@ -416,7 +384,11 @@ const findRawAttendanceById = async (rawAttendanceId, userId, attendanceDate) =>
   return rows[0] || null;
 };
 
-const findLatestComplaintsForRawAttendance = async (userId, rawAttendanceIds) => {
+
+const findLatestComplaintsForRawAttendance = async (
+  userId,
+  rawAttendanceIds
+) => {
   if (!rawAttendanceIds.length) {
     return [];
   }
@@ -450,54 +422,16 @@ const findLatestComplaintsForRawAttendance = async (userId, rawAttendanceIds) =>
   });
 };
 
-const deleteAttendanceSummaryForDate = async (userId, attendanceDate) => {
-  return prisma.attendanceSummary.deleteMany({
-    where: {
-      userId,
-      attendanceDate
-    }
-  });
-};
-
-const findLatestComplaintsForDates = async (userId, attendanceDates) => {
-  if (!attendanceDates.length) {
-    return [];
-  }
-
-  return prisma.attendanceComplaint.findMany({
-    where: {
-      userId,
-      attendanceDate: {
-        in: attendanceDates
-      }
-    },
-    select: {
-      id: true,
-      attendanceDate: true,
-      requestAction: true,
-      complaintType: true,
-      requestedEventTime: true,
-      status: true,
-      createdAt: true
-    },
-    orderBy: [
-      { createdAt: "desc" },
-      { id: "desc" }
-    ]
-  });
-};
 
 const findPendingComplaint = async (
   userId,
-  attendanceDate,
-  requestAction,
+  rawAttendanceId,
   complaintType
 ) => {
   return prisma.attendanceComplaint.findFirst({
     where: {
       userId,
-      attendanceDate,
-      requestAction,
+      rawAttendanceId,
       complaintType,
       status: "PENDING"
     },
@@ -506,6 +440,7 @@ const findPendingComplaint = async (
     }
   });
 };
+
 
 const createComplaint = async (data) => {
   return prisma.attendanceComplaint.create({
@@ -516,9 +451,6 @@ const createComplaint = async (data) => {
       dailyAttendanceId: true,
       rawAttendanceId: true,
       attendanceDate: true,
-      requestedAttendanceDate: true,
-      requestAction: true,
-      requestedEventTime: true,
       complaintType: true,
       reason: true,
       status: true,
@@ -530,15 +462,9 @@ const createComplaint = async (data) => {
   });
 };
 
-const findAttendanceComplaints = async (departmentId = null) => {
+
+const findAttendanceComplaints = async () => {
   return prisma.attendanceComplaint.findMany({
-    where: departmentId
-      ? {
-          user: {
-            departmentId: Number(departmentId)
-          }
-        }
-      : undefined,
     orderBy: {
       createdAt: "desc"
     },
@@ -560,17 +486,10 @@ const findAttendanceComplaints = async (departmentId = null) => {
 };
 
 
-const findComplaintById = async (id, departmentId = null) => {
-  return prisma.attendanceComplaint.findFirst({
+const findComplaintById = async (id) => {
+  return prisma.attendanceComplaint.findUnique({
     where: {
-      id: Number(id),
-      ...(departmentId
-        ? {
-            user: {
-              departmentId: Number(departmentId)
-            }
-          }
-        : {})
+      id: Number(id)
     },
     include: {
       rawAttendance: true,
@@ -588,157 +507,41 @@ const updateComplaintStatus = async (id, data) => {
     data: {
       status: data.status,
       reviewNote: data.reviewNote,
-      reviewedAt: new Date(),
-      ...(data.requestedAttendanceDate
-        ? { requestedAttendanceDate: data.requestedAttendanceDate }
-        : {}),
-      ...(data.requestedEventTime
-        ? { requestedEventTime: data.requestedEventTime }
-        : {})
+      reviewedAt: data.reviewedAt || new Date(),
+      reviewedBy: data.reviewedBy || undefined
     }
   });
 };
 
-const applyAttendanceRequest = async ({
-  complaint,
-  attendanceDate,
-  eventTime,
-  reviewNote
-}) => {
-  const requestedAttendanceDate = new Date(
-    `${attendanceDate}T00:00:00.000Z`
-  );
 
-  return prisma.$transaction(async (tx) => {
-    let attendanceRecord;
-
-    if (complaint.requestAction === "EDIT") {
-      if (!complaint.rawAttendanceId) {
-        throw new Error("The attendance event to edit no longer exists");
-      }
-
-      await tx.$executeRaw`
-        UPDATE attendance
-        SET
-          event_type = ${complaint.complaintType},
-          event_time = STR_TO_DATE(
-            ${`${attendanceDate} ${eventTime}:00`},
-            '%Y-%m-%d %H:%i:%s'
-          ),
-          updated_at = ${pakistanNowSql()}
-        WHERE id = ${complaint.rawAttendanceId}
-      `;
-
-      attendanceRecord = await findAttendanceRecordById(
-        tx,
-        complaint.rawAttendanceId
-      );
-    } else {
-      const user = await tx.user.findUnique({
-        where: { id: complaint.userId }
-      });
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      const sourceKey = `ATTENDANCE_REQUEST_${complaint.id}_${Date.now()}`;
-
-      await tx.$executeRaw`
-        INSERT INTO attendance (
-          user_id,
-          user_code,
-          biometric_id,
-          full_name,
-          location_id,
-          department_id,
-          designation_id,
-          event_type,
-          event_time,
-          remarks,
-          source_key,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${complaint.userId},
-          ${user.userCode},
-          ${user.biometricId || user.userCode},
-          ${`${user.firstName} ${user.lastName}`},
-          ${null},
-          ${user.departmentId || null},
-          ${user.designationId || null},
-          ${complaint.complaintType},
-          STR_TO_DATE(
-            ${`${attendanceDate} ${eventTime}:00`},
-            '%Y-%m-%d %H:%i:%s'
-          ),
-          ${`Added from approved attendance request #${complaint.id}`},
-          ${sourceKey},
-          ${pakistanNowSql()},
-          ${pakistanNowSql()}
-        )
-      `;
-
-      attendanceRecord = await findAttendanceRecordBySourceKey(tx, sourceKey);
-    }
-
-    const updatedComplaint = await tx.attendanceComplaint.update({
-      where: { id: complaint.id },
+const applyAttendanceCorrection = async (
+  complaint
+) => {
+  if (
+    complaint.complaintType === "CHECK_IN"
+  ) {
+    return prisma.attendance.update({
+      where: {
+        id: complaint.rawAttendanceId
+      },
       data: {
-        requestedAttendanceDate,
-        requestedEventTime: eventTime,
-        rawAttendanceId: attendanceRecord.id,
-        status: "APPROVED",
-        reviewNote: reviewNote || null,
-        reviewedAt: new Date()
+        eventType: "CHECK_IN"
       }
     });
-
-    return {
-      attendance: attendanceRecord,
-      complaint: updatedComplaint
-    };
-  }, {
-    timeout: 30000
-  });
-};
-
-const linkComplaintToSummary = async (complaintId, dailyAttendanceId) => {
-  return prisma.attendanceComplaint.update({
-    where: { id: complaintId },
-    data: { dailyAttendanceId }
-  });
-};
-
-
-const applyAttendanceCorrection = async (complaint) => {
-
-  if (complaint.complaintType === "CHECK_IN") {
-
-    await prisma.$executeRaw`
-      UPDATE attendance
-      SET event_type = 'CHECK_IN', updated_at = ${pakistanNowSql()}
-      WHERE id = ${complaint.rawAttendanceId}
-    `;
-
-    return findAttendanceRecordById(prisma, complaint.rawAttendanceId);
-
   }
 
-
-  if (complaint.complaintType === "CHECK_OUT") {
-
-    await prisma.$executeRaw`
-      UPDATE attendance
-      SET event_type = 'CHECK_OUT', updated_at = ${pakistanNowSql()}
-      WHERE id = ${complaint.rawAttendanceId}
-    `;
-
-    return findAttendanceRecordById(prisma, complaint.rawAttendanceId);
-
+  if (
+    complaint.complaintType === "CHECK_OUT"
+  ) {
+    return prisma.attendance.update({
+      where: {
+        id: complaint.rawAttendanceId
+      },
+      data: {
+        eventType: "CHECK_OUT"
+      }
+    });
   }
-
 
   return null;
 };
@@ -751,159 +554,159 @@ const updateOrCreateAttendance = async ({
   status,
   remarks
 }) => {
-
-  const attendanceDate = complaint.attendanceDate.toISOString().slice(0, 10);
+  const attendanceDate =
+    complaint.attendanceDate
+      .toISOString()
+      .slice(0, 10);
 
   let eventType;
   let timeValue;
 
   if (checkIn) {
     eventType = "CHECK_IN";
-    timeValue = checkIn; // "HH:mm"
+    timeValue = checkIn;
   } else if (checkOut) {
     eventType = "CHECK_OUT";
     timeValue = checkOut;
   }
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(
+    async (tx) => {
+      let attendanceRecord;
 
-    let attendanceRecord;
+      const existingAttendance =
+        complaint.rawAttendance;
 
-    const existingAttendance = complaint.rawAttendance;
-
-    /**
-     * CASE 1:
-     * Edit existing attendance record
-     */
-    if (existingAttendance) {
-
-      if (eventType && timeValue) {
-
-        await tx.$executeRaw`
-          UPDATE attendance
-          SET
-            event_type = ${eventType},
-            event_time = STR_TO_DATE(${`${attendanceDate} ${timeValue}:00`}, '%Y-%m-%d %H:%i:%s'),
-            remarks = ${remarks || existingAttendance.remarks},
-            updated_at = ${pakistanNowSql()}
-          WHERE id = ${existingAttendance.id}
-        `;
-
-      } else {
-
-        // Only remarks changed, no time edit submitted
-        await tx.$executeRaw`
-          UPDATE attendance
-          SET
-            remarks = ${remarks || existingAttendance.remarks},
-            updated_at = ${pakistanNowSql()}
-          WHERE id = ${existingAttendance.id}
-        `;
-
-      }
-
-      attendanceRecord = await findAttendanceRecordById(
-        tx,
-        existingAttendance.id
-      );
-
-    } else {
-
-      /**
-       * CASE 2:
-       * Insert new attendance record
-       */
-      const user = await tx.user.findUnique({
-        where: { id: complaint.userId }
-      });
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      if (!eventType || !timeValue) {
-        throw new Error("Check-in or Check-out time required");
-      }
-
-      const sourceKey = `ADMIN_CORRECTION_${Date.now()}`;
-
-      await tx.$executeRaw`
-        INSERT INTO attendance (
-          user_id,
-          user_code,
-          biometric_id,
-          full_name,
-          location_id,
-          department_id,
-          designation_id,
-          event_type,
-          event_time,
-          remarks,
-          source_key,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${complaint.userId},
-          ${user.userCode},
-          ${user.biometricId || user.userCode},
-          ${`${user.firstName} ${user.lastName}`},
-          ${null},
-          ${user.departmentId || null},
-          ${user.designationId || null},
-          ${eventType},
-          STR_TO_DATE(${`${attendanceDate} ${timeValue}:00`}, '%Y-%m-%d %H:%i:%s'),
-          ${remarks || "Added by admin correction"},
-          ${sourceKey},
-          ${pakistanNowSql()},
-          ${pakistanNowSql()}
-        )
-      `;
-
-      attendanceRecord = await findAttendanceRecordBySourceKey(tx, sourceKey);
-
-    }
-
-    /**
-     * Apply the manual status override to the daily summary.
-     * This is what the "Status" dropdown in the edit form controls —
-     * it was previously accepted but never persisted anywhere.
-     */
-    if (status && complaint.dailyAttendanceId) {
-      await tx.attendanceSummary.update({
-        where: { id: complaint.dailyAttendanceId },
-        data: {
-          attendanceStatus: status
+      if (existingAttendance) {
+        if (eventType && timeValue) {
+          await tx.$executeRaw`
+            UPDATE attendance
+            SET
+              event_type = ${eventType},
+              event_time = STR_TO_DATE(
+                ${`${attendanceDate} ${timeValue}:00`},
+                '%Y-%m-%d %H:%i:%s'
+              ),
+              remarks = ${
+                remarks ||
+                existingAttendance.remarks
+              },
+              updated_at = ${pakistanNowSql()}
+            WHERE id = ${existingAttendance.id}
+          `;
+        } else {
+          await tx.$executeRaw`
+            UPDATE attendance
+            SET
+              remarks = ${
+                remarks ||
+                existingAttendance.remarks
+              },
+              updated_at = ${pakistanNowSql()}
+            WHERE id = ${existingAttendance.id}
+          `;
         }
-      });
+
+        attendanceRecord =
+          await tx.attendance.findUnique({
+            where: {
+              id: existingAttendance.id
+            }
+          });
+      } else {
+        const user =
+          await tx.user.findUnique({
+            where: {
+              id: complaint.userId
+            }
+          });
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        if (!eventType || !timeValue) {
+          throw new Error(
+            "Check-in or Check-out time required"
+          );
+        }
+
+        const sourceKey =
+          `ADMIN_CORRECTION_${Date.now()}`;
+
+        attendanceRecord =
+          await tx.attendance.create({
+            data: {
+              userId: complaint.userId,
+              userCode: user.userCode,
+              biometricId:
+                user.biometricId ||
+                user.userCode,
+              fullName:
+                `${user.firstName || ""} ${
+                  user.lastName || ""
+                }`.trim(),
+              locationId: null,
+              departmentId:
+                user.departmentId || null,
+              designationId:
+                user.designationId || null,
+              eventType,
+              eventTime: new Date(
+                `${attendanceDate}T${timeValue}`
+              ),
+              remarks:
+                remarks ||
+                "Added by admin correction",
+              sourceKey
+            }
+          });
+      }
+
+      if (status) {
+        await tx.attendanceSummary.update({
+          where: {
+            id: complaint.dailyAttendanceId
+          },
+          data: {
+            attendanceStatus: status
+          }
+        });
+      }
+
+      return attendanceRecord;
+    },
+    {
+      timeout: 30000
     }
-
-    return attendanceRecord;
-
-  }, {
-    timeout: 30000
-  });
-
+  );
 };
+
 
 const updateAttendanceFromComplaint = async (
   complaint,
   data
 ) => {
+  return prisma.attendance.update({
+    where: {
+      id: complaint.rawAttendanceId
+    },
+    data: {
+      eventType:
+        data.eventType ||
+        complaint.rawAttendance.eventType,
 
-  await prisma.$executeRaw`
-    UPDATE attendance
-    SET
-      event_type = ${data.eventType || complaint.rawAttendance.eventType},
-      event_time = ${data.eventTime || complaint.rawAttendance.eventTime},
-      remarks = ${data.remarks || complaint.rawAttendance.remarks},
-      updated_at = ${pakistanNowSql()}
-    WHERE id = ${complaint.rawAttendanceId}
-  `;
+      eventTime:
+        data.eventTime ||
+        complaint.rawAttendance.eventTime,
 
-  return findAttendanceRecordById(prisma, complaint.rawAttendanceId);
-
+      remarks:
+        data.remarks ||
+        complaint.rawAttendance.remarks
+    }
+  });
 };
+
 
 const insertManualAttendance = async ({
   userId,
@@ -912,73 +715,57 @@ const insertManualAttendance = async ({
   eventTime,
   remarks
 }) => {
-  console.log("Repository input:", {
-    userId,
-    attendanceDate,
-    eventType,
-    eventTime,
-    remarks
-  });
-
-  const user = await prisma.user.findUnique({
-    where: {
-      id: Number(userId)
-    }
-  });
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        id: Number(userId)
+      }
+    });
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  const sourceKey = `ADMIN_MANUAL_${Date.now()}`;
+  const sourceKey =
+    `ADMIN_MANUAL_${Date.now()}`;
 
-  await prisma.$executeRaw`
-    INSERT INTO attendance (
-      user_id,
-      user_code,
-      biometric_id,
-      full_name,
-      location_id,
-      department_id,
-      designation_id,
-      event_type,
-      event_time,
-      remarks,
-      source_key,
-      created_at,
-      updated_at
-    )
-    VALUES (
-      ${user.id},
-      ${user.userCode},
-      ${user.biometricId || user.userCode},
-      ${`${user.firstName} ${user.lastName}`},
-      ${null},
-      ${user.departmentId},
-      ${user.designationId},
-      ${eventType},
-      STR_TO_DATE(
-        ${`${attendanceDate} ${eventTime}:00`},
-        '%Y-%m-%d %H:%i:%s'
+  return prisma.attendance.create({
+    data: {
+      userId: user.id,
+      userCode: user.userCode,
+      biometricId:
+        user.biometricId ||
+        user.userCode,
+      fullName:
+        `${user.firstName || ""} ${
+          user.lastName || ""
+        }`.trim(),
+      locationId: null,
+      departmentId:
+        user.departmentId || null,
+      designationId:
+        user.designationId || null,
+      eventType,
+      eventTime: new Date(
+        `${attendanceDate}T${eventTime}`
       ),
-      ${remarks || null},
-      ${sourceKey},
-      ${pakistanNowSql()},
-      ${pakistanNowSql()}
-    )
-  `;
-
-  return findAttendanceRecordBySourceKey(prisma, sourceKey);
+      remarks: remarks || null,
+      sourceKey
+    }
+  });
 };
 
 
+/**
+ * Auto checkout employees who checked in today
+ * but never checked out.
+ */
 const autoCheckoutEmployees = async () => {
-
   const users = await prisma.$queryRaw`
     SELECT DISTINCT a.user_id
     FROM attendance a
     WHERE a.event_type = 'CHECK_IN'
-      AND DATE(a.event_time) = DATE(${pakistanNowSql()})
+      AND DATE(a.event_time) = CURDATE()
       AND NOT EXISTS (
         SELECT 1
         FROM attendance b
@@ -989,10 +776,9 @@ const autoCheckoutEmployees = async () => {
   `;
 
   for (const row of users) {
-
     const user = await prisma.user.findUnique({
       where: {
-        id: row.user_id
+        id: Number(row.user_id)
       }
     });
 
@@ -1000,47 +786,57 @@ const autoCheckoutEmployees = async () => {
       continue;
     }
 
-    const attendanceDate = currentPakistanDateKey();
-    const sourceKey = `AUTO_CHECKOUT_${user.id}_${attendanceDate}`;
+    const today = new Date()
+      .toISOString()
+      .slice(0, 10);
 
-    await prisma.$executeRaw`
-      INSERT INTO attendance (
-        user_id,
-        user_code,
-        biometric_id,
-        full_name,
-        location_id,
-        department_id,
-        designation_id,
-        event_type,
-        event_time,
-        remarks,
-        source_key,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        ${user.id},
-        ${user.userCode},
-        ${user.biometricId || user.userCode},
-        ${`${user.firstName} ${user.lastName}`},
-        ${null},
-        ${user.departmentId},
-        ${user.designationId},
-        'CHECK_OUT',
-        STR_TO_DATE(${`${attendanceDate} 23:59:59`}, '%Y-%m-%d %H:%i:%s'),
-        'Auto checkout - Employee forgot to check out',
-        ${sourceKey},
-        ${pakistanNowSql()},
-        ${pakistanNowSql()}
-      )
-    `;
+    const sourceKey =
+      `AUTO_CHECKOUT_${user.id}_${today}`;
+
+    await prisma.attendance.upsert({
+      where: {
+        sourceKey
+      },
+
+      update: {},
+
+      create: {
+        userId: user.id,
+
+        userCode: user.userCode,
+
+        // IMPORTANT:
+        // Attendance requires biometricId.
+        // If User does not have biometricId,
+        // userCode is used as fallback.
+        biometricId: user.userCode,
+
+        fullName:
+          `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+
+        locationId: null,
+
+        departmentId: user.departmentId || null,
+
+        designationId: user.designationId || null,
+
+        eventType: "CHECK_OUT",
+
+        eventTime: new Date(
+          `${today}T23:59:59`
+        ),
+
+        remarks:
+          "Auto checkout - Employee forgot to check out",
+
+        sourceKey
+      }
+    });
 
     console.log(
       `Auto checkout created for ${user.userCode}`
     );
   }
-
 };
 
 
@@ -1048,26 +844,19 @@ module.exports = {
   createManyAttendance,
   createComplaint,
   deleteAttendanceByDates,
-  deleteAttendanceSummaryForDate,
   findDailyAttendanceByDate,
   findDailyAttendanceById,
   findDailyAttendanceForWeek,
-  findAllUsersAttendanceForWeek,
-  findLatestComplaintsForDates,
   findLatestComplaintsForRawAttendance,
   findPendingComplaint,
   findRawAttendanceById,
   findRawAttendanceForDay,
-  findUserByBiometricId,
   findUsersByCodes,
   getAttendanceCount,
   syncNewAttendance,
-  createDeviceAttendance,
   findAttendanceComplaints,
   findComplaintById,
   updateComplaintStatus,
-  applyAttendanceRequest,
-  linkComplaintToSummary,
   applyAttendanceCorrection,
   updateOrCreateAttendance,
   updateAttendanceFromComplaint,

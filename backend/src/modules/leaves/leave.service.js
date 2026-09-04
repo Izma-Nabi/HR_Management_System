@@ -1,6 +1,98 @@
 const { prisma } = require("../../../../database/prisma");
 const mailTransporter = require("../auth/mail.service");
 
+// Helper to categorize applicants by role and designation
+const extractRequesterCategory = (user) => {
+  const designationName = String(
+    user?.designation?.designationName ||
+      user?.designationName ||
+      (typeof user?.designation === "string" ? user.designation : "") ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+
+  // HR is identified ONLY from designation.
+  // Examples:
+  // HR
+  // HR Manager
+  // Senior HR Manager
+  // HR Executive
+  // Human Resources Manager
+  // Human Resources Officer
+  const isHR =
+    designationName.includes("hr") ||
+    designationName.includes("human resources");
+
+  const isTeamLead = designationName.includes("team lead");
+
+  const isProjectManager =
+    designationName.includes("project manager") ||
+    designationName.includes("manager");
+
+  return {
+    isHR,
+    isTeamLead,
+    isProjectManager,
+    isSpecialApplicant:
+      isHR || isTeamLead || isProjectManager
+  };
+};
+
+// Helper to determine if a user can approve or reject a leave request
+const canUserApproveLeave = (leaveRequest, user) => {
+  if (!user || !leaveRequest) return false;
+
+  const roleKey = String(user.role || user.roleName || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (roleKey === "SUPER_ADMIN" || roleKey === "ADMIN") {
+    return true;
+  }
+
+  const email = String(user.email || "").trim().toLowerCase();
+  const departmentName = String(
+    user.department?.departmentName || user.departmentName || ""
+  ).trim().toLowerCase();
+  const designationName = String(
+    user.designation?.designationName ||
+    user.designationName ||
+    (typeof user.designation === "string" ? user.designation : "") ||
+    ""
+  ).trim().toLowerCase();
+
+  const isHRUser =
+    email === "hr@company.com" ||
+    departmentName === "human resources" ||
+    departmentName === "hr" ||
+    designationName.includes("hr");
+
+  if (isHRUser) {
+    return true;
+  }
+
+  if (
+    leaveRequest.currentRefersTo === user.id ||
+    leaveRequest.reportingToId === user.id
+  ) {
+    return true;
+  }
+
+  const permissions = new Set(
+    (user.permissions || []).map((p) =>
+      String(p).trim().toUpperCase().replace(/[\s-]+/g, "_")
+    )
+  );
+
+  return (
+    permissions.has("APPROVE_LEAVE") ||
+    permissions.has("REJECT_LEAVE") ||
+    permissions.has("MANAGE_LEAVES")
+  );
+};
+
 const getLeaveApprovers = async (userId) => {
   const currentUser = await prisma.user.findUnique({
     where: {
@@ -259,14 +351,9 @@ const createLeave = async (
   }
 ) => {
   userId = Number(userId);
-  reportingToId = Number(reportingToId);
 
   if (!userId) {
     throw new Error("Invalid user.");
-  }
-
-  if (!reportingToId) {
-    throw new Error("Reporting To is required.");
   }
 
   const requester = await prisma.user.findUnique({
@@ -280,30 +367,13 @@ const createLeave = async (
       email: true,
       userCode: true,
       departmentId: true,
+      designationId: true,
       department: {
         select: {
           id: true,
           departmentName: true
         }
-      }
-    }
-  });
-
-  if (!requester) {
-    throw new Error("Authenticated user not found.");
-  }
-
-  const reportingTo = await prisma.user.findUnique({
-    where: {
-      id: reportingToId
-    },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      departmentId: true,
-      employmentStatus: true,
+      },
       designation: {
         select: {
           id: true,
@@ -319,44 +389,164 @@ const createLeave = async (
     }
   });
 
-  if (!reportingTo) {
-    throw new Error("Selected Reporting To user was not found.");
+  if (!requester) {
+    throw new Error("Authenticated user not found.");
   }
 
-  if (
-    requester.departmentId &&
-    reportingTo.departmentId !== requester.departmentId
-  ) {
-    throw new Error(
-      "Reporting To must belong to the same department."
-    );
-  }
+  const { isHR, isTeamLead, isProjectManager, isSpecialApplicant } =
+    extractRequesterCategory(requester);
 
-  if (reportingTo.employmentStatus !== "ACTIVE") {
-    throw new Error(
-      "Selected Reporting To user is not active."
-    );
-  }
-
-  const designationName =
-    reportingTo.designation?.designationName || "";
-
-  const isValidApprover =
-    designationName.toLowerCase().includes("team lead") ||
-    designationName.toLowerCase().includes("project manager");
-
-  if (!isValidApprover) {
-    throw new Error(
-      "Reporting To must be a Team Lead or Project Manager."
-    );
-  }
-
+  let targetReportingToId = null;
+  let targetApproverId = null;
+  let targetBackupEmployeeId = null;
+  let reportingTo = null;
   let backupEmployee = null;
+  let recipientEmails = [];
+  let routingNotice = "";
 
-  if (backupEmployeeId) {
-    backupEmployee = await prisma.user.findUnique({
+  if (isHR) {
+    // -----------------------------------------------------------
+    // Case 1: HR Leave Request -> Directly to Admin
+    // -----------------------------------------------------------
+    const adminApprover = await prisma.user.findFirst({
+  where: {
+    role: {
+      roleName: {
+        in: ["Admin", "ADMIN"]
+      }
+    },
+    id: {
+      not: requester.id
+    },
+    employmentStatus: "ACTIVE"
+  },
+  select: {
+    id: true,
+    firstName: true,
+    lastName: true,
+    email: true,
+    designation: {
+      select: {
+        id: true,
+        designationName: true
+      }
+    },
+    role: {
+      select: {
+        id: true,
+        roleName: true
+      }
+    }
+  },
+  orderBy: {
+    id: "asc"
+  }
+});
+
+    if (adminApprover) {
+      reportingTo = adminApprover;
+      targetReportingToId = adminApprover.id;
+      targetApproverId = adminApprover.id;
+      recipientEmails = [adminApprover.email];
+    }
+
+    routingNotice = "This leave request was submitted by an HR team member and has been routed directly to the Administrator for review and approval.";
+  } else if (isTeamLead || isProjectManager) {
+    // -----------------------------------------------------------
+    // Case 2: Team Lead / Project Manager Leave -> Directly to HR (hr@company.com)
+    // -----------------------------------------------------------
+    let hrApprover = await prisma.user.findFirst({
       where: {
-        id: Number(backupEmployeeId)
+        email: "hr@company.com",
+        employmentStatus: "ACTIVE"
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        designation: {
+          select: {
+            id: true,
+            designationName: true
+          }
+        },
+        role: {
+          select: {
+            id: true,
+            roleName: true
+          }
+        }
+      }
+    });
+
+    if (!hrApprover) {
+      hrApprover = await prisma.user.findFirst({
+        where: {
+          OR: [
+            {
+              department: {
+                departmentName: {
+                  in: ["Human Resources", "HR"]
+                }
+              }
+            },
+            {
+              designation: {
+                designationName: {
+                  contains: "HR"
+                }
+              }
+            }
+          ],
+          employmentStatus: "ACTIVE",
+          id: {
+            not: requester.id
+          }
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          designation: {
+            select: {
+              id: true,
+              designationName: true
+            }
+          },
+          role: {
+            select: {
+              id: true,
+              roleName: true
+            }
+          }
+        }
+      });
+    }
+
+    if (hrApprover) {
+      reportingTo = hrApprover;
+      targetReportingToId = hrApprover.id;
+      targetApproverId = hrApprover.id;
+      recipientEmails = [hrApprover.email];
+    } else {
+      recipientEmails = ["hr@company.com"];
+    }
+
+    const managementRole = isProjectManager ? "Project Manager" : "Team Lead";
+    routingNotice = `This leave request was submitted by a ${managementRole} and has been routed directly to HR (hr@company.com) for review and approval.`;
+  } else {
+    // -----------------------------------------------------------
+    // Case 3: Regular Employee -> Standard reportingTo & optional backup
+    // -----------------------------------------------------------
+    if (!reportingToId) {
+      throw new Error("Reporting To is required.");
+    }
+
+    reportingTo = await prisma.user.findUnique({
+      where: {
+        id: Number(reportingToId)
       },
       select: {
         id: true,
@@ -370,56 +560,132 @@ const createLeave = async (
             id: true,
             designationName: true
           }
+        },
+        role: {
+          select: {
+            id: true,
+            roleName: true
+          }
         }
       }
     });
 
-    if (!backupEmployee) {
-      throw new Error("Selected backup employee was not found.");
+    if (!reportingTo) {
+      throw new Error("Selected Reporting To user was not found.");
     }
 
     if (
       requester.departmentId &&
-      backupEmployee.departmentId !== requester.departmentId
+      reportingTo.departmentId !== requester.departmentId
     ) {
       throw new Error(
-        "Backup employee must belong to the same department."
+        "Reporting To must belong to the same department."
       );
     }
 
-    if (backupEmployee.id === requester.id) {
+    if (reportingTo.employmentStatus !== "ACTIVE") {
       throw new Error(
-        "You cannot select yourself as backup employee."
+        "Selected Reporting To user is not active."
       );
     }
 
-    if (backupEmployee.employmentStatus !== "ACTIVE") {
+    const designationName =
+      reportingTo.designation?.designationName || "";
+
+    const isValidApprover =
+      designationName.toLowerCase().includes("team lead") ||
+      designationName.toLowerCase().includes("project manager");
+
+    if (!isValidApprover) {
       throw new Error(
-        "Selected backup employee is not active."
+        "Reporting To must be a Team Lead or Project Manager."
       );
     }
 
-    const backupDesignation =
-      backupEmployee.designation?.designationName || "";
+    targetReportingToId = reportingTo.id;
+    targetApproverId = reportingTo.id;
 
-    const isManager =
-      backupDesignation.toLowerCase().includes("team lead") ||
-      backupDesignation.toLowerCase().includes("project manager");
+    if (backupEmployeeId) {
+      backupEmployee = await prisma.user.findUnique({
+        where: {
+          id: Number(backupEmployeeId)
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          departmentId: true,
+          employmentStatus: true,
+          designation: {
+            select: {
+              id: true,
+              designationName: true
+            }
+          }
+        }
+      });
 
-    if (isManager) {
-      throw new Error(
-        "Team Lead or Project Manager cannot be selected as backup employee."
-      );
+      if (!backupEmployee) {
+        throw new Error("Selected backup employee was not found.");
+      }
+
+      if (
+        requester.departmentId &&
+        backupEmployee.departmentId !== requester.departmentId
+      ) {
+        throw new Error(
+          "Backup employee must belong to the same department."
+        );
+      }
+
+      if (backupEmployee.id === requester.id) {
+        throw new Error(
+          "You cannot select yourself as backup employee."
+        );
+      }
+
+      if (backupEmployee.employmentStatus !== "ACTIVE") {
+        throw new Error(
+          "Selected backup employee is not active."
+        );
+      }
+
+      const backupDesignation =
+        backupEmployee.designation?.designationName || "";
+
+      const isManager =
+        backupDesignation.toLowerCase().includes("team lead") ||
+        backupDesignation.toLowerCase().includes("project manager");
+
+      if (isManager) {
+        throw new Error(
+          "Team Lead or Project Manager cannot be selected as backup employee."
+        );
+      }
+
+      targetBackupEmployeeId = backupEmployee.id;
     }
+
+    const hrUsers = await getHRUsers(requester.departmentId);
+    const fallbackHrEmail = (
+      process.env.HR_EMAIL || "hr@company.com"
+    )
+      .trim()
+      .toLowerCase();
+
+    recipientEmails = [
+      reportingTo.email,
+      ...hrUsers.map((hr) => hr.email),
+      fallbackHrEmail
+    ];
   }
 
   const leaveRequest = await prisma.leaveRequest.create({
     data: {
       userId,
-      reportingToId,
-      backupEmployeeId: backupEmployee
-        ? backupEmployee.id
-        : null,
+      reportingToId: targetReportingToId,
+      backupEmployeeId: targetBackupEmployeeId,
       type,
       startDate: new Date(`${startDate}T00:00:00`),
       endDate: new Date(`${endDate}T00:00:00`),
@@ -427,7 +693,7 @@ const createLeave = async (
       reason: reason || null,
       status: "PENDING",
       currentApprovalLevel: 1,
-      currentRefersTo: reportingTo.id
+      currentRefersTo: targetApproverId
     },
     include: {
       user: {
@@ -476,37 +742,27 @@ const createLeave = async (
     }
   });
 
-  const hrUsers = await getHRUsers(requester.departmentId);
+  const uniqueRecipients = Array.from(
+    new Set(
+      recipientEmails
+        .filter(Boolean)
+        .map((email) => String(email).trim().toLowerCase())
+    )
+  );
 
-  const fallbackHrEmail = (
-    process.env.HR_EMAIL || "hr@company.com"
-  )
-    .trim()
-    .toLowerCase();
-
-  const fullLeaveRecipients = [
-    reportingTo.email,
-    ...hrUsers.map((hr) => hr.email),
-    fallbackHrEmail
-  ]
-    .filter(Boolean)
-    .map((email) => email.trim().toLowerCase())
-    .filter(
-      (email, index, arr) =>
-        arr.indexOf(email) === index
-    );
-
-  if (fullLeaveRecipients.length > 0) {
+  if (uniqueRecipients.length > 0) {
     try {
       await mailTransporter.sendMail({
         from: process.env.SMTP_USER,
-        to: fullLeaveRecipients.join(","),
-        subject: `New Leave Request #${leaveRequest.id}`,
+        to: uniqueRecipients.join(","),
+        subject: `New Leave Request #${leaveRequest.id} - ${requester.firstName} ${requester.lastName}`,
         html: `
           <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:24px;color:#222">
-            <h2>New Leave Request</h2>
+            <h2>New Leave Request Submitted</h2>
 
-            <p>A new leave request has been submitted.</p>
+            <p>A new leave request has been submitted and is awaiting review.</p>
+
+            ${routingNotice ? `<p style="padding:10px 14px;background:#f3f4f6;border-left:4px solid #4f46e5;margin:16px 0;"><strong>Routing Note:</strong> ${routingNotice}</p>` : ""}
 
             <hr>
 
@@ -525,6 +781,11 @@ const createLeave = async (
             <p>
               <strong>Department:</strong>
               ${requester.department?.departmentName || "N/A"}
+            </p>
+
+            <p>
+              <strong>Designation:</strong>
+              ${requester.designation?.designationName || "N/A"}
             </p>
 
             <h3>Leave Details</h3>
@@ -564,23 +825,26 @@ const createLeave = async (
               PENDING
             </p>
 
-            <h3>Reporting To</h3>
-
+            ${
+              reportingTo
+                ? `
+            <h3>Assigned Reviewer / Approver</h3>
             <p>
-              ${reportingTo.firstName}
-              ${reportingTo.lastName}
-              (${reportingTo.designation?.designationName || "Approver"})
-            </p>
+              ${reportingTo.firstName} ${reportingTo.lastName}
+              (${reportingTo.designation?.designationName || reportingTo.role?.roleName || "Approver"})
+            </p>`
+                : ""
+            }
 
+            ${
+              backupEmployee
+                ? `
             <h3>Backup Employee</h3>
-
             <p>
-              ${
-                backupEmployee
-                  ? `${backupEmployee.firstName} ${backupEmployee.lastName}`
-                  : "No backup employee selected."
-              }
-            </p>
+              ${backupEmployee.firstName} ${backupEmployee.lastName}
+            </p>`
+                : ""
+            }
 
             <hr>
 
@@ -592,7 +856,7 @@ const createLeave = async (
       });
 
       console.log(
-        `Leave request email sent to: ${fullLeaveRecipients.join(", ")}`
+        `Leave request email sent to: ${uniqueRecipients.join(", ")}`
       );
     } catch (emailError) {
       console.error(
@@ -986,6 +1250,14 @@ const approveLeave = async (
           throw error;
         }
 
+        if (!canUserApproveLeave(leaveRequest, user)) {
+          const error = new Error(
+            "You are not authorized to approve this leave request."
+          );
+          error.statusCode = 403;
+          throw error;
+        }
+
         const pendingApproval =
           await tx.leaveApproval.findFirst({
             where: {
@@ -1120,6 +1392,14 @@ const rejectLeave = async (
       `Leave request is already ${leaveRequest.status.toLowerCase()}.`
     );
     error.statusCode = 400;
+    throw error;
+  }
+
+  if (!canUserApproveLeave(leaveRequest, user)) {
+    const error = new Error(
+      "You are not authorized to reject this leave request."
+    );
+    error.statusCode = 403;
     throw error;
   }
 
@@ -1292,6 +1572,72 @@ const getMyLeaves = async (userId) => {
   });
 };
 
+const getTeamLeaves = async (departmentId) => {
+  return prisma.leaveRequest.findMany({
+    where: {
+      user: {
+        departmentId: Number(departmentId)
+      }
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          userCode: true,
+          department: {
+            select: {
+              id: true,
+              departmentName: true
+            }
+          },
+          designation: {
+            select: {
+              id: true,
+              designationName: true
+            }
+          }
+        }
+      },
+      reportingTo: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          designation: {
+            select: {
+              id: true,
+              designationName: true
+            }
+          }
+        }
+      },
+      backupEmployee: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      },
+      approvals: {
+        include: {
+          approver: true
+        },
+        orderBy: {
+          approvalLevel: "asc"
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+};
+
 module.exports = {
   getLeaveApprovers,
   getBackupEmployees,
@@ -1300,6 +1646,7 @@ module.exports = {
   getLeaveRequests,
   getLeaveRequest,
   getMyLeaves,
+  getTeamLeaves,
   syncApprovedLeaveAttendance,
   approveLeave,
   rejectLeave,

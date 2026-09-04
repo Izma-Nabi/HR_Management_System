@@ -37,6 +37,11 @@ const canEditUser = computed(() => hasPermission("UPDATE_USER"));
 const canDeleteUser = computed(() => hasPermission("DELETE_ADMIN") || hasPermission("DELETE_EMPLOYEE"));
 const canCreateUser = computed(() => hasPermission("CREATE_ADMIN") || hasPermission("CREATE_EMPLOYEE"));
 
+// Pagination state
+const currentPage = ref(1);
+const pageSize = ref(10);
+const pageSizeOptions = [10, 25, 50, 100];
+
 const loadUsers = async () => {
 
   loading.value = true;
@@ -90,6 +95,54 @@ const filteredUsers = computed(() => {
       || user.roleName?.toLowerCase().includes(keyword);
   });
 });
+
+// Reset to page 1 whenever the search or page size changes, otherwise you
+// can get stuck on a page that no longer has any matching rows.
+watch(search, () => {
+  currentPage.value = 1;
+});
+
+watch(pageSize, () => {
+  currentPage.value = 1;
+});
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value));
+});
+
+// Keep currentPage in range if the underlying data shrinks (e.g. after a delete).
+watch([filteredUsers, totalPages], () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value;
+  }
+});
+
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredUsers.value.slice(start, start + pageSize.value);
+});
+
+const pageNumbers = computed(() => {
+  // Simple window of up to 5 page numbers centered on the current page.
+  const total = totalPages.value;
+  const current = currentPage.value;
+  const windowSize = 5;
+
+  let start = Math.max(1, current - Math.floor(windowSize / 2));
+  let end = Math.min(total, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+
+  const pages: number[] = [];
+  for (let p = start; p <= end; p++) {
+    pages.push(p);
+  }
+  return pages;
+});
+
+const goToPage = (page: number) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+};
 
 const initials = (name: string) => {
   return name
@@ -151,7 +204,7 @@ const initials = (name: string) => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(user, index) in filteredUsers" :key="user.id" :style="{ '--i': index }">
+          <tr v-for="(user, index) in paginatedUsers" :key="user.id" :style="{ '--i': index }">
             <td>
               <div class="employee-cell">
                 <span class="avatar">{{ initials(user.name) }}</span>
@@ -200,6 +253,40 @@ const initials = (name: string) => {
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
       <p>No users found.</p>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="!loading && filteredUsers.length > 0" class="pagination">
+      <div class="page-info">
+        Showing {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, filteredUsers.length) }}
+        of {{ filteredUsers.length }}
+      </div>
+
+      <div class="page-size">
+        <label for="pageSize">Rows per page</label>
+        <select id="pageSize" v-model.number="pageSize">
+          <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </div>
+
+      <div class="page-controls">
+        <button type="button" :disabled="currentPage === 1" @click="goToPage(1)">«</button>
+        <button type="button" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
+
+        <button
+          v-for="p in pageNumbers"
+          :key="p"
+          type="button"
+          class="page-num"
+          :class="{ active: p === currentPage }"
+          @click="goToPage(p)"
+        >
+          {{ p }}
+        </button>
+
+        <button type="button" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
+        <button type="button" :disabled="currentPage === totalPages" @click="goToPage(totalPages)">»</button>
+      </div>
     </div>
   </div>
 </template>
@@ -534,10 +621,97 @@ tbody tr:last-child td {
   }
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #eaecf3;
+  border-radius: 12px;
+}
+
+.page-info {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.page-size select {
+  padding: 6px 8px;
+  border: 1px solid #e2e6ef;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  background: #fff;
+  cursor: pointer;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.page-controls button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #e2e6ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #4338ca;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.page-controls button:hover:not(:disabled) {
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.page-controls button:disabled {
+  color: #c3c8d6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.page-controls .page-num.active {
+  color: #ffffff;
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
 @media (max-width: 760px) {
   .page-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-controls {
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 

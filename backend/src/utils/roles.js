@@ -67,7 +67,7 @@ const toRoleKey = (role) => {
 
   const normalizedRoleName = normalizeRoleName(roleName);
 
-  return ROLE_KEY_BY_ALIAS[normalizedRoleName] || normalizedRoleName;
+  return ROLE_KEY_BY_ALIAS[normalizedRoleName] || null;
 };
 
 const roleNameCandidates = (role) => {

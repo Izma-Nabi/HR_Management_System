@@ -16,14 +16,13 @@ const createLeave = async (req, res, next) => {
       !type ||
       !startDate ||
       !endDate ||
-      !totalDays ||
-      !reportingToId
+      !totalDays
     ) {
       return res.status(400).json({
         success: false,
         statusCode: 400,
         message:
-          "Leave type, start date, end date, total days and reporting to are required.",
+          "Leave type, start date, end date, and total days are required.",
         errors: []
       });
     }
@@ -56,7 +55,7 @@ const createLeave = async (req, res, next) => {
         endDate,
         totalDays: Number(totalDays),
         reason,
-        reportingToId: Number(reportingToId),
+        reportingToId: reportingToId ? Number(reportingToId) : null,
         backupEmployeeId: backupEmployeeId
           ? Number(backupEmployeeId)
           : null

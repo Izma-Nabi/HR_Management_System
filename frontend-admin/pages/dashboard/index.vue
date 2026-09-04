@@ -93,17 +93,27 @@ const recentAttendance = computed(() =>
 let dashboardRefreshTimer = null;
 
 onMounted(async () => {
+  // ALWAYS call dashboard API first
   await fetchDashboard();
 
-  if (roleKey.value === "EMPLOYEE") {
+  // Re-read role after dashboard response
+  const role = String(dashboard.value?.user?.role || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  // Employee, Team Lead and Project Manager use employee dashboard
+  if (role === "EMPLOYEE") {
     await router.replace("/dashboard/employees");
     return;
   }
 
+  // Keep refreshing dashboard for admin/HR/etc.
   dashboardRefreshTimer = window.setInterval(() => {
     fetchDashboard({ silent: true });
   }, 30000);
 });
+
 
 onUnmounted(() => {
   if (dashboardRefreshTimer) {

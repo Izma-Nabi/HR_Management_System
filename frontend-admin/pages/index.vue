@@ -10,10 +10,10 @@ const {
   fetchDashboard
 } = useDashboard();
 
-
 onMounted(async () => {
   const token = localStorage.getItem("token");
 
+  // Redirect unauthenticated users to login
   if (!token) {
     await navigateTo("/login", {
       replace: true
@@ -22,25 +22,31 @@ onMounted(async () => {
     return;
   }
 
-
+  // IMPORTANT:
+  // Always call /api/dashboard first.
+  // This includes Team Lead users.
   await fetchDashboard();
 
-
+  // Get role from the dashboard API response
   const role = String(dashboard.value?.user?.role || "")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
 
-
+  // Normal EMPLOYEE users use the separate employee dashboard
   if (role === "EMPLOYEE") {
-    await router.replace(
-      "/dashboard/employees"
-    );
-
+    await router.replace("/dashboard/employees");
     return;
   }
 
-  await router.replace("/dashboard");
+  // TEAM_LEAD stays on /dashboard.
+  // The backend already returns:
+  // sections.employeeAttendance
+  //
+  // Therefore the existing dashboard page will use:
+  // mode = "own"
+  //
+  // No redirect is needed here.
 });
 </script>
 

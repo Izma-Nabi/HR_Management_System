@@ -28,19 +28,6 @@ const getMyCurrentWeek = asyncHandler(async (req, res) => {
   );
 });
 
-const getAllUsersWeek = asyncHandler(async (req, res) => {
-  const result = await attendanceService.getAllUsersWeek(
-    req.query.startDate
-  );
-
-  return sendSuccess(
-    res,
-    200,
-    "All user attendance fetched successfully",
-    result
-  );
-});
-
 const getMyDayDetails = asyncHandler(async (req, res) => {
   const result = await attendanceService.getMyDayDetails(
     req.user.id,
@@ -64,7 +51,7 @@ const createComplaint = asyncHandler(async (req, res) => {
   return sendSuccess(
     res,
     201,
-    "Attendance change request submitted successfully",
+    "Attendance complaint submitted successfully",
     result
   );
 });
@@ -82,12 +69,12 @@ const getMyTodayAttendance = asyncHandler(async (req, res) => {
 });
 
 const getAttendanceComplaints = asyncHandler(async (req, res) => {
-  const result = await attendanceService.getAttendanceComplaints(req.user);
+  const result = await attendanceService.getAttendanceComplaints();
 
   return sendSuccess(
     res,
     200,
-    "Attendance change requests fetched successfully",
+    "Attendance complaints fetched successfully",
     result
   );
 });
@@ -97,13 +84,13 @@ const reviewAttendanceComplaint = asyncHandler(async (req, res) => {
   const result = await attendanceService.reviewAttendanceComplaint(
     req.params.id,
     req.body,
-    req.user
+    req.user.id
   );
 
   return sendSuccess(
     res,
     200,
-    "Attendance change request reviewed successfully",
+    "Attendance complaint reviewed successfully",
     result
   );
 });
@@ -116,7 +103,7 @@ const editAttendanceComplaint = asyncHandler(async (req, res) => {
     await attendanceService.editAttendanceComplaint(
       Number(id),
       req.body,
-      req.user
+      req.user.id
     );
 
   return sendSuccess(
@@ -135,7 +122,7 @@ const insertManualAttendance = asyncHandler(async (req, res) => {
   const result =
     await attendanceService.insertManualAttendance(
     req.body,
-    req.user
+    req.user.id
   );
 
   return sendSuccess(
@@ -150,7 +137,6 @@ const insertManualAttendance = asyncHandler(async (req, res) => {
 module.exports = {
   createComplaint,
   getMyCurrentWeek,
-  getAllUsersWeek,
   getMyDayDetails,
   importAttendance,
   getMyTodayAttendance,

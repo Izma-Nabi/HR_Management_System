@@ -60,13 +60,50 @@ const teamScopeFromUser = (user) => {
 };
 
 const uniqueEntriesByEventType = (records) => {
-  return records.filter(
-    (record, index, allRecords) =>
-      index === allRecords.findIndex(
-        (candidate) => candidate.eventType === record.eventType
-      )
+  if (!records || !records.length) {
+    return [];
+  }
+
+  // Make sure events are in chronological order
+  const sortedRecords = [...records].sort(
+    (a, b) =>
+      new Date(a.eventTime) - new Date(b.eventTime)
   );
+
+  // Get the most recent attendance event
+  const latestEvent =
+    sortedRecords[sortedRecords.length - 1];
+
+  if (latestEvent.eventType === "CHECK_IN") {
+    return [latestEvent];
+  }
+
+  if (latestEvent.eventType === "CHECK_OUT") {
+    const latestCheckIn =
+      [...sortedRecords]
+        .reverse()
+        .find(
+          (record) =>
+            record.eventType === "CHECK_IN"
+        );
+
+    const latestCheckOut =
+      [...sortedRecords]
+        .reverse()
+        .find(
+          (record) =>
+            record.eventType === "CHECK_OUT"
+        );
+
+    return [
+      latestCheckIn,
+      latestCheckOut
+    ].filter(Boolean);
+  }
+
+  return [];
 };
+
 
 const getEmployeeAttendance = async (user) => {
   const todayAttendance = await dashboardRepository.getEmployeeTodayAttendance(
